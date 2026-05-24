@@ -1,0 +1,82 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from odooctl.commands.restore import resolve_backup_dir, sha256_file, validate_backup_dir
+
+
+def write_manifest(path: Path, *, project: str = "p", environment: str = "staging") -> None:
+    backup = path.parent
+    path.write_text(
+        json.dumps(
+            {
+                "project": project,
+                "environment": environment,
+                "db_name": "odoo_staging",
+                "odoo_version": "19.0",
+                "checksums": {
+                    "db_dump": sha256_file(backup / "db.dump"),
+                    "filestore": sha256_file(backup / "filestore.tar.zst"),
+                },
+            }
+        )
+    )
+
+
+def make_backup(root: Path, name: str, *, project: str = "p") -> Path:
+    backup = root / name
+    backup.mkdir(parents=True)
+    (backup / "db.dump").write_bytes(b"db")
+    (backup / "filestore.tar.zst").write_bytes(b"fs")
+    write_manifest(backup / "manifest.json", project=project)
+    return backup
+
+
+def test_latest_restore_uses_requested_environment(tmp_path: Path):
+    make_backup(tmp_path, "production_2026-01-01_000000")
+    staging = make_backup(tmp_path, "staging_2026-01-02_000000")
+    assert resolve_backup_dir("staging", "latest", tmp_path) == staging
+
+
+def test_restore_preflight_requires_backup_directory(tmp_path: Path):
+    with pytest.raises(FileNotFoundError):
+        validate_backup_dir(tmp_path / "missing", expected_project="p")
+
+
+def test_restore_preflight_requires_db_dump_before_destructive_restore(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1")
+    (backup / "db.dump").unlink()
+    with pytest.raises(FileNotFoundError, match="db.dump"):
+        validate_backup_dir(backup, expected_project="p")
+
+
+def test_restore_preflight_requires_filestore_before_destructive_restore(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1")
+    (backup / "filestore.tar.zst").unlink()
+    with pytest.raises(FileNotFoundError, match="filestore.tar.zst"):
+        validate_backup_dir(backup, expected_project="p")
+
+
+def test_restore_preflight_rejects_wrong_project(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1", project="other")
+    with pytest.raises(RuntimeError, match="Backup project mismatch"):
+        validate_backup_dir(backup, expected_project="p")
+
+
+def test_restore_preflight_rejects_missing_checksums(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1")
+    manifest = json.loads((backup / "manifest.json").read_text())
+    manifest.pop("checksums")
+    (backup / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(RuntimeError, match="missing checksum"):
+        validate_backup_dir(backup, expected_project="p")
+
+
+def test_restore_preflight_rejects_checksum_mismatch(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1")
+    manifest = json.loads((backup / "manifest.json").read_text())
+    manifest["checksums"] = {"db_dump": "bad", "filestore": "bad"}
+    (backup / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        validate_backup_dir(backup, expected_project="p")

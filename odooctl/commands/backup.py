@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 from odooctl.adapters.filestore import FilestoreAdapter
 from odooctl.adapters.postgres import PostgresAdapter
+from odooctl.commands.restore import sha256_file
 from odooctl.config import load_config
 from odooctl.metadata.models import BackupManifest
 from odooctl.metadata.store import MetadataStore
@@ -52,7 +53,18 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
     commit = git_commit()
     (backup_dir / "git_commit.txt").write_text(commit or "unknown")
     (backup_dir / "docker_image.txt").write_text(cfg.odoo.image)
-    manifest = BackupManifest(project=cfg.project.name, environment=environment, db_name=env.db_name, git_commit=commit, docker_image=cfg.odoo.image, odoo_version=cfg.project.odoo_version)
+    manifest = BackupManifest(
+        project=cfg.project.name,
+        environment=environment,
+        db_name=env.db_name,
+        git_commit=commit,
+        docker_image=cfg.odoo.image,
+        odoo_version=cfg.project.odoo_version,
+        checksums={
+            "db_dump": sha256_file(backup_dir / "db.dump"),
+            "filestore": sha256_file(backup_dir / "filestore.tar.zst"),
+        },
+    )
     (backup_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2))
     MetadataStore().save_backup_manifest(backup_id, manifest)
     return backup_id

@@ -29,6 +29,7 @@ def test_module_invocation_entrypoint_smoke(tmp_path: Path):
     # Ensure the module is executable via `python -m odooctl.main` once the __main__ guard is present.
     result = runner.invoke(app, ["status", "--config", str(tmp_path / "missing.yml")])
     assert result.exit_code != 0
+    assert "Config file not found" in result.output
 
 
 def test_logs_command_accepts_tail_and_no_follow(tmp_path: Path, monkeypatch):

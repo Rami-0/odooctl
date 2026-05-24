@@ -62,3 +62,7 @@ def github_actions(config: str = "odooctl.yml", output: str = ".github/workflows
     content = gha_cmd.run(config, output, dry_run, force)
     if dry_run:
         typer.echo(content)
+
+
+if __name__ == "__main__":
+    app()

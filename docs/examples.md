@@ -34,8 +34,8 @@ Production deploys are designed to preserve rollback points by capturing a backu
 ## Generate a GitHub Actions deploy workflow
 
 ```bash
-odooctl github-actions --dry-run
-oodooctl github-actions
+oodooctl github-actions --dry-run
+odooctl github-actions
 ```
 
 This writes a manual `workflow_dispatch` pipeline that checks out the repository, installs `odooctl`, and runs a deployment from GitHub Actions using secrets for the database password.

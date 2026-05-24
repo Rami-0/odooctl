@@ -6,8 +6,11 @@ from odooctl.commands import github_actions
 
 
 def test_render_workflow_contains_deploy_job():
-    content = github_actions.render_workflow()
+    content = github_actions.render_workflow(["qa", "production"], default_branch="release")
     assert "workflow_dispatch" in content
+    assert "- qa" in content
+    assert "- production" in content
+    assert "default: release" in content
     assert "odooctl deploy ${{ inputs.environment }} --branch ${{ inputs.branch }}" in content
 
 

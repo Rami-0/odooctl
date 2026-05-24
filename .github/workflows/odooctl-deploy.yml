@@ -1,0 +1,33 @@
+name: odooctl deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+      branch:
+        description: Git branch to deploy
+        required: true
+        default: main
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install odooctl
+        run: pip install .
+      - name: Deploy
+        env:
+          ODOO_DB_PASSWORD: ${{ secrets.ODOO_DB_PASSWORD }}
+        run: |
+          odooctl deploy ${{ inputs.environment }} --branch ${{ inputs.branch }}

@@ -1,0 +1,2 @@
+-- Disable custom connector records here, for example:
+-- UPDATE connector_backend SET active = false;

@@ -1,0 +1,29 @@
+[project]
+name = "odooctl"
+version = "0.1.0"
+description = "CLI-first Odoo-aware deployment platform for self-hosted Odoo projects"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "typer>=0.12",
+  "pydantic>=2",
+  "pyyaml>=6",
+  "rich>=13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+odooctl = "odooctl.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

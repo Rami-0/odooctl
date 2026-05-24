@@ -34,7 +34,7 @@ Production deploys are designed to preserve rollback points by capturing a backu
 ## Generate a GitHub Actions deploy workflow
 
 ```bash
-oodooctl github-actions --dry-run
+odooctl github-actions --dry-run
 odooctl github-actions
 ```
 

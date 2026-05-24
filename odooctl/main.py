@@ -1,6 +1,19 @@
 from __future__ import annotations
+
 import typer
-from odooctl.commands import init as init_cmd, deploy as deploy_cmd, backup as backup_cmd, restore as restore_cmd, clone as clone_cmd, update_modules as update_cmd, rollback as rollback_cmd, logs as logs_cmd, status as status_cmd
+
+from odooctl.commands import (
+    backup as backup_cmd,
+    clone as clone_cmd,
+    deploy as deploy_cmd,
+    github_actions as gha_cmd,
+    init as init_cmd,
+    logs as logs_cmd,
+    restore as restore_cmd,
+    rollback as rollback_cmd,
+    status as status_cmd,
+    update_modules as update_cmd,
+)
 
 app = typer.Typer(help="Odoo-aware deployment CLI for self-hosted Docker Compose projects.")
 
@@ -42,3 +55,10 @@ def logs(environment: str, service: str | None = None, config: str = "odooctl.ym
 @app.command()
 def status(config: str = "odooctl.yml"):
     status_cmd.execute(config)
+
+
+@app.command(name="github-actions")
+def github_actions(config: str = "odooctl.yml", output: str = ".github/workflows/odooctl-deploy.yml", dry_run: bool = False, force: bool = False):
+    content = gha_cmd.run(config, output, dry_run, force)
+    if dry_run:
+        typer.echo(content)

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
+import click
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -112,6 +113,8 @@ class OdooCtlConfig(BaseModel):
 
 def load_config(path: str | Path = "odooctl.yml") -> OdooCtlConfig:
     config_path = Path(path)
+    if not config_path.exists():
+        raise click.ClickException(f"Config file not found: {config_path}")
     data = yaml.safe_load(config_path.read_text())
     return OdooCtlConfig.model_validate(data)
 

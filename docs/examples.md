@@ -38,4 +38,4 @@ odooctl github-actions --dry-run
 odooctl github-actions
 ```
 
-This writes a manual `workflow_dispatch` pipeline that checks out the repository, installs `odooctl`, and runs a deployment from GitHub Actions using secrets for the database password.
+This writes a manual `workflow_dispatch` pipeline that checks out the repository, installs `odooctl`, and runs a deployment from GitHub Actions using secrets for the database password. A ready-to-copy example lives at `.github/workflows/odooctl-deploy.yml`.

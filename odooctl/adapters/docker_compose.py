@@ -21,8 +21,15 @@ class DockerComposeAdapter:
     def restart(self, service: str) -> None:
         run(self._cmd("restart", service), cwd=self.project_dir, stream=True)
 
-    def logs(self, service: str | None = None) -> None:
-        run(self._cmd("logs", "-f", *([service] if service else [])), cwd=self.project_dir, stream=True)
+    def logs(self, service: str | None = None, *, follow: bool = True, tail: int | None = None) -> None:
+        args = ["logs"]
+        if follow:
+            args.append("-f")
+        if tail is not None:
+            args.extend(["--tail", str(tail)])
+        if service:
+            args.append(service)
+        run(self._cmd(*args), cwd=self.project_dir, stream=True)
 
     def ps(self) -> str:
         return run(self._cmd("ps"), cwd=self.project_dir, check=False).stdout

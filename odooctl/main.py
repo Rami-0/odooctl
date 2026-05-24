@@ -49,8 +49,8 @@ def rollback(environment: str, mode: str = "code", backup: str | None = None, co
     rollback_cmd.execute(environment, mode, backup, config)
 
 @app.command()
-def logs(environment: str, service: str | None = None, config: str = "odooctl.yml"):
-    logs_cmd.execute(environment, service, config)
+def logs(environment: str, service: str | None = None, config: str = "odooctl.yml", follow: bool = True, tail: int | None = None):
+    logs_cmd.execute(environment, service, config, follow=follow, tail=tail)
 
 @app.command()
 def status(config: str = "odooctl.yml"):

@@ -1,17 +1,21 @@
 project:
   name: my-odoo-project
   odoo_version: "19.0"
+
 runtime:
   type: docker_compose
   compose_file: docker-compose.yml
   reverse_proxy: traefik
+
 environments:
   production:
     branch: main
     domain: odoo.example.com
     db_name: odoo_prod
     filestore_path: /var/lib/odoo/filestore/odoo_prod
-    update_modules: [custom_base, salla_connector]
+    update_modules:
+      - custom_base
+      - salla_connector
   staging:
     branch: staging
     domain: staging-odoo.example.com
@@ -19,23 +23,50 @@ environments:
     filestore_path: /var/lib/odoo/filestore/odoo_staging
     clone_from: production
     sanitize: true
-    update_modules: [custom_base, salla_connector]
+    update_modules:
+      - custom_base
+      - salla_connector
+
 postgres:
   host: localhost
   port: 5432
   user: odoo
   password_env: ODOO_DB_PASSWORD
+
 odoo:
   image: my-registry/odoo:19
   config_path: ./odoo.conf
   service: odoo
-  addons_paths: [./addons, ./enterprise, ./custom_addons]
+  addons_paths:
+    - ./addons
+    - ./enterprise
+    - ./custom_addons
+
 backups:
   local_path: ./backups
+  remote:
+    type: s3
+    bucket: my-odoo-backups
+    endpoint_env: S3_ENDPOINT
+    access_key_env: S3_ACCESS_KEY
+    secret_key_env: S3_SECRET_KEY
+  retention:
+    daily: 7
+    weekly: 4
+    monthly: 6
+
 sanitization:
-  sql_files: [.sanitize/staging.sql, .sanitize/disable_connectors.sql]
+  sql_files:
+    - .sanitize/staging.sql
+    - .sanitize/disable_connectors.sql
   disable_mail_servers: true
   disable_fetchmail: true
   disable_crons: true
   rewrite_base_url: true
   disable_payment_providers: true
+
+healthcheck:
+  path: /web/login
+  timeout_seconds: 5
+  retries: 12
+  interval_seconds: 5

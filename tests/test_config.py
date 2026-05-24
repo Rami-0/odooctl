@@ -4,6 +4,9 @@ from odooctl.commands.backup import redact_config_snapshot
 from odooctl.config import example_config, load_config
 
 
+EXAMPLE_PATH = Path(__file__).resolve().parents[1] / "examples" / "odooctl.yml"
+
+
 def test_example_config_loads(tmp_path: Path):
     path = tmp_path / "odooctl.yml"
     path.write_text(example_config())
@@ -17,6 +20,10 @@ def test_config_uses_env_reference_not_secret_value():
     text = example_config()
     assert "password_env: ODOO_DB_PASSWORD" in text
     assert "password:" not in text
+
+
+def test_example_file_matches_generated_config():
+    assert EXAMPLE_PATH.read_text() == example_config()
 
 
 def test_redact_config_snapshot_masks_sensitive_values():

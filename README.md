@@ -40,4 +40,4 @@ pytest -q
 
 ## Status
 
-This is an MVP foundation: local backups, Docker Compose orchestration, PostgreSQL/filestore operations, staging sanitization, metadata, examples, docs, and tests. Remote S3 upload is stubbed for the next slice.
+This is an MVP foundation: local backups, Docker Compose orchestration, PostgreSQL/filestore operations, staging sanitization, metadata, examples, docs, and tests. Remote backup mirroring is implemented locally as a verifiable MVP stand-in for S3 uploads.

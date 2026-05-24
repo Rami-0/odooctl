@@ -1,0 +1,15 @@
+name: Deploy Odoo
+on:
+  push:
+    branches: [main, staging]
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy staging
+        if: github.ref_name == 'staging'
+        run: odooctl deploy staging --branch staging
+      - name: Deploy production
+        if: github.ref_name == 'main'
+        run: odooctl deploy production --branch main

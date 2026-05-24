@@ -1,0 +1,25 @@
+services:
+  odoo:
+    image: my-registry/odoo:19
+    depends_on: [db]
+    volumes:
+      - ./addons:/mnt/extra-addons
+      - ./enterprise:/mnt/enterprise
+      - odoo-filestore:/var/lib/odoo
+    environment:
+      - HOST=db
+      - USER=odoo
+      - PASSWORD=${ODOO_DB_PASSWORD}
+    ports:
+      - "8069:8069"
+  db:
+    image: postgres:17
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+volumes:
+  postgres-data:
+  odoo-filestore:

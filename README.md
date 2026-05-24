@@ -1,0 +1,41 @@
+# odooctl
+
+`odooctl` is a CLI-first, Odoo-aware deployment platform for self-hosted Odoo projects using Docker Compose.
+
+It focuses on the operational workflow that generic deploy tools miss: PostgreSQL backups, filestore consistency, module updates, staging clones, sanitization, rollback, metadata, and health checks.
+
+## MVP commands
+
+```bash
+odooctl init
+odooctl deploy staging --branch staging
+odooctl deploy production --branch main
+odooctl backup production
+odooctl restore staging --backup latest
+odooctl clone production staging --sanitize
+odooctl update-modules staging --modules sale,stock,custom_module
+odooctl rollback production --mode code
+odooctl rollback production --mode full --backup production_2026-05-24_1600
+odooctl logs staging --service odoo
+odooctl status
+```
+
+## Install for development
+
+```bash
+uv venv
+uv pip install -e '.[dev]'
+pytest -q
+```
+
+## Safety defaults
+
+- Production deploys create database and filestore backups before deployment.
+- Module update failures return non-zero and stop the deployment.
+- Health check failures fail the deployment.
+- Staging clone sanitization disables mail, fetchmail, crons, payment providers, and rewrites `web.base.url` by default.
+- Secrets are referenced through environment variables such as `password_env`; do not commit secret values.
+
+## Status
+
+This is an MVP foundation: local backups, Docker Compose orchestration, PostgreSQL/filestore operations, staging sanitization, metadata, examples, docs, and tests. Remote S3 upload is stubbed for the next slice.

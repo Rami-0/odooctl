@@ -58,6 +58,9 @@ def test_status_reports_metadata_and_services(monkeypatch, tmp_path: Path):
     assert "Environment: production" in joined
     assert "Commit: abc1234" in joined
     assert "Image: registry/odoo:abc1234" in joined
-    assert "Odoo: success" in joined
+    assert "Odoo: running" in joined
+    assert "PostgreSQL: running" in joined
+    assert "Health check: passing" in joined
+    assert "Health check URL: https://odoo.example.com/web/login" in joined
     assert "Docker Compose services:" in joined
     assert "odoo running" in joined

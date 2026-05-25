@@ -16,6 +16,8 @@ odooctl clone production staging --sanitize
 
 This uses the configured `clone_from`, filestore paths, sanitization rules, and post-clone module update list from `odooctl.yml`.
 
+If you only want to validate the source/target wiring without mutating anything, run `odooctl status --environment staging --json` first and inspect the configured domains and database names.
+
 ## Deploy staging from a branch
 
 ```bash
@@ -48,3 +50,5 @@ odooctl github-actions
 ```
 
 This writes a manual `workflow_dispatch` pipeline that checks out the repository, installs `odooctl`, and runs a deployment from GitHub Actions using secrets for the database password. A ready-to-copy example lives at `.github/workflows/odooctl-deploy.yml`.
+
+The generated workflow is intended for production deploys, but the same pattern can be adapted for staging by changing the branch input or environment selection.

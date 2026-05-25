@@ -10,7 +10,7 @@ from odooctl.utils.logging import success
 WORKFLOW_FILENAME = "odooctl-deploy.yml"
 
 
-def render_workflow(environment_names: list[str] | None = None, default_branch: str = "main") -> str:
+def render_workflow(environment_names: list[str] | None = None, default_branch: str = "main", config_path: str = "odooctl.yml") -> str:
     environment_names = environment_names or ["staging", "production"]
     options = "\n".join(f"          - {name}" for name in environment_names)
     return f"""name: odooctl deploy
@@ -41,12 +41,12 @@ jobs:
       - name: Install odooctl
         run: pip install .
       - name: Validate config
-        run: odooctl validate
+        run: odooctl validate --config {config_path}
       - name: Deploy
         env:
           ODOO_DB_PASSWORD: ${{{{ secrets.ODOO_DB_PASSWORD }}}}
         run: |
-          odooctl deploy ${{{{ inputs.environment }}}} --branch ${{{{ inputs.branch }}}}
+          odooctl deploy ${{{{ inputs.environment }}}} --branch ${{{{ inputs.branch }}}} --config {config_path}
 """
 
 
@@ -54,7 +54,7 @@ def run(config: str = "odooctl.yml", output: str = f".github/workflows/{WORKFLOW
     parsed = load_config(config)
     environment_names = sorted(parsed.environments)
     default_branch = parsed.environments.get("production", next(iter(parsed.environments.values()))).branch
-    content = render_workflow(environment_names, default_branch)
+    content = render_workflow(environment_names, default_branch, config_path=config)
     path = Path(output)
     if dry_run:
         return content

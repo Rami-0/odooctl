@@ -19,6 +19,12 @@ def test_help_lists_core_commands():
     assert "github-actions" in result.output
 
 
+def test_version_flag_prints_installed_version():
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0, result.output
+    assert result.output.startswith("odooctl ")
+
+
 def test_init_dry_run_prints_example_config(tmp_path: Path):
     result = runner.invoke(app, ["init", "--dry-run", "--output", str(tmp_path / "ignored.yml")])
     assert result.exit_code == 0, result.output

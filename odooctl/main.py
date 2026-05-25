@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from importlib.metadata import version
+
 import typer
 
 from odooctl.commands import (
@@ -16,7 +18,24 @@ from odooctl.commands import (
     validate as validate_cmd,
 )
 
-app = typer.Typer(help="Odoo-aware deployment CLI for self-hosted Docker Compose projects.")
+app = typer.Typer(
+    help="Odoo-aware deployment CLI for self-hosted Docker Compose projects.",
+    add_completion=False,
+)
+
+
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    version_option: bool = typer.Option(False, "--version", help="Show the installed odooctl version and exit."),
+):
+    if version_option:
+        typer.echo(f"odooctl {version('odooctl')}")
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
 
 @app.command()
 def init(output: str = "odooctl.yml", dry_run: bool = False, force: bool = False):

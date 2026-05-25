@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from odooctl.commands.restore import resolve_backup_dir, sha256_file, validate_backup_dir
+from odooctl.commands.restore import execute, resolve_backup_dir, sha256_file, validate_backup_dir
 
 
 def write_manifest(path: Path, *, project: str = "p", environment: str = "staging") -> None:
@@ -80,3 +80,35 @@ def test_restore_preflight_rejects_checksum_mismatch(tmp_path: Path):
     (backup / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises(RuntimeError, match="checksum mismatch"):
         validate_backup_dir(backup, expected_project="p")
+
+
+def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nenvironments:\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /var/lib/odoo/filestore/odoo_staging\nodoo:\n  image: registry/odoo:latest\n"""
+    )
+    backup = make_backup(tmp_path / "backups", "staging_2026-01-02_000000", project="demo")
+
+    events: list[tuple[str, tuple[object, ...]]] = []
+
+    class DummyPostgres:
+        def __init__(self, config):
+            events.append(("postgres_init", (config.host, config.port, config.user)))
+
+        def restore(self, db_name, dump_path):
+            events.append(("restore", (db_name, Path(dump_path).name)))
+
+    class DummyFilestore:
+        def restore_archive(self, archive_path, target_path):
+            events.append(("filestore_restore", (Path(archive_path).name, target_path)))
+
+    monkeypatch.setattr("odooctl.commands.restore.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.commands.restore.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.commands.restore.check_url", lambda *args, **kwargs: events.append(("healthcheck", args)))
+    monkeypatch.chdir(tmp_path)
+
+    assert execute("staging", backup.name, str(config)) == backup.name
+    assert events[0] == ("postgres_init", ("localhost", 5432, "odoo"))
+    assert events[1] == ("restore", ("odoo_staging", "db.dump"))
+    assert events[2] == ("filestore_restore", ("filestore.tar.zst", "/var/lib/odoo/filestore/odoo_staging"))
+    assert events[3][0] == "healthcheck"

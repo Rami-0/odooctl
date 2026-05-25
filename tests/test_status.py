@@ -21,6 +21,14 @@ class DummyCompose:
         return "odoo running\npostgres running"
 
 
+class DummyComposeStopped:
+    def __init__(self, compose_file: str) -> None:
+        self.compose_file = compose_file
+
+    def ps(self) -> str:
+        return "odoo exited (1) 2 minutes ago\npostgres running"
+
+
 class DummyStore:
     def latest_deployment(self, environment: str):
         if environment == "production":
@@ -85,3 +93,20 @@ def test_status_can_emit_json(monkeypatch, tmp_path: Path):
     assert '"current_git_commit": "feedbeef"' in output
     assert '"health_check": "passing"' in output
     assert '"health_check_url": "https://odoo.example.com/web/login"' in output
+
+
+def test_status_marks_service_as_stopped_when_compose_reports_exit(monkeypatch, tmp_path: Path):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /var/lib/odoo/filestore/odoo_prod\nodoo:\n  image: registry/odoo:latest\n"""
+    )
+    dummy_console = DummyConsole()
+    monkeypatch.setattr(status_cmd, "Console", lambda: dummy_console)
+    monkeypatch.setattr(status_cmd, "DockerComposeAdapter", DummyComposeStopped)
+    monkeypatch.setattr(status_cmd, "MetadataStore", lambda: DummyStore())
+    monkeypatch.setattr(status_cmd, "git_commit", lambda: "feedbeef")
+
+    status_cmd.execute(str(config), "production")
+
+    joined = "\n".join(dummy_console.lines)
+    assert "Odoo: stopped" in joined

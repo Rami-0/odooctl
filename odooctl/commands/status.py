@@ -1,16 +1,29 @@
 from __future__ import annotations
+
 import json
+
 from rich.console import Console
+
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.commands.backup import git_commit
 from odooctl.config import load_config
 from odooctl.metadata.store import MetadataStore
 
+
 def _service_status(ps_output: str, service: str) -> str:
-    lowered = ps_output.lower()
-    if service.lower() in lowered:
-        return "running"
+    service_name = service.lower()
+    for line in ps_output.splitlines():
+        tokens = line.strip().split()
+        if not tokens:
+            continue
+        if tokens[0].lower() == service_name:
+            lowered = line.lower()
+            if "running" in lowered:
+                return "running"
+            if "exit" in lowered or "stopped" in lowered:
+                return "stopped"
+            return "unknown"
     return "unknown"
 
 def execute(config_path: str = "odooctl.yml", environment: str | None = None, *, json_output: bool = False) -> None:

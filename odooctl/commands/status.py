@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 from rich.console import Console
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
@@ -12,15 +13,43 @@ def _service_status(ps_output: str, service: str) -> str:
         return "running"
     return "unknown"
 
-def execute(config_path: str = "odooctl.yml", environment: str | None = None) -> None:
+def execute(config_path: str = "odooctl.yml", environment: str | None = None, *, json_output: bool = False) -> None:
     cfg = load_config(config_path)
     store = MetadataStore()
     console = Console()
+    ps = DockerComposeAdapter(cfg.runtime.compose_file).ps()
+    env_items = [(environment, cfg.env(environment))] if environment else list(cfg.environments.items())
+    if json_output:
+        payload = {
+            "project": cfg.project.name,
+            "current_git_commit": git_commit() or "unknown",
+            "environments": [],
+        }
+        for name, env in env_items:
+            dep = store.latest_deployment(name) or {}
+            backup = store.latest_backup(name) or {}
+            health_url = dep.get('health_check_url', public_url(env.domain) + cfg.healthcheck.path)
+            payload["environments"].append(
+                {
+                    "name": name,
+                    "url": public_url(env.domain),
+                    "branch": env.branch,
+                    "commit": dep.get('commit', backup.get('git_commit', 'unknown')),
+                    "image": dep.get('docker_image', backup.get('docker_image', cfg.odoo.image)),
+                    "odoo": _service_status(ps, cfg.odoo.service),
+                    "postgresql": _service_status(ps, 'postgres'),
+                    "latest_backup": backup.get('timestamp', 'unknown'),
+                    "last_deployment": dep.get('status', 'unknown'),
+                    "health_check": 'passing' if dep.get('status') == 'success' else 'failing' if dep.get('health_check_url') else dep.get('status', 'unknown'),
+                    "health_check_url": health_url,
+                }
+            )
+        console.print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+
     console.print(f"Project: {cfg.project.name}")
     console.print(f"Current git commit: {git_commit() or 'unknown'}")
     console.print("")
-    ps = DockerComposeAdapter(cfg.runtime.compose_file).ps()
-    env_items = [(environment, cfg.env(environment))] if environment else list(cfg.environments.items())
     for name, env in env_items:
         dep = store.latest_deployment(name) or {}
         backup = store.latest_backup(name) or {}

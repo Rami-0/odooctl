@@ -34,7 +34,10 @@ CONFIG = """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compos
 
 def test_deploy_production_runs_backup_pull_update_and_records_metadata(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
-    config.write_text(CONFIG)
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     events: list[tuple[str, tuple[object, ...]]] = []
     store = DummyStore()
@@ -65,7 +68,10 @@ def test_deploy_production_runs_backup_pull_update_and_records_metadata(tmp_path
 
 def test_deploy_production_restarts_on_failure_and_records_message(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
-    config.write_text(CONFIG)
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     store = DummyStore()
     compose = DummyCompose("docker-compose.yml")
@@ -86,3 +92,122 @@ def test_deploy_production_restarts_on_failure_and_records_message(tmp_path: Pat
     assert compose.calls[-1] == ("restart", ("odoo",))
     assert store.saved[-1].status == "failed"
     assert "healthcheck failed" in (store.saved[-1].message or "")
+
+
+def test_deploy_missing_environment_fails_before_any_action(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    called = []
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", lambda *args, **kwargs: called.append("run"))
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    try:
+        deploy_cmd.execute("preview", "main", str(config))
+    except KeyError as exc:
+        assert "Unknown environment 'preview'" in str(exc)
+
+    assert called == []
+
+
+def test_deploy_invalid_branch_fails_preflight(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/staging", str(tmp_path / "srv/filestore/staging")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/staging").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    called = []
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", lambda *args, **kwargs: called.append("run"))
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    try:
+        deploy_cmd.execute("staging", "feature/x", str(config))
+    except RuntimeError as exc:
+        assert "Branch 'feature/x' is not allowed for environment 'staging'" in str(exc)
+
+    assert called == []
+
+
+def test_deploy_missing_compose_file_fails_preflight(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/staging", str(tmp_path / "srv/filestore/staging")))
+    (tmp_path / "srv/filestore/staging").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    called = []
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", lambda *args, **kwargs: called.append("run"))
+
+    try:
+        deploy_cmd.execute("staging", "staging", str(config))
+    except FileNotFoundError as exc:
+        assert "Compose file not found" in str(exc)
+
+    assert called == []
+
+
+def test_deploy_missing_target_paths_fails_preflight(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG)
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    called = []
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", lambda *args, **kwargs: called.append("run"))
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    try:
+        deploy_cmd.execute("production", "main", str(config))
+    except FileNotFoundError as exc:
+        assert "Target filestore path not found" in str(exc)
+
+    assert called == []
+
+
+def test_deploy_missing_env_vars_fails_preflight_before_rollout(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+
+    called = []
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", lambda *args, **kwargs: called.append("run"))
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    try:
+        deploy_cmd.execute("production", "main", str(config))
+    except RuntimeError as exc:
+        assert "Missing required environment variables" in str(exc)
+
+    assert called == []
+
+
+def test_deploy_emits_stage_progress_messages(tmp_path: Path, monkeypatch, capsys):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda environment, config_path: "production_2026")
+    monkeypatch.setattr(deploy_cmd, "git_commit", lambda: "feedbeef")
+    monkeypatch.setattr(deploy_cmd, "run", lambda args, stream=True: None)
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda compose_file: DummyCompose(compose_file))
+    monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr(deploy_cmd, "MetadataStore", lambda: DummyStore())
+
+    deploy_cmd.execute("production", "main", str(config))
+
+    out = capsys.readouterr().out
+    assert "[deploy] preflight" in out
+    assert "[deploy] backup" in out
+    assert "[deploy] rollout" in out
+    assert "[deploy] verify" in out
+    assert "[deploy] done" in out

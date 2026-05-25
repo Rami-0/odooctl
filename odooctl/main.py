@@ -56,8 +56,15 @@ def restore(environment: str, backup: str = "latest", config: str = "odooctl.yml
     typer.echo(f"Restored {environment} from backup {backup_id}")
 
 @app.command(name="clone")
-def clone_env(source: str, target: str, sanitize: bool = True, config: str = "odooctl.yml"):
-    url = clone_cmd.execute(source, target, sanitize, config)
+def clone_env(
+    source: str,
+    target: str,
+    sanitize: bool = True,
+    config: str = "odooctl.yml",
+    sanitization_profile: str = typer.Option("normal", "--sanitization-profile", "--profile"),
+    preview: bool = typer.Option(False, "--preview", "--dry-run"),
+):
+    url = clone_cmd.execute(source, target, sanitize, config, sanitization_profile, preview)
     typer.echo(f"Staging URL: {url}")
 
 @app.command("update-modules")

@@ -13,7 +13,11 @@ def write_manifest(path: Path, *, project: str = "p", environment: str = "stagin
             {
                 "project": project,
                 "environment": environment,
+                "backup_id": backup.name,
+                "schema_version": 1,
+                "backup_mode": "full",
                 "db_name": "odoo_staging",
+                "filestore_path": "/var/lib/odoo/filestore/odoo_staging",
                 "odoo_version": "19.0",
                 "checksums": {
                     "db_dump": sha256_file(backup / "db.dump"),
@@ -62,6 +66,21 @@ def test_restore_preflight_rejects_wrong_project(tmp_path: Path):
     backup = make_backup(tmp_path, "staging_1", project="other")
     with pytest.raises(RuntimeError, match="Backup project mismatch"):
         validate_backup_dir(backup, expected_project="p")
+
+
+def test_restore_preflight_rejects_wrong_environment(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1", project="p")
+    with pytest.raises(RuntimeError, match="Backup environment mismatch"):
+        validate_backup_dir(backup, expected_project="p", expected_environment="production")
+
+
+def test_restore_preflight_rejects_unsupported_mode(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_1", project="p")
+    manifest = json.loads((backup / "manifest.json").read_text())
+    manifest["backup_mode"] = "db-only"
+    (backup / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(RuntimeError, match="Unsupported backup mode"):
+        validate_backup_dir(backup, expected_project="p", expected_environment="staging", restore_mode="full")
 
 
 def test_restore_preflight_rejects_missing_checksums(tmp_path: Path):

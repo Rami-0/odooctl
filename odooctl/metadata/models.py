@@ -8,15 +8,20 @@ def now_utc() -> str:
 
 
 class BackupManifest(BaseModel):
+    schema_version: int = 1
+    backup_id: str
     project: str
     environment: str
     timestamp: str = Field(default_factory=now_utc)
     db_name: str
+    filestore_path: str | None = None
+    artifact_paths: list[str] = Field(default_factory=list)
     db_dump: str = "db.dump"
     filestore: str = "filestore.tar.zst"
     git_commit: str | None = None
     docker_image: str | None = None
     odoo_version: str
+    backup_mode: str = "full"
     checksums: dict[str, str] = Field(default_factory=dict)
     status: str = "complete"
 

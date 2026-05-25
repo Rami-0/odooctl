@@ -6,18 +6,35 @@ from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.config import load_config
-from odooctl.odoo.sanitize import sanitize_database
+from odooctl.odoo.sanitize import profile_sql, sanitize_database
 from odooctl.odoo.module_update import update_modules_compose
 from odooctl.odoo.healthcheck import check_url
 
 
-def execute(source: str, target: str, sanitize: bool | None = True, config_path: str = "odooctl.yml") -> str:
+def execute(
+    source: str,
+    target: str,
+    sanitize: bool | None = True,
+    config_path: str = "odooctl.yml",
+    sanitization_profile: str = "normal",
+    preview: bool = False,
+) -> str:
     cfg = load_config(config_path)
     src = cfg.env(source)
     dst = cfg.env(target)
+    should_sanitize = dst.sanitize if sanitize is None else sanitize
+    base_url = public_url(dst.domain)
+    if preview:
+        print("[clone] preview")
+        print(
+            f"source={source} target={target} profile={sanitization_profile} "
+            f"base_url={base_url} sanitize={'yes' if should_sanitize else 'no'}"
+        )
+        print(f"affected_integrations={','.join(dst.update_modules) or 'none'}")
+        print(f"production_source={'yes' if source == 'production' else 'no'}")
+        return base_url
     pg = PostgresAdapter(cfg.postgres)
     fs = FilestoreAdapter()
-    should_sanitize = dst.sanitize if sanitize is None else sanitize
     # Direct dump/restore keeps db + filestore in one explicit clone flow.
     with tempfile.NamedTemporaryFile(prefix="odooctl-clone-", suffix=".dump", delete=False) as tmp:
         tmp_dump = Path(tmp.name)
@@ -28,10 +45,11 @@ def execute(source: str, target: str, sanitize: bool | None = True, config_path:
         tmp_dump.unlink(missing_ok=True)
     fs.copy(src.filestore_path, dst.filestore_path)
     if should_sanitize:
-        sanitize_database(pg, dst.db_name, dst, cfg)
+        for sql in profile_sql(sanitization_profile, dst, cfg):
+            pg.psql(dst.db_name, sql)
     compose = DockerComposeAdapter(cfg.runtime.compose_file)
     update_modules_compose(compose, cfg.odoo.service, dst.db_name, dst.update_modules)
     compose.restart(cfg.odoo.service)
-    url = public_url(dst.domain) + cfg.healthcheck.path
+    url = base_url + cfg.healthcheck.path
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
-    return public_url(dst.domain)
+    return base_url

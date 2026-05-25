@@ -23,21 +23,39 @@ def git_commit() -> str | None:
     return r.stdout.strip() or None
 
 
-def prune_backups(backup_root: Path, keep: int) -> list[Path]:
+def _remove_tree(path: Path) -> None:
+    for child in sorted(path.rglob("*"), reverse=True):
+        if child.is_file() or child.is_symlink():
+            child.unlink()
+        elif child.is_dir():
+            child.rmdir()
+    path.rmdir()
+
+
+def prune_backups(
+    backup_root: Path,
+    keep: int,
+    *,
+    environment: str | None = None,
+    newer_than_days: int | None = None,
+    now: float | None = None,
+) -> list[Path]:
+    if not backup_root.exists():
+        return []
     backups = sorted(
-        [p for p in backup_root.iterdir() if p.is_dir()],
+        [p for p in backup_root.iterdir() if p.is_dir() and (environment is None or p.name.startswith(f"{environment}_"))],
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
     removed: list[Path] = []
-    for path in backups[keep:]:
+    keep_count = max(keep, 0)
+    to_remove = list(backups[keep_count:])
+    if newer_than_days is not None:
+        cutoff = (now if now is not None else datetime.now(timezone.utc).timestamp()) - (newer_than_days * 86400)
+        to_remove.extend([p for p in backups[:keep_count] if p.stat().st_mtime < cutoff])
+    for path in sorted(set(to_remove), key=lambda p: p.stat().st_mtime):
         removed.append(path)
-        for child in sorted(path.rglob("*"), reverse=True):
-            if child.is_file() or child.is_symlink():
-                child.unlink()
-            elif child.is_dir():
-                child.rmdir()
-        path.rmdir()
+        _remove_tree(path)
     return removed
 
 
@@ -73,9 +91,13 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
     (backup_dir / "git_commit.txt").write_text(commit or "unknown")
     (backup_dir / "docker_image.txt").write_text(cfg.odoo.image)
     manifest = BackupManifest(
+        backup_id=backup_id,
         project=cfg.project.name,
         environment=environment,
         db_name=env.db_name,
+        filestore_path=env.filestore_path,
+        artifact_paths=["db.dump", "filestore.tar.zst"],
+        backup_mode="full",
         git_commit=commit,
         docker_image=cfg.odoo.image,
         odoo_version=cfg.project.odoo_version,
@@ -90,5 +112,5 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
         remote = S3Adapter(cfg.backups.remote)
         remote.upload_backup(backup_dir)
     keep_count = max(cfg.backups.retention.daily, cfg.backups.retention.weekly, cfg.backups.retention.monthly)
-    prune_backups(Path(cfg.backups.local_path), keep=max(keep_count, 1))
+    prune_backups(Path(cfg.backups.local_path), keep=max(keep_count, 1), environment=environment)
     return backup_id

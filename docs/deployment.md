@@ -7,3 +7,5 @@
 `odooctl restore staging --backup latest` restores the selected backup, verifies checksums, runs the health check, and prints the restored backup id.
 
 For CI/CD, `odooctl github-actions` generates a starter GitHub Actions workflow that exposes staging/production deploys as a manual dispatch job.
+
+See `docs/operations/deploy-staging-production.md` for the operator workflow and branch/environment rules.

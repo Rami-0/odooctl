@@ -6,7 +6,7 @@ from typing import Literal
 
 import yaml
 import click
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ProjectConfig(BaseModel):
@@ -102,6 +102,16 @@ class OdooCtlConfig(BaseModel):
         if not value:
             raise ValueError("at least one environment is required")
         return value
+
+    @model_validator(mode="after")
+    def validate_environment_graph(self) -> "OdooCtlConfig":
+        for name, env in self.environments.items():
+            if env.clone_from and env.clone_from not in self.environments:
+                known = ", ".join(sorted(self.environments))
+                raise ValueError(f"Environment '{name}' clone_from '{env.clone_from}' is not defined. Known: {known}")
+            if env.clone_from == name:
+                raise ValueError(f"Environment '{name}' cannot clone_from itself")
+        return self
 
     def env(self, name: str) -> EnvironmentConfig:
         try:

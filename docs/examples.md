@@ -1,10 +1,11 @@
 # Examples
 
-## Generate a starter config
+## Generate and validate a starter config
 
 ```bash
 odooctl init --dry-run
 odooctl init
+odooctl validate
 ```
 
 ## Clone production into staging

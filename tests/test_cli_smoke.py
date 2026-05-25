@@ -32,6 +32,18 @@ def test_module_invocation_entrypoint_smoke(tmp_path: Path):
     assert "Config file not found" in result.output
 
 
+def test_validate_reports_success_for_example_config(tmp_path: Path):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nenvironments:\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /var/lib/odoo/filestore/odoo_staging\nodoo:\n  image: registry/odoo:latest\n"""
+    )
+
+    result = runner.invoke(app, ["validate", "--config", str(config)])
+
+    assert result.exit_code == 0, result.output
+    assert "Config valid: demo (staging)" in result.output
+
+
 def test_logs_command_accepts_tail_and_no_follow(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(

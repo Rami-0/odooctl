@@ -49,7 +49,7 @@ def validate_backup_dir(backup_dir: Path, *, expected_project: str | None = None
     return manifest
 
 
-def execute(environment: str, backup: str = "latest", config_path: str = "odooctl.yml") -> None:
+def execute(environment: str, backup: str = "latest", config_path: str = "odooctl.yml") -> str:
     cfg = load_config(config_path)
     env = cfg.env(environment)
     backup_dir = resolve_backup_dir(environment, backup, Path(cfg.backups.local_path))
@@ -58,3 +58,4 @@ def execute(environment: str, backup: str = "latest", config_path: str = "odooct
     FilestoreAdapter().restore_archive(backup_dir / "filestore.tar.zst", env.filestore_path)
     url = public_url(env.domain) + cfg.healthcheck.path
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
+    return backup_dir.name

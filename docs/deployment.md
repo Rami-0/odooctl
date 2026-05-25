@@ -4,4 +4,6 @@
 
 `odooctl deploy staging --branch staging` follows the same flow without mandatory production backup.
 
+`odooctl restore staging --backup latest` restores the selected backup, verifies checksums, runs the health check, and prints the restored backup id.
+
 For CI/CD, `odooctl github-actions` generates a starter GitHub Actions workflow that exposes staging/production deploys as a manual dispatch job.

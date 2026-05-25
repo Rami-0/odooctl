@@ -33,7 +33,8 @@ def backup(environment: str, config: str = "odooctl.yml"):
 
 @app.command()
 def restore(environment: str, backup: str = "latest", config: str = "odooctl.yml"):
-    restore_cmd.execute(environment, backup, config)
+    backup_id = restore_cmd.execute(environment, backup, config)
+    typer.echo(f"Restored {environment} from backup {backup_id}")
 
 @app.command(name="clone")
 def clone_env(source: str, target: str, sanitize: bool = True, config: str = "odooctl.yml"):

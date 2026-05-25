@@ -1,4 +1,6 @@
 from pathlib import Path
+import subprocess
+import sys
 
 from typer.testing import CliRunner
 
@@ -26,10 +28,16 @@ def test_init_dry_run_prints_example_config(tmp_path: Path):
 
 
 def test_module_invocation_entrypoint_smoke(tmp_path: Path):
-    # Ensure the module is executable via `python -m odooctl.main` once the __main__ guard is present.
-    result = runner.invoke(app, ["status", "--config", str(tmp_path / "missing.yml")])
-    assert result.exit_code != 0
-    assert "Config file not found" in result.output
+    # Ensure the package is executable via `python -m odooctl`.
+    result = subprocess.run(
+        [sys.executable, "-m", "odooctl", "status", "--config", str(tmp_path / "missing.yml")],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "Config file not found" in (result.stdout + result.stderr)
 
 
 def test_validate_reports_success_for_example_config(tmp_path: Path):

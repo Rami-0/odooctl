@@ -6,7 +6,7 @@ from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.config import load_config
-from odooctl.odoo.sanitize import profile_sql, sanitize_database
+from odooctl.odoo.sanitize import profile_sql
 from odooctl.odoo.module_update import update_modules_compose
 from odooctl.odoo.healthcheck import check_url
 
@@ -22,6 +22,10 @@ def execute(
     cfg = load_config(config_path)
     src = cfg.env(source)
     dst = cfg.env(target)
+    if not dst.clone_from:
+        raise RuntimeError(f"Environment '{target}' is not configured as a clone target; set clone_from before cloning into it")
+    if dst.clone_from != source:
+        raise RuntimeError(f"Environment '{target}' must be cloned from '{dst.clone_from}', not '{source}'")
     should_sanitize = dst.sanitize if sanitize is None else sanitize
     base_url = public_url(dst.domain)
     if preview:

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from odooctl.commands.backup import redact_config_snapshot
 from odooctl.config import example_config, load_config
 
@@ -49,3 +51,39 @@ def test_missing_env_vars_reports_only_referenced_values(monkeypatch):
     cfg = load_config(EXAMPLE_PATH)
     assert cfg.referenced_env_vars() == ["ODOO_DB_PASSWORD", "ODOO_S3_ACCESS_KEY", "ODOO_S3_ENDPOINT", "ODOO_S3_SECRET_KEY"]
     assert cfg.missing_env_vars() == ["ODOO_S3_ACCESS_KEY", "ODOO_S3_SECRET_KEY"]
+
+
+def test_environment_clone_from_must_reference_known_environment(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: preview\n"""
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(path)
+
+    assert "clone_from 'preview' is not defined" in str(exc_info.value)
+
+
+def test_environment_clone_from_can_be_omitted(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n  qa:\n    branch: qa\n    domain: qa.example.com\n    db_name: odoo_qa\n    filestore_path: /srv/filestore/qa\n"""
+    )
+
+    cfg = load_config(path)
+
+    assert cfg.env("production").clone_from is None
+    assert cfg.env("qa").clone_from is None
+
+
+def test_environment_clone_from_cannot_reference_itself(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: staging\n"""
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(path)
+
+    assert "cannot clone_from itself" in str(exc_info.value)

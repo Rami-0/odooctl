@@ -32,31 +32,33 @@ def execute(config_path: str = "odooctl.yml", environment: str | None = None, *,
     console = Console()
     ps = DockerComposeAdapter(cfg.runtime.compose_file).ps()
     env_items = [(environment, cfg.env(environment))] if environment else list(cfg.environments.items())
+
+    def build_environment_payload(name: str, env) -> dict:
+        dep = store.latest_deployment(name) or {}
+        backup = store.latest_backup(name) or {}
+        health_url = dep.get("health_check_url", public_url(env.domain) + cfg.healthcheck.path)
+        return {
+            "name": name,
+            "url": public_url(env.domain),
+            "branch": env.branch,
+            "commit": dep.get("commit", backup.get("git_commit", "unknown")),
+            "image": dep.get("docker_image", backup.get("docker_image", cfg.odoo.image)),
+            "odoo": _service_status(ps, cfg.odoo.service),
+            "postgresql": _service_status(ps, "postgres"),
+            "latest_backup": backup.get("timestamp", "unknown"),
+            "last_deployment": dep.get("status", "unknown"),
+            "last_deployment_backup": dep.get("backup", "unknown"),
+            "last_deployment_message": dep.get("message"),
+            "health_check": "passing" if dep.get("status") == "success" else "failing" if dep.get("health_check_url") else dep.get("status", "unknown"),
+            "health_check_url": health_url,
+        }
+
     if json_output:
         payload = {
             "project": cfg.project.name,
             "current_git_commit": git_commit() or "unknown",
-            "environments": [],
+            "environments": [build_environment_payload(name, env) for name, env in env_items],
         }
-        for name, env in env_items:
-            dep = store.latest_deployment(name) or {}
-            backup = store.latest_backup(name) or {}
-            health_url = dep.get('health_check_url', public_url(env.domain) + cfg.healthcheck.path)
-            payload["environments"].append(
-                {
-                    "name": name,
-                    "url": public_url(env.domain),
-                    "branch": env.branch,
-                    "commit": dep.get('commit', backup.get('git_commit', 'unknown')),
-                    "image": dep.get('docker_image', backup.get('docker_image', cfg.odoo.image)),
-                    "odoo": _service_status(ps, cfg.odoo.service),
-                    "postgresql": _service_status(ps, 'postgres'),
-                    "latest_backup": backup.get('timestamp', 'unknown'),
-                    "last_deployment": dep.get('status', 'unknown'),
-                    "health_check": 'passing' if dep.get('status') == 'success' else 'failing' if dep.get('health_check_url') else dep.get('status', 'unknown'),
-                    "health_check_url": health_url,
-                }
-            )
         console.print(json.dumps(payload, indent=2, sort_keys=True))
         return
 
@@ -64,20 +66,22 @@ def execute(config_path: str = "odooctl.yml", environment: str | None = None, *,
     console.print(f"Current git commit: {git_commit() or 'unknown'}")
     console.print("")
     for name, env in env_items:
-        dep = store.latest_deployment(name) or {}
-        backup = store.latest_backup(name) or {}
-        health_url = dep.get('health_check_url', public_url(env.domain) + cfg.healthcheck.path)
+        payload = build_environment_payload(name, env)
         console.print(f"Environment: {name}")
-        console.print(f"URL: {public_url(env.domain)}")
-        console.print(f"Branch: {env.branch}")
-        console.print(f"Commit: {dep.get('commit', backup.get('git_commit', 'unknown'))}")
-        console.print(f"Image: {dep.get('docker_image', backup.get('docker_image', cfg.odoo.image))}")
-        console.print(f"Odoo: {_service_status(ps, cfg.odoo.service)}")
-        console.print(f"PostgreSQL: {_service_status(ps, 'postgres')}")
-        console.print(f"Latest backup: {backup.get('timestamp', 'unknown')}")
-        console.print(f"Last deployment: {dep.get('status', 'unknown')}")
-        console.print(f"Health check: {dep.get('status', 'unknown') if dep.get('health_check_url') is None else ('passing' if dep.get('status') == 'success' else 'failing')}")
-        console.print(f"Health check URL: {health_url}")
+        console.print(f"URL: {payload['url']}")
+        console.print(f"Branch: {payload['branch']}")
+        console.print(f"Commit: {payload['commit']}")
+        console.print(f"Image: {payload['image']}")
+        console.print(f"Odoo: {payload['odoo']}")
+        console.print(f"PostgreSQL: {payload['postgresql']}")
+        console.print(f"Latest backup: {payload['latest_backup']}")
+        console.print(f"Last deployment: {payload['last_deployment']}")
+        if payload['last_deployment_backup'] != 'unknown':
+            console.print(f"Deployment backup: {payload['last_deployment_backup']}")
+        if payload['last_deployment_message']:
+            console.print(f"Deployment message: {payload['last_deployment_message']}")
+        console.print(f"Health check: {payload['health_check']}")
+        console.print(f"Health check URL: {payload['health_check_url']}")
         console.print("")
     if ps:
         console.print("Docker Compose services:")

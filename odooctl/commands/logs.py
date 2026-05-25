@@ -13,4 +13,5 @@ def execute(
     tail: int | None = None,
 ) -> None:
     cfg = load_config(config_path)
+    cfg.env(environment)
     DockerComposeAdapter(cfg.runtime.compose_file).logs(service or cfg.odoo.service, follow=follow, tail=tail)

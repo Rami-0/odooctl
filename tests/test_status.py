@@ -42,7 +42,7 @@ class DummyStore:
 def test_status_reports_metadata_and_services(monkeypatch, tmp_path: Path):
     config = tmp_path / "odooctl.yml"
     config.write_text(
-        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /var/lib/odoo/filestore/odoo_prod\nodoo:\n  image: registry/odoo:latest\n"""
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /var/lib/odoo/filestore/odoo_prod\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /var/lib/odoo/filestore/odoo_staging\nodoo:\n  image: registry/odoo:latest\n"""
     )
     dummy_console = DummyConsole()
     monkeypatch.setattr(status_cmd, "Console", lambda: dummy_console)
@@ -50,12 +50,13 @@ def test_status_reports_metadata_and_services(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(status_cmd, "MetadataStore", lambda: DummyStore())
     monkeypatch.setattr(status_cmd, "git_commit", lambda: "feedbeef")
 
-    status_cmd.execute(str(config))
+    status_cmd.execute(str(config), "production")
 
     joined = "\n".join(dummy_console.lines)
     assert "Project: demo" in joined
     assert "Current git commit: feedbeef" in joined
     assert "Environment: production" in joined
+    assert "Environment: staging" not in joined
     assert "Commit: abc1234" in joined
     assert "Image: registry/odoo:abc1234" in joined
     assert "Odoo: running" in joined

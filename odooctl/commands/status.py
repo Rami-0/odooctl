@@ -12,7 +12,7 @@ def _service_status(ps_output: str, service: str) -> str:
         return "running"
     return "unknown"
 
-def execute(config_path: str = "odooctl.yml") -> None:
+def execute(config_path: str = "odooctl.yml", environment: str | None = None) -> None:
     cfg = load_config(config_path)
     store = MetadataStore()
     console = Console()
@@ -20,7 +20,8 @@ def execute(config_path: str = "odooctl.yml") -> None:
     console.print(f"Current git commit: {git_commit() or 'unknown'}")
     console.print("")
     ps = DockerComposeAdapter(cfg.runtime.compose_file).ps()
-    for name, env in cfg.environments.items():
+    env_items = [(environment, cfg.env(environment))] if environment else list(cfg.environments.items())
+    for name, env in env_items:
         dep = store.latest_deployment(name) or {}
         backup = store.latest_backup(name) or {}
         health_url = dep.get('health_check_url', public_url(env.domain) + cfg.healthcheck.path)

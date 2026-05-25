@@ -12,7 +12,7 @@ def test_example_config_loads(tmp_path: Path):
     path = tmp_path / "odooctl.yml"
     path.write_text(example_config())
     cfg = load_config(path)
-    assert cfg.project.name == "my-odoo-project"
+    assert cfg.project.name == "demo-odoo-project"
     assert cfg.env("staging").sanitize is True
     assert cfg.postgres.password_env == "ODOO_DB_PASSWORD"
 
@@ -45,7 +45,7 @@ def test_redact_config_snapshot_masks_sensitive_values():
 
 def test_missing_env_vars_reports_only_referenced_values(monkeypatch):
     monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
-    monkeypatch.setenv("S3_ENDPOINT", "https://s3.example.com")
+    monkeypatch.setenv("ODOO_S3_ENDPOINT", "https://s3.example.com")
     cfg = load_config(EXAMPLE_PATH)
-    assert cfg.referenced_env_vars() == ["ODOO_DB_PASSWORD", "S3_ACCESS_KEY", "S3_ENDPOINT", "S3_SECRET_KEY"]
-    assert cfg.missing_env_vars() == ["S3_ACCESS_KEY", "S3_SECRET_KEY"]
+    assert cfg.referenced_env_vars() == ["ODOO_DB_PASSWORD", "ODOO_S3_ACCESS_KEY", "ODOO_S3_ENDPOINT", "ODOO_S3_SECRET_KEY"]
+    assert cfg.missing_env_vars() == ["ODOO_S3_ACCESS_KEY", "ODOO_S3_SECRET_KEY"]

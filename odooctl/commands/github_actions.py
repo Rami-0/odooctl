@@ -40,6 +40,8 @@ jobs:
           python-version: '3.11'
       - name: Install odooctl
         run: pip install .
+      - name: Validate config
+        run: odooctl validate
       - name: Deploy
         env:
           ODOO_DB_PASSWORD: ${{{{ secrets.ODOO_DB_PASSWORD }}}}

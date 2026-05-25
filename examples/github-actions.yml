@@ -1,15 +1,31 @@
-name: Deploy Odoo
+name: odooctl deploy
 on:
-  push:
-    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      branch:
+        description: Git branch to deploy
+        required: true
+        default: main
+        type: string
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy staging
-        if: github.ref_name == 'staging'
-        run: odooctl deploy staging --branch staging
-      - name: Deploy production
-        if: github.ref_name == 'main'
-        run: odooctl deploy production --branch main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install odooctl
+        run: pip install .
+      - name: Deploy
+        env:
+          ODOO_DB_PASSWORD: ${{ secrets.ODOO_DB_PASSWORD }}
+        run: |
+          odooctl deploy ${{ inputs.environment }} --branch ${{ inputs.branch }}

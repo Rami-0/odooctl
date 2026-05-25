@@ -70,6 +70,48 @@ def test_status_accepts_json_alias(tmp_path: Path):
     assert '"project": "demo"' in result.output
 
 
+def test_clone_cli_exposes_preview_and_sanitization_profile(monkeypatch):
+    recorded: dict[str, object] = {}
+
+    def fake_execute(source, target, sanitize=True, config_path="odooctl.yml", sanitization_profile="normal", preview=False):
+        recorded.update(
+            source=source,
+            target=target,
+            sanitize=sanitize,
+            config_path=config_path,
+            sanitization_profile=sanitization_profile,
+            preview=preview,
+        )
+        return "https://staging.example.com"
+
+    monkeypatch.setattr("odooctl.main.clone_cmd.execute", fake_execute)
+
+    result = runner.invoke(
+        app,
+        [
+            "clone",
+            "production",
+            "staging",
+            "--config",
+            "custom.yml",
+            "--sanitization-profile",
+            "strict",
+            "--preview",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert recorded == {
+        "source": "production",
+        "target": "staging",
+        "sanitize": True,
+        "config_path": "custom.yml",
+        "sanitization_profile": "strict",
+        "preview": True,
+    }
+    assert "Staging URL: https://staging.example.com" in result.output
+
+
 def test_logs_command_accepts_tail_and_no_follow(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(

@@ -28,7 +28,13 @@ def resolve_backup_dir(environment: str, backup: str, backups_root: Path) -> Pat
     return candidates[-1]
 
 
-def validate_backup_dir(backup_dir: Path, *, expected_project: str | None = None) -> dict:
+def validate_backup_dir(
+    backup_dir: Path,
+    *,
+    expected_project: str | None = None,
+    expected_environment: str | None = None,
+    restore_mode: str = "full",
+) -> dict:
     if not backup_dir.exists() or not backup_dir.is_dir():
         raise FileNotFoundError(f"Backup directory does not exist: {backup_dir}")
     missing = [name for name in REQUIRED_BACKUP_FILES if not (backup_dir / name).exists()]
@@ -39,6 +45,12 @@ def validate_backup_dir(backup_dir: Path, *, expected_project: str | None = None
         raise RuntimeError(
             f"Backup project mismatch: expected {expected_project}, got {manifest.get('project')}"
         )
+    if expected_environment and manifest.get("environment") != expected_environment:
+        raise RuntimeError(
+            f"Backup environment mismatch: expected {expected_environment}, got {manifest.get('environment')}"
+        )
+    if restore_mode == "full" and manifest.get("backup_mode", "full") != "full":
+        raise RuntimeError(f"Unsupported backup mode for full restore: {manifest.get('backup_mode')}")
     checksums = manifest.get("checksums") or {}
     for key, file_name in (("db_dump", "db.dump"), ("filestore", "filestore.tar.zst")):
         expected = checksums.get(key)
@@ -53,7 +65,7 @@ def execute(environment: str, backup: str = "latest", config_path: str = "odooct
     cfg = load_config(config_path)
     env = cfg.env(environment)
     backup_dir = resolve_backup_dir(environment, backup, Path(cfg.backups.local_path))
-    validate_backup_dir(backup_dir, expected_project=cfg.project.name)
+    validate_backup_dir(backup_dir, expected_project=cfg.project.name, expected_environment=environment, restore_mode="full")
     PostgresAdapter(cfg.postgres).restore(env.db_name, backup_dir / "db.dump")
     FilestoreAdapter().restore_archive(backup_dir / "filestore.tar.zst", env.filestore_path)
     url = public_url(env.domain) + cfg.healthcheck.path

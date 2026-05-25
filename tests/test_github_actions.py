@@ -11,8 +11,8 @@ def test_render_workflow_contains_deploy_job():
     assert "- qa" in content
     assert "- production" in content
     assert "default: release" in content
-    assert "odooctl validate" in content
-    assert "odooctl deploy ${{ inputs.environment }} --branch ${{ inputs.branch }}" in content
+    assert "odooctl validate --config odooctl.yml" in content
+    assert "odooctl deploy ${{ inputs.environment }} --branch ${{ inputs.branch }} --config odooctl.yml" in content
 
 
 def test_run_writes_default_workflow(tmp_path: Path):

@@ -32,6 +32,14 @@ odooctl status
 
 Production deploys are designed to preserve rollback points by capturing a backup before code changes.
 
+## Restore a backup into staging
+
+```bash
+odooctl restore staging --backup latest
+```
+
+Use restore when you want to rebuild a staging environment from a known-good backup without re-running a clone flow.
+
 ## Generate a GitHub Actions deploy workflow
 
 ```bash

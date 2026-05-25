@@ -50,6 +50,9 @@ def execute(
     compose = DockerComposeAdapter(cfg.runtime.compose_file)
     update_modules_compose(compose, cfg.odoo.service, dst.db_name, dst.update_modules)
     compose.restart(cfg.odoo.service)
+    running_services = compose.ps()
+    if cfg.odoo.service not in running_services:
+        raise RuntimeError(f"Target service is not running after clone: {cfg.odoo.service}")
     url = base_url + cfg.healthcheck.path
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
     return base_url

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from odooctl.commands.clone import execute
 
 
@@ -40,6 +42,10 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
         def restart(self, service):
             events.append(("restart", (service,)))
 
+        def ps(self):
+            events.append(("ps", ()))
+            return "odoo running"
+
     monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
     monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
     monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
@@ -63,9 +69,10 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
     assert "UPDATE ir_config_parameter SET value = 'https://staging.example.com' WHERE key = 'web.base.url';" in psql_sql
     assert any("webhook" in sql and "callback" in sql for sql in psql_sql)
     assert any("api_key" in sql and "secret" in sql and "token" in sql for sql in psql_sql)
-    assert events[-4] == ("compose_init", ("docker-compose.yml",))
-    assert events[-3] == ("update", ("odoo", "odoo_staging", ("sale",)))
-    assert events[-2] == ("restart", ("odoo",))
+    assert ("compose_init", ("docker-compose.yml",)) in events
+    assert ("update", ("odoo", "odoo_staging", ("sale",))) in events
+    assert events[-3] == ("restart", ("odoo",))
+    assert events[-2] == ("ps", ())
     assert events[-1] == ("healthcheck", ("https://staging.example.com/web/health", 10, 3, 1))
 
 
@@ -104,6 +111,9 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
         def restart(self, service):
             pass
 
+        def ps(self):
+            return "odoo running"
+
     monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
     monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
     monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
@@ -115,6 +125,50 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
 
     assert any("UPDATE ir_mail_server SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging")
     assert not any("UPDATE ir_cron SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging")
+
+
+def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    update_modules: [sale]\n    sanitize: true\n"""
+    )
+
+    class DummyPostgres:
+        def __init__(self, config):
+            pass
+
+        def dump(self, db_name, output):
+            pass
+
+        def restore(self, db_name, dump_path):
+            pass
+
+        def psql(self, db_name, sql):
+            pass
+
+    class DummyFilestore:
+        def copy(self, source, target):
+            pass
+
+    class DummyCompose:
+        def __init__(self, compose_file):
+            pass
+
+        def restart(self, service):
+            pass
+
+        def ps(self):
+            return "postgres running"
+
+    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(RuntimeError, match="Target service is not running"):
+        execute("production", "staging", True, str(config))
 
 
 def test_clone_preview_is_readable_and_side_effect_free(tmp_path: Path, monkeypatch, capsys):

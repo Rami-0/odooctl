@@ -1,54 +1,62 @@
-# Examples
+# odooctl command workflows
 
-## Generate and validate a starter config
+This page collects common MVP workflows for self-hosted Odoo teams.
+
+## 1) Start from a config template
 
 ```bash
 odooctl init --dry-run
-odooctl init
-odooctl validate
 ```
 
-## Clone production into staging
+Then save the generated YAML to `odooctl.yml` and fill in environment-specific values.
+
+## 2) Validate your project config
 
 ```bash
-odooctl clone production staging --sanitize
+odooctl validate --config odooctl.yml
 ```
 
-This uses the configured `clone_from`, filestore paths, sanitization rules, and post-clone module update list from `odooctl.yml`.
+Validation checks required project fields, environment definitions, backup settings, and secret references.
 
-If you only want to validate the source/target wiring without mutating anything, run `odooctl status --environment staging --json` first and inspect the configured domains and database names.
-
-## Deploy staging from a branch
+## 3) Inspect project state
 
 ```bash
-odooctl deploy staging --branch staging
+odooctl status --config odooctl.yml
+odooctl status --config odooctl.yml --environment production --json
 ```
 
-## Production safety workflow
+Use `status` to review the current git commit, image reference, compose service state, backup metadata, and deployment result.
+
+## 4) Back up production before changes
 
 ```bash
-odooctl backup production
-odooctl deploy production --branch main
-odooctl status
+odooctl backup production --config odooctl.yml
 ```
 
-Production deploys are designed to preserve rollback points by capturing a backup before code changes.
+The backup manifest captures the database dump, filestore archive, git commit, image reference, and timestamp.
 
-## Restore a backup into staging
+## 5) Clone production to staging and sanitize it
 
 ```bash
-odooctl restore staging --backup latest
+odooctl clone production staging --sanitize --config odooctl.yml
 ```
 
-Use restore when you want to rebuild a staging environment from a known-good backup without re-running a clone flow.
+This is the key MVP workflow: dump production, restore into staging, copy the filestore, sanitize unsafe data, update modules, restart staging, and print the staging URL.
 
-## Generate a GitHub Actions deploy workflow
+## 6) Update modules directly
 
 ```bash
-odooctl github-actions --dry-run
-odooctl github-actions
+odooctl update-modules staging --modules sale,stock,custom_module --config odooctl.yml
 ```
 
-This writes a manual `workflow_dispatch` pipeline that checks out the repository, installs `odooctl`, validates `odooctl.yml`, and runs a deployment from GitHub Actions using secrets for the database password. A ready-to-copy example lives at `.github/workflows/odooctl-deploy.yml`, and `examples/github-actions.yml` shows a simpler push-based variant.
+The command streams the Odoo update run and exits non-zero if module updates fail.
 
-The generated workflow is intended for production deploys, but the same pattern can be adapted for staging by changing the branch input or environment selection.
+## 7) Deployment and rollback
+
+```bash
+odooctl deploy staging --branch staging --config odooctl.yml
+odooctl rollback production --mode code --config odooctl.yml
+odooctl rollback production --mode full --backup production_2026-05-24_1600 --config odooctl.yml
+```
+
+Production deploys back up data first, while full rollback restores the backed-up database and filestore.

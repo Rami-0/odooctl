@@ -36,6 +36,8 @@ class DummyStore:
                 "status": "success",
                 "commit": "abc1234",
                 "docker_image": "registry/odoo:abc1234",
+                "backup": "production_1",
+                "message": "deployment complete",
                 "health_check_url": "https://odoo.example.com/web/login",
             }
         return None
@@ -71,6 +73,8 @@ def test_status_reports_metadata_and_services(monkeypatch, tmp_path: Path):
     assert "PostgreSQL: running" in joined
     assert "Health check: passing" in joined
     assert "Health check URL: https://odoo.example.com/web/login" in joined
+    assert "Deployment backup: production_1" in joined
+    assert "Deployment message: deployment complete" in joined
     assert "Docker Compose services:" in joined
     assert "odoo running" in joined
 
@@ -93,6 +97,7 @@ def test_status_can_emit_json(monkeypatch, tmp_path: Path):
     assert '"current_git_commit": "feedbeef"' in output
     assert '"health_check": "passing"' in output
     assert '"health_check_url": "https://odoo.example.com/web/login"' in output
+    assert '"last_deployment_backup": "production_1"' in output
 
 
 def test_status_marks_service_as_stopped_when_compose_reports_exit(monkeypatch, tmp_path: Path):

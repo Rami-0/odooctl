@@ -110,6 +110,18 @@ class OdooCtlConfig(BaseModel):
             known = ", ".join(sorted(self.environments))
             raise KeyError(f"Unknown environment '{name}'. Known: {known}") from exc
 
+    def referenced_env_vars(self) -> list[str]:
+        refs = {self.postgres.password_env}
+        if self.backups.remote:
+            remote = self.backups.remote
+            for value in (remote.endpoint_env, remote.access_key_env, remote.secret_key_env):
+                if value:
+                    refs.add(value)
+        return sorted(refs)
+
+    def missing_env_vars(self) -> list[str]:
+        return [name for name in self.referenced_env_vars() if not os.getenv(name)]
+
 
 def load_config(path: str | Path = "odooctl.yml") -> OdooCtlConfig:
     config_path = Path(path)

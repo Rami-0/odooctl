@@ -3,13 +3,19 @@ from __future__ import annotations
 import typer
 
 from odooctl.config import load_config
-from odooctl.utils.logging import success
+from odooctl.utils.logging import success, warn
 
 
 def execute(config_path: str = "odooctl.yml") -> None:
     cfg = load_config(config_path)
     env_names = ", ".join(sorted(cfg.environments))
     success(f"Config valid: {cfg.project.name} ({env_names})")
+
+    missing = cfg.missing_env_vars()
+    if missing:
+        warn("Missing referenced environment variables: " + ", ".join(missing))
+    else:
+        success("All referenced environment variables are set")
 
 
 def run(config_path: str = "odooctl.yml") -> None:

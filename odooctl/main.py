@@ -54,8 +54,8 @@ def logs(environment: str, service: str | None = None, config: str = "odooctl.ym
     logs_cmd.execute(environment, service, config, follow=follow, tail=tail)
 
 @app.command()
-def status(config: str = "odooctl.yml"):
-    status_cmd.execute(config)
+def status(config: str = "odooctl.yml", environment: str | None = None):
+    status_cmd.execute(config, environment)
 
 
 @app.command()

@@ -8,6 +8,7 @@ It focuses on the operational workflow that generic deploy tools miss: PostgreSQ
 
 ```bash
 odooctl init
+odooctl validate
 odooctl deploy staging --branch staging
 odooctl deploy production --branch main
 odooctl backup production

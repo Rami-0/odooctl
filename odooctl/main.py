@@ -13,6 +13,7 @@ from odooctl.commands import (
     rollback as rollback_cmd,
     status as status_cmd,
     update_modules as update_cmd,
+    validate as validate_cmd,
 )
 
 app = typer.Typer(help="Odoo-aware deployment CLI for self-hosted Docker Compose projects.")
@@ -55,6 +56,11 @@ def logs(environment: str, service: str | None = None, config: str = "odooctl.ym
 @app.command()
 def status(config: str = "odooctl.yml"):
     status_cmd.execute(config)
+
+
+@app.command()
+def validate(config: str = "odooctl.yml"):
+    validate_cmd.run(config)
 
 
 @app.command(name="github-actions")

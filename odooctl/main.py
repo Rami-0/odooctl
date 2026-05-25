@@ -54,7 +54,11 @@ def logs(environment: str, service: str | None = None, config: str = "odooctl.ym
     logs_cmd.execute(environment, service, config, follow=follow, tail=tail)
 
 @app.command()
-def status(config: str = "odooctl.yml", environment: str | None = None, json_output: bool = False):
+def status(
+    config: str = "odooctl.yml",
+    environment: str | None = None,
+    json_output: bool = typer.Option(False, "--json", "--json-output"),
+):
     status_cmd.execute(config, environment, json_output=json_output)
 
 

@@ -52,6 +52,18 @@ def test_validate_reports_success_for_example_config(tmp_path: Path):
     assert "Config valid: demo (staging)" in result.output
 
 
+def test_status_accepts_json_alias(tmp_path: Path):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /var/lib/odoo/filestore/odoo_prod\nodoo:\n  image: registry/odoo:latest\n"""
+    )
+
+    result = runner.invoke(app, ["status", "--config", str(config), "--environment", "production", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert '"project": "demo"' in result.output
+
+
 def test_logs_command_accepts_tail_and_no_follow(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(

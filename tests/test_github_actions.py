@@ -22,7 +22,10 @@ def test_run_writes_default_workflow(tmp_path: Path):
     )
     output = tmp_path / ".github" / "workflows" / "odooctl-deploy.yml"
 
-    github_actions.run(config=str(config), output=str(output))
+    rendered = github_actions.run(config=str(config), output=str(output))
 
     assert output.exists()
-    assert "actions/checkout@v4" in output.read_text()
+    content = output.read_text()
+    assert content == rendered
+    assert "actions/checkout@v4" in content
+    assert "odooctl validate" in content

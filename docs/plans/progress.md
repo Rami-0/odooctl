@@ -169,6 +169,19 @@
 - Blockers/open questions: `uv pip install build` updated the local development venv only; no repo file changes from that install. Real Docker experiment-stack verification remains outstanding.
 - Next recommended task: add the schedule command for systemd timer / cron generation, then continue M5 redaction precision.
 
+### 2026-05-26T23:16:41+00:00 — M5 schedule generation
+
+- Completed the M5 scheduled-ops slice: added `odooctl schedule` to render installable systemd timer/service pairs or cron entries for `backup` and `doctor` runs.
+- The command follows the plan UX (`odooctl schedule backup --env production --cron "0 2 * * *"`) while also supporting cron aliases, explicit users, and custom `odooctl` binary paths; generation is output-only so operators install the files themselves.
+- Files changed: `odooctl/commands/schedule.py`, `odooctl/main.py`, `tests/test_schedule.py`, `README.md`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_schedule.py tests/test_cli_smoke.py` — 12 passed.
+  - `pytest -q` — 131 passed.
+- Commit SHA: pending.
+- Push status: pending.
+- Blockers/open questions: real Docker experiment-stack verification remains outstanding.
+- Next recommended task: improve redaction precision with configurable minimum secret length/ignored values, then continue toward real S3 optional adapter.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -209,7 +222,7 @@
 ### M5 — Distribution, scheduling, polish
 
 - [x] Add PyPI metadata and install docs.
-- [ ] Add schedule command for systemd timer / cron generation.
+- [x] Add schedule command for systemd timer / cron generation.
 - [ ] Improve redaction precision.
 - [ ] Add real S3 optional adapter.
 - [ ] Update operator docs.

@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from odooctl.adapters.docker_compose import DockerComposeAdapter
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
+
+
+def _compose_adapter(compose_file: str, project_root: Path):
+    try:
+        return DockerComposeAdapter(compose_file, project_dir=str(project_root))
+    except TypeError:
+        return DockerComposeAdapter(compose_file)
 
 
 def execute(
@@ -12,6 +21,7 @@ def execute(
     follow: bool = True,
     tail: int | None = None,
 ) -> None:
-    cfg = load_config(config_path)
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
     cfg.env(environment)
-    DockerComposeAdapter(cfg.runtime.compose_file).logs(service or cfg.odoo.service, follow=follow, tail=tail)
+    _compose_adapter(cfg.runtime.compose_file, context.root).logs(service or cfg.odoo.service, follow=follow, tail=tail)

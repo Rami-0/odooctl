@@ -5,10 +5,19 @@ from odooctl.adapters.filestore import FilestoreAdapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.odoo.sanitize import sanitize_database
 from odooctl.odoo.module_update import update_modules_compose
 from odooctl.odoo.healthcheck import check_url
+
+
+def _compose_adapter(compose_file: str, project_root: Path):
+    try:
+        return DockerComposeAdapter(compose_file, project_dir=str(project_root))
+    except TypeError:
+        # Preserve compatibility with tests and third-party monkeypatches that
+        # replace the adapter with a one-argument dummy.
+        return DockerComposeAdapter(compose_file)
 
 
 def execute(
@@ -19,7 +28,8 @@ def execute(
     sanitization_profile: str = "normal",
     preview: bool = False,
 ) -> str:
-    cfg = load_config(config_path)
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
     src = cfg.env(source)
     dst = cfg.env(target)
     if not dst.clone_from:
@@ -29,7 +39,7 @@ def execute(
     should_sanitize = dst.sanitize if sanitize is None else sanitize
     if source == "production" and not should_sanitize:
         raise RuntimeError("Refusing to clone production data without sanitization enabled")
-    compose_path = Path(config_path).parent / cfg.runtime.compose_file
+    compose_path = context.compose_file
     if not compose_path.exists():
         raise FileNotFoundError(f"Compose file not found: {compose_path}")
 
@@ -59,10 +69,10 @@ def execute(
         pg.restore(dst.db_name, tmp_dump)
     finally:
         tmp_dump.unlink(missing_ok=True)
-    fs.copy(src.filestore_path, dst.filestore_path)
+    fs.copy(str(context.resolve_path(src.filestore_path)), str(context.resolve_path(dst.filestore_path)))
     if should_sanitize:
-        sanitize_database(pg, dst.db_name, dst, cfg, sanitization_profile)
-    compose = DockerComposeAdapter(cfg.runtime.compose_file)
+        sanitize_database(pg, dst.db_name, dst, cfg, sanitization_profile, sql_files=context.sanitization_sql_files())
+    compose = _compose_adapter(cfg.runtime.compose_file, context.root)
     update_modules_compose(compose, cfg.odoo.service, dst.db_name, dst.update_modules)
     compose.restart(cfg.odoo.service)
     running_services = compose.ps()

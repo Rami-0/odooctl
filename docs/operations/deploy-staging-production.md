@@ -17,6 +17,7 @@ This is the working model for `odooctl` deployments.
 2. Run validation locally:
    - `odooctl validate`
 3. Ensure the compose file, env vars, and filestore paths exist.
+4. Ensure the git worktree is clean before deploys or code rollbacks; commit or stash local edits first.
 
 ### 2) Deploy staging first
 
@@ -39,6 +40,7 @@ This is the working model for `odooctl` deployments.
 ### 4) Rollback decision
 
 - Use **code rollback** when the deploy failed or the new code is bad. It targets the last successful deployment commit recorded in metadata and refuses to run if no commit is available.
+- Code rollback requires a clean git worktree before it checks out the recorded commit. Commit or stash local edits first.
 - Use **full rollback** when database/filestore state must be restored.
 - A failed production deploy may restart the Odoo service as a recovery attempt, but it does **not** automatically roll back code or data; run `odooctl rollback production --mode code` or `odooctl rollback production --mode full` deliberately after deciding which state must be restored.
 - Keep the previous backup id and deployment metadata attached to the release.
@@ -57,6 +59,7 @@ For manual ops, the branch used in deploy should always match the environment co
 ## Operator checklist
 
 - [ ] Config validates cleanly
+- [ ] Git worktree is clean; local edits are committed or stashed
 - [ ] Branch matches environment mapping
 - [ ] Each environment has a unique branch, database name, filestore path, and domain
 - [ ] Staging clone source is correct

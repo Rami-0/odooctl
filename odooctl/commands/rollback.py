@@ -62,7 +62,7 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         commit = str(previous["commit"])
         previous_image = previous.get("docker_image")
         image = str(previous_image) if previous_image else cfg.odoo.image
-        _assert_clean_worktree()
+        _assert_clean_worktree("code rollback")
 
     try:
         if mode == "code":

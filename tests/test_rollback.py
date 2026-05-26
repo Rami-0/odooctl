@@ -66,7 +66,7 @@ environments:
 
 @pytest.fixture(autouse=True)
 def clean_worktree(monkeypatch):
-    monkeypatch.setattr(rollback_cmd, "_assert_clean_worktree", lambda: None)
+    monkeypatch.setattr(rollback_cmd, "_assert_clean_worktree", lambda operation="deploy": None)
 
 
 def write_config(tmp_path: Path) -> Path:
@@ -152,10 +152,12 @@ def test_rollback_code_mode_requires_clean_worktree_before_git_side_effects(tmp_
     monkeypatch.setattr(
         rollback_cmd,
         "_assert_clean_worktree",
-        lambda: (_ for _ in ()).throw(RuntimeError("Git worktree is dirty; commit or stash changes before deploy")),
+        lambda operation="deploy": (_ for _ in ()).throw(
+            RuntimeError(f"Git worktree is dirty; commit or stash changes before {operation}")
+        ),
     )
 
-    with pytest.raises(RuntimeError, match="Git worktree is dirty"):
+    with pytest.raises(RuntimeError, match="before code rollback"):
         rollback_cmd.execute("production", "code", None, str(config))
 
     assert run_calls == []

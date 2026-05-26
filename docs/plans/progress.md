@@ -82,8 +82,8 @@
   - `pytest -q tests/test_module_update.py tests/test_status.py tests/test_healthcheck.py` — 8 passed.
   - `pytest -q` — 109 passed.
   - `ODOO_DB_PASSWORD=ambient-secret pytest -q` — 109 passed.
-- Commit SHA: pending this run.
-- Push status: pending this run.
+- Commit SHA: 48c6797 (`Fix Docker module update flags and URLs`).
+- Push status: pushed to `origin/master` (`4db57fb..48c6797`); follow-up progress-status commit may be pushed separately.
 - Blockers/open questions: no Docker integration run in this tick; real experiment-stack verification remains needed for container backup/restore/update-modules acceptance.
 - Next recommended task: start M3 with temp-DB clone/sanitize/swap choreography and `db_selector` multi-db validation tests.
 

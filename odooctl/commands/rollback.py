@@ -1,4 +1,6 @@
 from __future__ import annotations
+from pathlib import Path
+
 import typer
 from odooctl.commands.backup import git_commit
 from odooctl.commands.restore import execute as restore_execute
@@ -31,6 +33,10 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         missing_env_vars = cfg.missing_env_vars()
         if missing_env_vars:
             raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
+
+    compose_path = Path(config_path).parent / cfg.runtime.compose_file
+    if not compose_path.exists():
+        raise FileNotFoundError(f"Compose file not found: {compose_path}")
 
     env = cfg.env(environment)
     url = public_url(env.domain) + cfg.healthcheck.path

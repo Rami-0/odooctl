@@ -32,7 +32,10 @@ class MetadataStore:
         for path in deployments_dir.glob(f"{environment}-*.json"):
             if path.name == f"{environment}-latest.json":
                 continue
-            history.append(json.loads(path.read_text()))
+            data = json.loads(path.read_text())
+            if data.get("environment") != environment:
+                continue
+            history.append(data)
         history.sort(key=lambda item: item.get("timestamp", ""), reverse=True)
         for data in history[1:]:
             if data.get("status") == "success":

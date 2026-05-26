@@ -30,8 +30,8 @@
   - `pytest -q` — 97 passed.
   - `ODOO_DB_PASSWORD=ambient-secret pytest -q` — 97 passed.
   - `pytest -m integration` — 97 deselected / 0 selected, exit 0.
-- Commit SHA: recorded in final tick report after commit creation.
-- Push status: pending; push will be attempted before finishing this run.
+- Commit SHA: d5ea2d9 (`Harden pytest harness environment isolation`).
+- Push status: pushed to `origin/master` (`a9747a3..d5ea2d9`); follow-up progress-status commit may be pushed separately.
 - Blockers/open questions: none.
 - Next recommended task: start M1 with `ProjectContext` and `doctor` tests.
 

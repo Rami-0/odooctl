@@ -108,6 +108,7 @@ class OdooCtlConfig(BaseModel):
         seen_db_names: dict[str, str] = {}
         seen_filestore_paths: dict[str, str] = {}
         seen_domains: dict[str, str] = {}
+        seen_branches: dict[str, str] = {}
 
         for name, env in self.environments.items():
             if name == "production" and env.clone_from:
@@ -144,6 +145,14 @@ class OdooCtlConfig(BaseModel):
                     "deploy and rollback healthchecks would target the wrong instance"
                 )
             seen_domains[env.domain] = name
+
+            if env.branch in seen_branches:
+                first_env = seen_branches[env.branch]
+                raise ValueError(
+                    f"Environments '{first_env}' and '{name}' cannot share branch '{env.branch}'; "
+                    "branch-to-environment mapping must be unique for deploy and rollback to target the right instance"
+                )
+            seen_branches[env.branch] = name
         return self
 
     def env(self, name: str) -> EnvironmentConfig:

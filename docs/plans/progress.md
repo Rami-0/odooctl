@@ -177,8 +177,8 @@
 - Verification:
   - `pytest -q tests/test_schedule.py tests/test_cli_smoke.py` — 12 passed.
   - `pytest -q` — 131 passed.
-- Commit SHA: pending.
-- Push status: pending.
+- Commit SHA: 135eeba (`Add schedule generation command`).
+- Push status: pushed to `origin/master` (`a4e2723..135eeba`); follow-up progress-status commit may be pushed separately.
 - Blockers/open questions: real Docker experiment-stack verification remains outstanding.
 - Next recommended task: improve redaction precision with configurable minimum secret length/ignored values, then continue toward real S3 optional adapter.
 

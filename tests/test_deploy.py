@@ -94,6 +94,40 @@ def test_deploy_production_restarts_on_failure_and_records_message(tmp_path: Pat
     assert "healthcheck failed" in (store.saved[-1].message or "")
 
 
+def test_deploy_production_records_recovery_restart_failure_honestly(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    store = DummyStore()
+
+    class FailingRestartCompose(DummyCompose):
+        def restart(self, service: str):
+            super().restart(service)
+            raise RuntimeError("container restart failed")
+
+    compose = FailingRestartCompose("docker-compose.yml")
+
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda environment, config_path: "production_2026")
+    monkeypatch.setattr(deploy_cmd, "git_commit", lambda: "feedbeef")
+    monkeypatch.setattr(deploy_cmd, "run", lambda args, stream=True: None)
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
+    monkeypatch.setattr(deploy_cmd, "MetadataStore", lambda: store)
+
+    try:
+        deploy_cmd.execute("production", "main", str(config))
+    except RuntimeError:
+        pass
+
+    assert compose.calls[-1] == ("restart", ("odoo",))
+    assert store.saved[-1].status == "failed"
+    assert store.saved[-1].message == "healthcheck failed; recovery restart failed: container restart failed"
+
+
 def test_deploy_missing_environment_fails_before_any_action(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(CONFIG)

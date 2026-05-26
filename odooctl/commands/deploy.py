@@ -14,11 +14,11 @@ from odooctl.odoo.module_update import update_modules_compose
 from odooctl.utils.shell import run
 
 
-def _assert_clean_worktree() -> None:
+def _assert_clean_worktree(operation: str = "deploy") -> None:
     result = run(["git", "status", "--porcelain"], check=False)
     dirty_paths = result.stdout.strip()
     if dirty_paths:
-        raise RuntimeError(f"Git worktree is dirty; commit or stash changes before deploy:\n{dirty_paths}")
+        raise RuntimeError(f"Git worktree is dirty; commit or stash changes before {operation}:\n{dirty_paths}")
 
 
 def _preflight(environment: str, branch: str | None, config_path: str):

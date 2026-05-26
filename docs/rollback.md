@@ -7,6 +7,8 @@ Code rollback and full rollback are intentionally separate.
 
 Code rollback refuses to run when no successful deployment commit is recorded. In that case, use a full rollback with an explicit backup or perform a manual git recovery after human review.
 
+Code rollback also refuses to run when the git worktree has uncommitted changes, because it must safely check out the last successful deployment commit. Commit or stash local edits before running `odooctl rollback <environment> --mode code`. Full rollback restores database and filestore state from an explicit backup and does not require a clean git worktree.
+
 Both rollback modes restart the configured Odoo service and then verify the environment healthcheck URL (`https://<domain><healthcheck.path>`). If the healthcheck fails after the service is brought up, `odooctl rollback` exits with that failure instead of reporting a successful rollback.
 
 Rollback also fails fast when the configured Docker Compose file is missing, before checking out code or restoring a full backup.

@@ -17,6 +17,7 @@ from odooctl.commands import (
     project as project_cmd,
     restore as restore_cmd,
     rollback as rollback_cmd,
+    schedule as schedule_cmd,
     status as status_cmd,
     update_modules as update_cmd,
     validate as validate_cmd,
@@ -122,6 +123,38 @@ def doctor(
     json_output: bool = typer.Option(False, "--json", "--json-output"),
 ):
     doctor_cmd.execute(_context_config(config), json_output=json_output)
+
+
+@app.command()
+def schedule(
+    command: str = typer.Argument(..., help="odooctl command to schedule: backup or doctor."),
+    environment: str = typer.Option(..., "--env", "--environment", help="Environment to target."),
+    format: str = typer.Option("systemd", "--format", "-f", help="Output format: systemd or cron."),
+    interval: str = typer.Option(
+        "daily",
+        "--interval",
+        "-i",
+        "--cron",
+        help="systemd OnCalendar value or cron alias/expression.",
+    ),
+    cron_line: bool = typer.Option(False, "--cron-line", help="Shortcut for --format cron."),
+    user: str | None = typer.Option(None, "--user", "-u", help="User for systemd service or /etc/cron.d entry."),
+    odooctl_bin: str = typer.Option("odooctl", "--odooctl-bin", help="Path/name of the odooctl executable."),
+    config: str = "odooctl.yml",
+):
+    try:
+        content = schedule_cmd.render(
+            command,
+            environment,
+            _context_config(config),
+            format="cron" if cron_line else format,
+            interval=interval,
+            user=user,
+            odooctl_bin=odooctl_bin,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(content)
 
 
 @app.command(name="github-actions")

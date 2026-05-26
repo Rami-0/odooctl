@@ -8,6 +8,7 @@ from odooctl.commands import (
     backup as backup_cmd,
     clone as clone_cmd,
     deploy as deploy_cmd,
+    doctor as doctor_cmd,
     github_actions as gha_cmd,
     init as init_cmd,
     logs as logs_cmd,
@@ -92,6 +93,14 @@ def status(
 @app.command()
 def validate(config: str = "odooctl.yml"):
     validate_cmd.run(config)
+
+
+@app.command()
+def doctor(
+    config: str = "odooctl.yml",
+    json_output: bool = typer.Option(False, "--json", "--json-output"),
+):
+    doctor_cmd.execute(config, json_output=json_output)
 
 
 @app.command(name="github-actions")

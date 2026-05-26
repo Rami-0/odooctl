@@ -35,6 +35,18 @@
 - Blockers/open questions: none.
 - Next recommended task: start M1 with `ProjectContext` and `doctor` tests.
 
+### 2026-05-26T15:45:00+00:00 — M1 ProjectContext + doctor foundation
+
+- Completed the first M1 slice: added `ProjectContext` for config-rooted path resolution, side-effect-free preflight checks, and a new `odooctl doctor` command with human and JSON output.
+- Files changed: `odooctl/context.py`, `odooctl/preflight.py`, `odooctl/commands/doctor.py`, `odooctl/main.py`, `tests/test_context.py`, `tests/test_doctor.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_context.py tests/test_doctor.py tests/test_cli_smoke.py` — 12 passed.
+  - `pytest -q` — 101 passed.
+- Commit SHA: pending at time of progress entry; see final report for committed SHA.
+- Push status: pending at time of progress entry; see final report for push result.
+- Blockers/open questions: none.
+- Next recommended task: thread `ProjectContext` through existing commands so compose, metadata, backups, git, sanitization SQL, and config paths stop depending on process cwd.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -45,9 +57,9 @@
 
 ### M1 — ProjectContext + doctor
 
-- [ ] Add `odooctl/context.py` and root paths/state at project root.
-- [ ] Add `odooctl/preflight.py`.
-- [ ] Add `odooctl doctor` with human and JSON output.
+- [x] Add `odooctl/context.py` and root paths/state at project root.
+- [x] Add `odooctl/preflight.py`.
+- [x] Add `odooctl doctor` with human and JSON output.
 - [ ] Thread context through commands.
 
 ### M2 — Docker-native execution mode

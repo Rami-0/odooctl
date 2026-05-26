@@ -3,6 +3,7 @@ from pathlib import Path
 
 import typer
 from odooctl.commands.backup import git_commit
+from odooctl.commands.deploy import _assert_clean_worktree
 from odooctl.commands.restore import execute as restore_execute
 from odooctl.config import load_config
 from odooctl.adapters.docker_compose import DockerComposeAdapter
@@ -61,6 +62,7 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         commit = str(previous["commit"])
         previous_image = previous.get("docker_image")
         image = str(previous_image) if previous_image else cfg.odoo.image
+        _assert_clean_worktree()
 
     try:
         if mode == "code":

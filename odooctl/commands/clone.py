@@ -36,6 +36,7 @@ def execute(
             f"source={source} target={target} profile={sanitization_profile} "
             f"base_url={base_url} sanitize={'yes' if should_sanitize else 'no'}"
         )
+        print(f"source_branch={src.branch} target_branch={dst.branch} clone_from={dst.clone_from}")
         print(f"affected_integrations={','.join(dst.update_modules) or 'none'}")
         print(f"production_source={'yes' if source == 'production' else 'no'}")
         return base_url

@@ -192,6 +192,9 @@ def test_clone_preview_is_readable_and_side_effect_free(tmp_path: Path, monkeypa
     assert "target=staging" in out
     assert "profile=normal" in out
     assert "base_url=https://staging.example.com" in out
+    assert "source_branch=main" in out
+    assert "target_branch=staging" in out
+    assert "clone_from=production" in out
 
 
 def test_clone_respects_clone_from_mapping(tmp_path: Path, monkeypatch):

@@ -57,7 +57,7 @@ For manual ops, the branch used in deploy should always match the environment co
 
 - [ ] Config validates cleanly
 - [ ] Branch matches environment mapping
-- [ ] Each environment has a unique database name and filestore path
+- [ ] Each environment has a unique database name, filestore path, and domain
 - [ ] Staging clone source is correct
 - [ ] Production backup completed
 - [ ] Healthcheck endpoint is reachable

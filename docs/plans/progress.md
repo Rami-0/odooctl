@@ -116,6 +116,19 @@
 - Blockers/open questions: Docker experiment-stack verification still not run; unit coverage verifies command construction only.
 - Next recommended task: run real experiment-stack verification for Docker backup/clone/restore/update-modules, then start M4 project registry if the stack passes.
 
+### 2026-05-26T20:23:00+00:00 — M4 project registry and project selection foundation
+
+- Completed the first M4 product-surface slice: added an XDG-backed global project registry, `odooctl project add/list/use/remove/current`, and global `-p/--project` plus `-C/--project-dir` resolution with the planned precedence for existing commands.
+- Registry state now lives under `${XDG_CONFIG_HOME:-~/.config}/odooctl/config.toml`, records active project plus per-project path/config, and resolves registered projects into `ProjectContext` without moving `.odooctl/` state out of the project repo.
+- Files changed: `odooctl/registry.py`, `odooctl/commands/project.py`, `odooctl/main.py`, `tests/test_registry.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_registry.py tests/test_cli_smoke.py` — 12 passed.
+  - `pytest -q` — 122 passed.
+- Commit SHA: pending in this run.
+- Push status: pending in this run.
+- Blockers/open questions: real Docker experiment-stack verification remains outstanding; M4 env lifecycle commands are not implemented yet.
+- Next recommended task: implement `env list/show/create/destroy` config editing with production destroy guards and mocked clone provisioning tests.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -148,10 +161,10 @@
 
 ### M4 — Global project registry + env lifecycle
 
-- [ ] Add project registry.
-- [ ] Add `project` command group.
+- [x] Add project registry.
+- [x] Add `project` command group.
 - [ ] Add `env` command group.
-- [ ] Support `-p/--project` and `-C/--project-dir` UX.
+- [x] Support `-p/--project` and `-C/--project-dir` UX.
 
 ### M5 — Distribution, scheduling, polish
 

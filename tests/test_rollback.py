@@ -70,8 +70,15 @@ def write_config(tmp_path: Path) -> Path:
     return config
 
 
+def write_compose(tmp_path: Path) -> Path:
+    compose = tmp_path / "docker-compose.yml"
+    compose.write_text("services: {}\n")
+    return compose
+
+
 def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path, monkeypatch, capsys):
     config = write_config(tmp_path)
+    write_compose(tmp_path)
     compose = DummyCompose("docker-compose.yml")
     restore_calls: list[tuple[object, ...]] = []
     run_calls: list[list[str]] = []
@@ -115,6 +122,7 @@ def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path
 
 def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
+    write_compose(tmp_path)
     compose = DummyCompose("docker-compose.yml")
 
     monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
@@ -128,6 +136,7 @@ def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, 
 
 def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
+    write_compose(tmp_path)
     compose = DummyCompose("docker-compose.yml")
     events: list[tuple[str, tuple[object, ...]]] = []
 
@@ -177,6 +186,7 @@ def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatc
 
 def test_rollback_full_mode_requires_env_vars(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
+    write_compose(tmp_path)
     compose = DummyCompose("docker-compose.yml")
     restore_calls: list[tuple[object, ...]] = []
 
@@ -192,6 +202,7 @@ def test_rollback_full_mode_requires_env_vars(tmp_path: Path, monkeypatch):
 
 def test_rollback_fails_when_post_rollback_healthcheck_fails(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
+    write_compose(tmp_path)
     compose = DummyCompose("docker-compose.yml")
 
     store = DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"})
@@ -217,6 +228,7 @@ def test_rollback_fails_when_post_rollback_healthcheck_fails(tmp_path: Path, mon
 
 def test_rollback_full_mode_requires_backup(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
+    write_compose(tmp_path)
     compose = DummyCompose("docker-compose.yml")
     restore_calls: list[tuple[object, ...]] = []
 
@@ -228,6 +240,25 @@ def test_rollback_full_mode_requires_backup(tmp_path: Path, monkeypatch):
 
     assert restore_calls == []
     assert compose.calls == []
+
+
+def test_rollback_full_mode_missing_compose_file_fails_before_restore(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+    store = DummyStore(None)
+    restore_calls: list[tuple[object, ...]] = []
+
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(rollback_cmd, "restore_execute", lambda *args: restore_calls.append(args))
+
+    with pytest.raises(FileNotFoundError, match="Compose file not found"):
+        rollback_cmd.execute("production", "full", "production_2026", str(config))
+
+    assert restore_calls == []
+    assert compose.calls == []
+    assert store.saved == []
 
 
 def test_rollback_rejects_invalid_mode(tmp_path: Path, monkeypatch):

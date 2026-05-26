@@ -151,8 +151,8 @@
 - Verification:
   - `pytest -q tests/test_env_cmd.py tests/test_filestore_volume.py tests/test_clone_swap.py` — 10 passed.
   - `pytest -q` — 127 passed.
-- Commit SHA: fc9095b (`Implement guarded environment purge`); progress follow-up commit pending.
-- Push status: pending in this run.
+- Commit SHA: fc9095b (`Implement guarded environment purge`); progress follow-up commit 5fed41a.
+- Push status: pushed to `origin/master` through 5fed41a (`036d4e6..5fed41a`).
 - Blockers/open questions: real Docker experiment-stack verification still not run.
 - Next recommended task: run Docker experiment-stack verification for backup/clone/restore/update-modules; if not feasible, start M5 PyPI metadata/install docs.
 

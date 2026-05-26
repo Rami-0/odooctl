@@ -87,6 +87,21 @@
 - Blockers/open questions: no Docker integration run in this tick; real experiment-stack verification remains needed for container backup/restore/update-modules acceptance.
 - Next recommended task: start M3 with temp-DB clone/sanitize/swap choreography and `db_selector` multi-db validation tests.
 
+### 2026-05-26T18:50:40+00:00 — M3 temp DB clone/sanitize/swap foundation
+
+- Completed the first M3 safety slice: clone now restores into `<target_db><temp_db_suffix>`, sanitizes the temporary DB before exposure, then terminates target connections, drops the old target DB, and renames the prepared temp DB into place.
+- Added guarded DB swap helpers that refuse production targets, plus default `sanitization.temp_db_suffix: _incoming`.
+- Expanded default sanitization for real Odoo deployments with guarded OCA `queue_job`, `base_automation`, and unsent `mail_mail` spool cleanup SQL.
+- Relaxed same-domain validation for explicit same-stack `db_selector: true` multi-db environments while preserving the old failure for non-selector/shared-domain configs.
+- Files changed: `odooctl/commands/clone.py`, `odooctl/config.py`, `odooctl/odoo/db_swap.py`, `odooctl/odoo/sanitize.py`, `examples/odooctl.yml`, `tests/test_clone.py`, `tests/test_clone_swap.py`, `tests/test_sanitize.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_clone.py tests/test_clone_swap.py tests/test_sanitize.py tests/test_config.py` — 35 passed.
+  - `pytest -q` — 112 passed.
+- Commit SHA: pending.
+- Push status: pending.
+- Blockers/open questions: Docker experiment-stack verification still not run; filestore named-volume adapter remains outstanding for M3.
+- Next recommended task: add explicit config tests for `db_selector` multi-db sharing and then implement Docker volume filestore adapter.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -112,10 +127,10 @@
 
 ### M3 — Safe clone + multi-db + filestore volumes
 
-- [ ] Implement temp DB clone/sanitize/swap.
+- [x] Implement temp DB clone/sanitize/swap.
 - [ ] Support multi-db mode with `db_selector`.
 - [ ] Add Docker volume filestore adapter.
-- [ ] Expand sanitization for queue jobs and mail spool.
+- [x] Expand sanitization for queue jobs and mail spool.
 
 ### M4 — Global project registry + env lifecycle
 

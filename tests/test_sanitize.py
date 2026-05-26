@@ -23,6 +23,9 @@ def test_default_sanitization_disables_dangerous_integrations(tmp_path: Path):
     assert "UPDATE fetchmail_server SET active = false" in sql
     assert "UPDATE ir_cron SET active = false" in sql
     assert "payment_provider" in sql
+    assert "queue_job" in sql
+    assert "base_automation" in sql
+    assert "mail_mail" in sql
     assert "https://staging.odoo.example.com" in sql
 
 

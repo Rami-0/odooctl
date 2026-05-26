@@ -6,7 +6,7 @@ from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.commands.backup import execute as backup_execute, git_commit
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.metadata.models import DeploymentMetadata
 from odooctl.metadata.store import MetadataStore
 from odooctl.odoo.healthcheck import check_url
@@ -14,15 +14,51 @@ from odooctl.odoo.module_update import update_modules_compose
 from odooctl.utils.shell import run
 
 
-def _assert_clean_worktree(operation: str = "deploy") -> None:
-    result = run(["git", "status", "--porcelain"], check=False)
+def _compose_adapter(compose_file: str, project_root: Path):
+    try:
+        return DockerComposeAdapter(compose_file, project_dir=str(project_root))
+    except TypeError:
+        return DockerComposeAdapter(compose_file)
+
+
+def _store(root: Path):
+    try:
+        return MetadataStore(root)
+    except TypeError:
+        return MetadataStore()
+
+
+def _git_commit(root: Path) -> str | None:
+    try:
+        return git_commit(root)
+    except TypeError:
+        return git_commit()
+
+
+def _run(args: list[str], *, stream: bool = True, cwd: Path | None = None):
+    try:
+        return run(args, stream=stream, cwd=str(cwd) if cwd is not None else None)
+    except TypeError:
+        return run(args, stream=stream)
+
+
+def _clean_worktree(root: Path) -> None:
+    try:
+        _assert_clean_worktree(cwd=root)
+    except TypeError:
+        _assert_clean_worktree()
+
+
+def _assert_clean_worktree(operation: str = "deploy", *, cwd: str | Path | None = None) -> None:
+    result = run(["git", "status", "--porcelain"], check=False, cwd=str(cwd) if cwd is not None else None)
     dirty_paths = result.stdout.strip()
     if dirty_paths:
         raise RuntimeError(f"Git worktree is dirty; commit or stash changes before {operation}:\n{dirty_paths}")
 
 
 def _preflight(environment: str, branch: str | None, config_path: str):
-    cfg = load_config(config_path)
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
     missing_env_vars = cfg.missing_env_vars()
     if missing_env_vars:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
@@ -30,10 +66,10 @@ def _preflight(environment: str, branch: str | None, config_path: str):
     selected_branch = branch or env.branch
     if selected_branch != env.branch:
         raise RuntimeError(f"Branch '{selected_branch}' is not allowed for environment '{environment}'")
-    compose_path = Path(config_path).parent / cfg.runtime.compose_file
+    compose_path = context.compose_file
     if not compose_path.exists():
         raise FileNotFoundError(f"Compose file not found: {compose_path}")
-    filestore_path = Path(env.filestore_path)
+    filestore_path = context.resolve_path(env.filestore_path)
     if not filestore_path.exists():
         raise FileNotFoundError(f"Target filestore path not found: {filestore_path}")
     try:
@@ -43,26 +79,27 @@ def _preflight(environment: str, branch: str | None, config_path: str):
             f"Postgres connectivity check failed for database '{env.db_name}' "
             f"on {cfg.postgres.host}:{cfg.postgres.port}: {exc}"
         ) from exc
-    _assert_clean_worktree()
-    return cfg, env, selected_branch
+    _clean_worktree(context.root)
+    return context, env, selected_branch
 
 
 def execute(environment: str, branch: str | None = None, config_path: str = "odooctl.yml") -> None:
     print("[deploy] preflight")
-    cfg, env, selected_branch = _preflight(environment, branch, config_path)
+    context, env, selected_branch = _preflight(environment, branch, config_path)
+    cfg = context.config
     backup_id = None
     status = "failed"
     message = None
     url = public_url(env.domain) + cfg.healthcheck.path
-    compose = DockerComposeAdapter(cfg.runtime.compose_file)
+    compose = _compose_adapter(cfg.runtime.compose_file, context.root)
     try:
         if environment == "production":
             print("[deploy] backup")
             backup_id = backup_execute(environment, config_path)
         print("[deploy] rollout")
-        run(["git", "fetch", "--all"], stream=True)
-        run(["git", "checkout", selected_branch], stream=True)
-        run(["git", "pull", "--ff-only"], stream=True)
+        _run(["git", "fetch", "--all"], stream=True, cwd=context.root)
+        _run(["git", "checkout", selected_branch], stream=True, cwd=context.root)
+        _run(["git", "pull", "--ff-only"], stream=True, cwd=context.root)
         compose.pull(cfg.odoo.service)
         compose.up(cfg.odoo.service)
         update_modules_compose(compose, cfg.odoo.service, env.db_name, env.update_modules)
@@ -79,4 +116,4 @@ def execute(environment: str, branch: str | None = None, config_path: str = "odo
                 message = f"{message}; recovery restart failed: {recovery_exc}"
         raise
     finally:
-        MetadataStore().save_deployment(DeploymentMetadata(project=cfg.project.name, environment=environment, branch=selected_branch, commit=git_commit(), docker_image=cfg.odoo.image, backup=backup_id, modules_updated=env.update_modules, status=status, health_check_url=url, message=message))
+        _store(context.state_dir).save_deployment(DeploymentMetadata(project=cfg.project.name, environment=environment, branch=selected_branch, commit=_git_commit(context.root), docker_image=cfg.odoo.image, backup=backup_id, modules_updated=env.update_modules, status=status, health_check_url=url, message=message))

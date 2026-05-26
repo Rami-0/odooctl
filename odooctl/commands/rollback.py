@@ -5,7 +5,7 @@ import typer
 from odooctl.commands.backup import git_commit
 from odooctl.commands.deploy import _assert_clean_worktree
 from odooctl.commands.restore import execute as restore_execute
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.metadata.models import DeploymentMetadata
@@ -13,6 +13,34 @@ from odooctl.metadata.store import MetadataStore
 from odooctl.odoo.healthcheck import check_url
 from odooctl.utils.logging import warn
 from odooctl.utils.shell import run
+
+
+def _compose_adapter(compose_file: str, project_root: Path):
+    try:
+        return DockerComposeAdapter(compose_file, project_dir=str(project_root))
+    except TypeError:
+        return DockerComposeAdapter(compose_file)
+
+
+def _store(root: Path):
+    try:
+        return MetadataStore(root)
+    except TypeError:
+        return MetadataStore()
+
+
+def _git_commit(root: Path) -> str | None:
+    try:
+        return git_commit(root)
+    except TypeError:
+        return git_commit()
+
+def _clean_worktree(operation: str, root: Path) -> None:
+    try:
+        _assert_clean_worktree(operation, cwd=root)
+    except TypeError:
+        _assert_clean_worktree(operation)
+
 
 def _verify_health(cfg, environment: str) -> None:
     url = public_url(cfg.env(environment).domain) + cfg.healthcheck.path
@@ -25,7 +53,8 @@ def _verify_health(cfg, environment: str) -> None:
     )
 
 def execute(environment: str, mode: str = "code", backup: str | None = None, config_path: str = "odooctl.yml") -> None:
-    cfg = load_config(config_path)
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
     if mode not in {"code", "full"}:
         raise typer.BadParameter("--mode must be code or full")
     if mode == "full" and not backup:
@@ -35,17 +64,17 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         if missing_env_vars:
             raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
 
-    compose_path = Path(config_path).parent / cfg.runtime.compose_file
+    compose_path = context.compose_file
     if not compose_path.exists():
         raise FileNotFoundError(f"Compose file not found: {compose_path}")
 
     env = cfg.env(environment)
     url = public_url(env.domain) + cfg.healthcheck.path
-    compose = DockerComposeAdapter(cfg.runtime.compose_file)
-    store = MetadataStore()
+    compose = _compose_adapter(cfg.runtime.compose_file, context.root)
+    store = _store(context.state_dir)
     status = "failed"
     message = None
-    commit: str | None = git_commit()
+    commit: str | None = _git_commit(context.root)
     image: str | None = cfg.odoo.image
 
     if mode == "code":
@@ -62,17 +91,17 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         commit = str(previous["commit"])
         previous_image = previous.get("docker_image")
         image = str(previous_image) if previous_image else cfg.odoo.image
-        _assert_clean_worktree("code rollback")
+        _clean_worktree("code rollback", context.root)
 
     try:
         if mode == "code":
             warn("Code-only rollback: redeploying the last successful commit does not restore database or filestore.")
             print(f"[rollback] target commit: {commit}")
             print(f"[rollback] recorded image: {image}")
-            run(["git", "fetch", "--all"], stream=True)
+            run(["git", "fetch", "--all"], stream=True, cwd=str(context.root))
             if commit is None:
                 raise RuntimeError("No current git commit available for code rollback metadata")
-            run(["git", "checkout", commit], stream=True)
+            run(["git", "checkout", commit], stream=True, cwd=str(context.root))
         else:
             if backup is None:
                 raise RuntimeError("Full rollback requires a backup id")

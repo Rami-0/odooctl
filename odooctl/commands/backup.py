@@ -6,7 +6,7 @@ from odooctl.adapters.filestore import FilestoreAdapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.s3 import S3Adapter
 from odooctl.commands.restore import sha256_file
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.metadata.models import BackupManifest
 from odooctl.metadata.store import MetadataStore
 from odooctl.utils.paths import ensure_dir
@@ -18,8 +18,8 @@ SENSITIVE_CONFIG_KEYS = re.compile(
 )
 
 
-def git_commit() -> str | None:
-    r = shell_run(["git", "rev-parse", "--short", "HEAD"], check=False)
+def git_commit(cwd: str | Path | None = None) -> str | None:
+    r = shell_run(["git", "rev-parse", "--short", "HEAD"], check=False, cwd=str(cwd) if cwd is not None else None)
     return r.stdout.strip() or None
 
 
@@ -75,19 +75,20 @@ def redact_config_snapshot(text: str) -> str:
 
 
 def execute(environment: str, config_path: str = "odooctl.yml") -> str:
-    cfg = load_config(config_path)
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
     env = cfg.env(environment)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
     backup_id = f"{environment}_{ts}"
-    backup_dir = ensure_dir(Path(cfg.backups.local_path) / backup_id)
+    backup_dir = ensure_dir(context.backups_dir / backup_id)
     pg = PostgresAdapter(cfg.postgres)
     fs = FilestoreAdapter()
     pg.dump(env.db_name, backup_dir / "db.dump")
-    fs.archive(env.filestore_path, backup_dir / "filestore.tar.zst")
-    if Path(cfg.odoo.config_path).exists():
-        text = Path(cfg.odoo.config_path).read_text()
+    fs.archive(str(context.resolve_path(env.filestore_path)), backup_dir / "filestore.tar.zst")
+    if context.odoo_config_path.exists():
+        text = context.odoo_config_path.read_text()
         (backup_dir / "odoo.conf.redacted").write_text(redact_config_snapshot(text))
-    commit = git_commit()
+    commit = git_commit(context.root)
     (backup_dir / "git_commit.txt").write_text(commit or "unknown")
     (backup_dir / "docker_image.txt").write_text(cfg.odoo.image)
     manifest = BackupManifest(
@@ -107,10 +108,10 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
         },
     )
     (backup_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2))
-    MetadataStore().save_backup_manifest(backup_id, manifest)
+    MetadataStore(context.state_dir).save_backup_manifest(backup_id, manifest)
     if cfg.backups.remote:
-        remote = S3Adapter(cfg.backups.remote)
+        remote = S3Adapter(cfg.backups.remote, root=context.state_dir / "remote-backups")
         remote.upload_backup(backup_dir)
     keep_count = max(cfg.backups.retention.daily, cfg.backups.retention.weekly, cfg.backups.retention.monthly)
-    prune_backups(Path(cfg.backups.local_path), keep=max(keep_count, 1), environment=environment)
+    prune_backups(context.backups_dir, keep=max(keep_count, 1), environment=environment)
     return backup_id

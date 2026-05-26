@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from odooctl.adapters.filestore import FilestoreAdapter
 from odooctl.adapters.postgres import PostgresAdapter
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.odoo.healthcheck import check_url
 from odooctl.adapters.reverse_proxy import public_url
 
@@ -62,12 +62,13 @@ def validate_backup_dir(
 
 
 def execute(environment: str, backup: str = "latest", config_path: str = "odooctl.yml") -> str:
-    cfg = load_config(config_path)
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
     env = cfg.env(environment)
-    backup_dir = resolve_backup_dir(environment, backup, Path(cfg.backups.local_path))
+    backup_dir = resolve_backup_dir(environment, backup, context.backups_dir)
     validate_backup_dir(backup_dir, expected_project=cfg.project.name, expected_environment=environment, restore_mode="full")
     PostgresAdapter(cfg.postgres).restore(env.db_name, backup_dir / "db.dump")
-    FilestoreAdapter().restore_archive(backup_dir / "filestore.tar.zst", env.filestore_path)
+    FilestoreAdapter().restore_archive(backup_dir / "filestore.tar.zst", str(context.resolve_path(env.filestore_path)))
     url = public_url(env.domain) + cfg.healthcheck.path
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
     return backup_dir.name

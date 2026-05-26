@@ -7,8 +7,29 @@ from rich.console import Console
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.commands.backup import git_commit
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.metadata.store import MetadataStore
+
+
+def _compose_adapter(compose_file: str, project_root):
+    try:
+        return DockerComposeAdapter(compose_file, project_dir=str(project_root))
+    except TypeError:
+        return DockerComposeAdapter(compose_file)
+
+
+def _store(root):
+    try:
+        return MetadataStore(root)
+    except TypeError:
+        return MetadataStore()
+
+
+def _git_commit(root) -> str | None:
+    try:
+        return git_commit(root)
+    except TypeError:
+        return git_commit()
 
 
 def _service_status(ps_output: str, service: str) -> str:
@@ -27,10 +48,11 @@ def _service_status(ps_output: str, service: str) -> str:
     return "unknown"
 
 def execute(config_path: str = "odooctl.yml", environment: str | None = None, *, json_output: bool = False) -> None:
-    cfg = load_config(config_path)
-    store = MetadataStore()
+    context = ProjectContext.from_config_path(config_path)
+    cfg = context.config
+    store = _store(context.state_dir)
     console = Console()
-    ps = DockerComposeAdapter(cfg.runtime.compose_file).ps()
+    ps = _compose_adapter(cfg.runtime.compose_file, context.root).ps()
     env_items = [(environment, cfg.env(environment))] if environment else list(cfg.environments.items())
 
     def build_environment_payload(name: str, env) -> dict:
@@ -44,7 +66,7 @@ def execute(config_path: str = "odooctl.yml", environment: str | None = None, *,
             "commit": dep.get("commit", backup.get("git_commit", "unknown")),
             "image": dep.get("docker_image", backup.get("docker_image", cfg.odoo.image)),
             "odoo": _service_status(ps, cfg.odoo.service),
-            "postgresql": _service_status(ps, "postgres"),
+            "postgresql": _service_status(ps, cfg.postgres.service),
             "latest_backup": backup.get("timestamp", "unknown"),
             "last_deployment": dep.get("status", "unknown"),
             "last_deployment_backup": dep.get("backup", "unknown"),
@@ -56,14 +78,14 @@ def execute(config_path: str = "odooctl.yml", environment: str | None = None, *,
     if json_output:
         payload = {
             "project": cfg.project.name,
-            "current_git_commit": git_commit() or "unknown",
+            "current_git_commit": _git_commit(context.root) or "unknown",
             "environments": [build_environment_payload(name, env) for name, env in env_items],
         }
         console.print(json.dumps(payload, indent=2, sort_keys=True))
         return
 
     console.print(f"Project: {cfg.project.name}")
-    console.print(f"Current git commit: {git_commit() or 'unknown'}")
+    console.print(f"Current git commit: {_git_commit(context.root) or 'unknown'}")
     console.print("")
     for name, env in env_items:
         payload = build_environment_payload(name, env)

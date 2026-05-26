@@ -47,6 +47,19 @@
 - Blockers/open questions: none.
 - Next recommended task: thread `ProjectContext` through existing commands so compose, metadata, backups, git, sanitization SQL, and config paths stop depending on process cwd.
 
+### 2026-05-26T16:36:14+00:00 — M1 context threading completed
+
+- Completed the remaining M1 slice: threaded `ProjectContext` through deploy, backup, clone, restore, rollback, status, logs, update-modules, and validate command paths.
+- Rooted compose execution at the project root, moved metadata reads/writes to `ProjectContext.state_dir`, rooted backup and filestore paths, ran git commands from the project root, and resolved sanitization SQL files relative to the project root.
+- Added backward-compatible `postgres.service` default and switched status PostgreSQL service detection to that config field instead of hardcoded `postgres`.
+- Files changed: `odooctl/commands/backup.py`, `odooctl/commands/clone.py`, `odooctl/commands/deploy.py`, `odooctl/commands/logs.py`, `odooctl/commands/restore.py`, `odooctl/commands/rollback.py`, `odooctl/commands/status.py`, `odooctl/commands/update_modules.py`, `odooctl/commands/validate.py`, `odooctl/config.py`, `odooctl/odoo/sanitize.py`, `tests/test_clone.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q` — 101 passed.
+- Commit SHA: pending before final git discipline.
+- Push status: pending before final git discipline.
+- Blockers/open questions: none.
+- Next recommended task: start M2 with additive config fields for execution mode and container PostgreSQL/Odoo connection settings.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -60,7 +73,7 @@
 - [x] Add `odooctl/context.py` and root paths/state at project root.
 - [x] Add `odooctl/preflight.py`.
 - [x] Add `odooctl doctor` with human and JSON output.
-- [ ] Thread context through commands.
+- [x] Thread context through commands.
 
 ### M2 — Docker-native execution mode
 

@@ -184,7 +184,7 @@ def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeyp
 
     execute("production", "staging", True, str(config))
 
-    assert ("psql_file", ("odoo_staging", Path(".sanitize/extra.sql"))) in events
+    assert ("psql_file", ("odoo_staging", extra_sql)) in events
     assert [event for event, _ in events].index("psql_file") > [event for event, _ in events].index("psql")
 
 

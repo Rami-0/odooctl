@@ -47,11 +47,13 @@ def sanitize_database(
     env: EnvironmentConfig,
     config: OdooCtlConfig,
     profile: str = "normal",
+    *,
+    sql_files: list[Path] | None = None,
 ) -> None:
     for sql in profile_sql(profile, env, config):
         pg.psql(db_name, sql)
-    for file_name in config.sanitization.sql_files:
-        path = Path(file_name)
+    paths = sql_files if sql_files is not None else [Path(file_name) for file_name in config.sanitization.sql_files]
+    for path in paths:
         if not path.exists():
-            raise FileNotFoundError(f"Configured sanitization SQL file does not exist: {file_name}")
+            raise FileNotFoundError(f"Configured sanitization SQL file does not exist: {path}")
         pg.psql_file(db_name, path)

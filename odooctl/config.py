@@ -35,6 +35,7 @@ class PostgresConfig(BaseModel):
     port: int = 5432
     user: str = "odoo"
     password_env: str = "ODOO_DB_PASSWORD"
+    service: str = "postgres"
 
     def password(self) -> str:
         value = os.getenv(self.password_env)

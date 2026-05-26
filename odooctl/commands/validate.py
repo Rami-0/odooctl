@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import typer
 
-from odooctl.config import load_config
+from odooctl.context import ProjectContext
 from odooctl.utils.logging import success, warn
 
 
 def execute(config_path: str = "odooctl.yml") -> None:
-    cfg = load_config(config_path)
+    cfg = ProjectContext.from_config_path(config_path).config
     env_names = ", ".join(sorted(cfg.environments))
     success(f"Config valid: {cfg.project.name} ({env_names})")
 

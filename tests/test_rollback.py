@@ -132,7 +132,7 @@ def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatc
     events: list[tuple[str, tuple[object, ...]]] = []
 
     store = DummyStore(None)
-
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
     monkeypatch.setattr(
         rollback_cmd,
         "DockerComposeAdapter",
@@ -174,6 +174,21 @@ def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatc
     assert metadata.status == "success"
     assert metadata.health_check_url == "https://odoo.example.com/web/health"
     assert metadata.message == "rollback:full"
+
+def test_rollback_full_mode_requires_env_vars(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+    restore_calls: list[tuple[object, ...]] = []
+
+    monkeypatch.delenv("ODOO_DB_PASSWORD", raising=False)
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "restore_execute", lambda *args: restore_calls.append(args))
+
+    with pytest.raises(RuntimeError, match="Missing required environment variables: ODOO_DB_PASSWORD"):
+        rollback_cmd.execute("production", "full", "production_2026", str(config))
+
+    assert restore_calls == []
+    assert compose.calls == []
 
 def test_rollback_fails_when_post_rollback_healthcheck_fails(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)

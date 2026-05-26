@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -60,6 +61,7 @@ def test_deploy_production_runs_backup_pull_update_and_records_metadata(tmp_path
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda compose_obj, service, db_name, modules: events.append(("update", (service, db_name, tuple(modules)))))
     monkeypatch.setattr(deploy_cmd, "check_url", lambda url, **kwargs: events.append(("healthcheck", (url, kwargs["timeout"], kwargs["retries"], kwargs["interval"]))))
     monkeypatch.setattr(deploy_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(deploy_cmd, "_assert_clean_worktree", lambda: None)
 
     deploy_cmd.execute("production", "main", str(config))
 
@@ -94,6 +96,7 @@ def test_deploy_production_restarts_on_failure_and_records_message(tmp_path: Pat
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
     monkeypatch.setattr(deploy_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(deploy_cmd, "_assert_clean_worktree", lambda: None)
 
     try:
         deploy_cmd.execute("production", "main", str(config))
@@ -129,6 +132,7 @@ def test_deploy_production_records_recovery_restart_failure_honestly(tmp_path: P
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
     monkeypatch.setattr(deploy_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(deploy_cmd, "_assert_clean_worktree", lambda: None)
 
     try:
         deploy_cmd.execute("production", "main", str(config))
@@ -244,6 +248,34 @@ def test_deploy_unreachable_database_fails_before_rollout(tmp_path: Path, monkey
     assert called == ["postgres"]
 
 
+def test_deploy_dirty_worktree_fails_before_rollout(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    called = []
+
+    def fake_run(args, **kwargs):
+        if tuple(args) == ("git", "status", "--porcelain"):
+            return SimpleNamespace(stdout=" M odooctl/main.py\n", returncode=0, stderr="", args=list(args))
+        called.append("run")
+        return SimpleNamespace(stdout="", returncode=0, stderr="", args=list(args))
+
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", fake_run)
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+    monkeypatch.setattr(deploy_cmd, "PostgresAdapter", DummyPostgres)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        deploy_cmd.execute("production", "main", str(config))
+
+    assert "Git worktree is dirty" in str(exc_info.value)
+    assert "M odooctl/main.py" in str(exc_info.value)
+    assert called == []
+
+
 def test_deploy_missing_env_vars_fails_preflight_before_rollout(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
@@ -278,6 +310,7 @@ def test_deploy_emits_stage_progress_messages(tmp_path: Path, monkeypatch, capsy
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "MetadataStore", lambda: DummyStore())
+    monkeypatch.setattr(deploy_cmd, "_assert_clean_worktree", lambda: None)
 
     deploy_cmd.execute("production", "main", str(config))
 

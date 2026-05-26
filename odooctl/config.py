@@ -105,6 +105,9 @@ class OdooCtlConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_environment_graph(self) -> "OdooCtlConfig":
+        seen_db_names: dict[str, str] = {}
+        seen_filestore_paths: dict[str, str] = {}
+
         for name, env in self.environments.items():
             if name == "production" and env.clone_from:
                 raise ValueError(
@@ -116,6 +119,22 @@ class OdooCtlConfig(BaseModel):
                 raise ValueError(f"Environment '{name}' clone_from '{env.clone_from}' is not defined. Known: {known}")
             if env.clone_from == name:
                 raise ValueError(f"Environment '{name}' cannot clone_from itself")
+
+            if env.db_name in seen_db_names:
+                first_env = seen_db_names[env.db_name]
+                raise ValueError(
+                    f"Environments '{first_env}' and '{name}' cannot share db_name '{env.db_name}'; "
+                    "clone and rollback operations drop and recreate target databases"
+                )
+            seen_db_names[env.db_name] = name
+
+            if env.filestore_path in seen_filestore_paths:
+                first_env = seen_filestore_paths[env.filestore_path]
+                raise ValueError(
+                    f"Environments '{first_env}' and '{name}' cannot share filestore_path '{env.filestore_path}'; "
+                    "clone and rollback operations replace target filestores"
+                )
+            seen_filestore_paths[env.filestore_path] = name
         return self
 
     def env(self, name: str) -> EnvironmentConfig:

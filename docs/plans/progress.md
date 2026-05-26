@@ -55,8 +55,8 @@
 - Files changed: `odooctl/commands/backup.py`, `odooctl/commands/clone.py`, `odooctl/commands/deploy.py`, `odooctl/commands/logs.py`, `odooctl/commands/restore.py`, `odooctl/commands/rollback.py`, `odooctl/commands/status.py`, `odooctl/commands/update_modules.py`, `odooctl/commands/validate.py`, `odooctl/config.py`, `odooctl/odoo/sanitize.py`, `tests/test_clone.py`, `docs/plans/progress.md`.
 - Verification:
   - `pytest -q` — 101 passed.
-- Commit SHA: pending before final git discipline.
-- Push status: pending before final git discipline.
+- Commit SHA: 53c6905 (`Thread ProjectContext through commands`).
+- Push status: pushed to `origin/master` (`e8f0b73..53c6905`).
 - Blockers/open questions: none.
 - Next recommended task: start M2 with additive config fields for execution mode and container PostgreSQL/Odoo connection settings.
 

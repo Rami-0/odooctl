@@ -60,13 +60,13 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
     assert url == "https://staging.example.com"
     assert events[0] == ("postgres_init", ("localhost", 5432, "odoo"))
     assert events[1][0] == "dump" and events[1][1][0] == "odoo_prod" and str(events[1][1][1]).endswith(".dump")
-    assert events[2][0] == "restore" and events[2][1][0] == "odoo_staging" and str(events[2][1][1]).endswith(".dump")
+    assert events[2][0] == "restore" and events[2][1][0] == "odoo_staging_incoming" and str(events[2][1][1]).endswith(".dump")
     assert events[3] == ("copy", ("/srv/filestore/prod", "/srv/filestore/staging"))
-    assert events[4] == ("psql", ("odoo_staging", "UPDATE ir_mail_server SET active = false;"))
-    assert events[5] == ("psql", ("odoo_staging", "UPDATE fetchmail_server SET active = false;"))
-    assert events[6] == ("psql", ("odoo_staging", "UPDATE ir_cron SET active = false WHERE active = true;"))
-    assert events[7] == ("psql", ("odoo_staging", "UPDATE payment_provider SET state = 'disabled' WHERE state != 'disabled';"))
-    psql_sql = [str(args[1]) for event, args in events if event == "psql" and args[0] == "odoo_staging"]
+    assert events[4] == ("psql", ("odoo_staging_incoming", "UPDATE ir_mail_server SET active = false;"))
+    assert events[5] == ("psql", ("odoo_staging_incoming", "UPDATE fetchmail_server SET active = false;"))
+    assert events[6] == ("psql", ("odoo_staging_incoming", "UPDATE ir_cron SET active = false WHERE active = true;"))
+    assert events[7] == ("psql", ("odoo_staging_incoming", "UPDATE payment_provider SET state = 'disabled' WHERE state != 'disabled';"))
+    psql_sql = [str(args[1]) for event, args in events if event == "psql" and args[0] == "odoo_staging_incoming"]
     assert "UPDATE ir_config_parameter SET value = 'https://staging.example.com' WHERE key = 'web.base.url';" in psql_sql
     assert any("webhook" in sql and "callback" in sql for sql in psql_sql)
     assert any("api_key" in sql and "secret" in sql and "token" in sql for sql in psql_sql)
@@ -126,8 +126,8 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
 
     execute("production", "staging", True, str(config), sanitization_profile="minimal")
 
-    assert any("UPDATE ir_mail_server SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging")
-    assert not any("UPDATE ir_cron SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging")
+    assert any("UPDATE ir_mail_server SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging_incoming")
+    assert not any("UPDATE ir_cron SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging_incoming")
 
 
 def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeypatch):
@@ -184,7 +184,7 @@ def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeyp
 
     execute("production", "staging", True, str(config))
 
-    assert ("psql_file", ("odoo_staging", extra_sql)) in events
+    assert ("psql_file", ("odoo_staging_incoming", extra_sql)) in events
     assert [event for event, _ in events].index("psql_file") > [event for event, _ in events].index("psql")
 
 

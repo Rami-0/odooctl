@@ -20,6 +20,26 @@ def default_sql(env: EnvironmentConfig, config: OdooCtlConfig) -> list[str]:
         stmts.append("UPDATE ir_cron SET active = false WHERE active = true;")
     if config.sanitization.disable_payment_providers:
         stmts.append("UPDATE payment_provider SET state = 'disabled' WHERE state != 'disabled';")
+    if config.sanitization.disable_queue_jobs:
+        stmts.append(
+            "DO $$ BEGIN "
+            "IF to_regclass('public.queue_job') IS NOT NULL THEN "
+            "UPDATE queue_job SET state = 'cancelled' WHERE state NOT IN ('done', 'cancelled'); "
+            "END IF; END $$;"
+        )
+        stmts.append(
+            "DO $$ BEGIN "
+            "IF to_regclass('public.base_automation') IS NOT NULL THEN "
+            "UPDATE base_automation SET active = false WHERE active = true; "
+            "END IF; END $$;"
+        )
+    if config.sanitization.purge_mail_queue:
+        stmts.append(
+            "DO $$ BEGIN "
+            "IF to_regclass('public.mail_mail') IS NOT NULL THEN "
+            "DELETE FROM mail_mail WHERE state != 'sent'; "
+            "END IF; END $$;"
+        )
     stmts.append(
         "UPDATE ir_config_parameter SET value = '' "
         "WHERE key ILIKE '%webhook%' OR key ILIKE '%callback%' OR key ILIKE '%endpoint_url%';"

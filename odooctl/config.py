@@ -108,6 +108,9 @@ class SanitizationConfig(BaseModel):
     disable_crons: bool = True
     rewrite_base_url: bool = True
     disable_payment_providers: bool = True
+    disable_queue_jobs: bool = True
+    purge_mail_queue: bool = True
+    temp_db_suffix: str = "_incoming"
 
 
 class HealthcheckConfig(BaseModel):
@@ -179,10 +182,13 @@ class OdooCtlConfig(BaseModel):
 
             if env.domain in seen_domains:
                 first_env = seen_domains[env.domain]
-                raise ValueError(
-                    f"Environments '{first_env}' and '{name}' cannot share domain '{env.domain}'; "
-                    "deploy and rollback healthchecks would target the wrong instance"
-                )
+                first = self.environments[first_env]
+                shared_multidb_stack = first.stack == env.stack and first.db_selector and env.db_selector
+                if not shared_multidb_stack:
+                    raise ValueError(
+                        f"Environments '{first_env}' and '{name}' cannot share domain '{env.domain}'; "
+                        "deploy and rollback healthchecks would target the wrong instance unless both use db_selector in the same stack"
+                    )
             seen_domains[env.domain] = name
 
             if env.branch in seen_branches:
@@ -289,6 +295,9 @@ sanitization:
   disable_crons: true
   rewrite_base_url: true
   disable_payment_providers: true
+  disable_queue_jobs: true
+  purge_mail_queue: true
+  temp_db_suffix: _incoming
 
 healthcheck:
   path: /web/login

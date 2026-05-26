@@ -7,6 +7,7 @@ from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.context import ProjectContext
+from odooctl.odoo.db_swap import swap_temp_database
 from odooctl.odoo.sanitize import sanitize_database
 from odooctl.odoo.module_update import update_modules_compose
 from odooctl.odoo.healthcheck import check_url, with_db_selector
@@ -63,17 +64,23 @@ def execute(
 
     pg = make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
     fs = FilestoreAdapter()
-    # Direct dump/restore keeps db + filestore in one explicit clone flow.
-    with tempfile.NamedTemporaryFile(prefix="odooctl-clone-", suffix=".dump", delete=False) as tmp:
-        tmp_dump = Path(tmp.name)
-    try:
-        pg.dump(src.db_name, tmp_dump)
-        pg.restore(dst.db_name, tmp_dump)
-    finally:
-        tmp_dump.unlink(missing_ok=True)
+    temp_db = f"{dst.db_name}{cfg.sanitization.temp_db_suffix}"
+    if temp_db == dst.db_name:
+        raise RuntimeError("Configured sanitization.temp_db_suffix must produce a temporary database distinct from the target")
+    if hasattr(pg, "clone_db_in_container"):
+        pg.clone_db_in_container(src.db_name, temp_db)  # type: ignore[attr-defined]
+    else:
+        with tempfile.NamedTemporaryFile(prefix="odooctl-clone-", suffix=".dump", delete=False) as tmp:
+            tmp_dump = Path(tmp.name)
+        try:
+            pg.dump(src.db_name, tmp_dump)
+            pg.restore(temp_db, tmp_dump)
+        finally:
+            tmp_dump.unlink(missing_ok=True)
     fs.copy(str(context.resolve_path(src.filestore_path)), str(context.resolve_path(dst.filestore_path)))
     if should_sanitize:
-        sanitize_database(pg, dst.db_name, dst, cfg, sanitization_profile, sql_files=context.sanitization_sql_files())
+        sanitize_database(pg, temp_db, dst, cfg, sanitization_profile, sql_files=context.sanitization_sql_files())
+    swap_temp_database(pg, temp_db=temp_db, target_db=dst.db_name, target_env_name=target)
     compose = _compose_adapter(cfg.runtime.compose_file, context.root)
     try:
         update_modules_compose(

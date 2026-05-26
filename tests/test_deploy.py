@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from odooctl.commands import deploy as deploy_cmd
 
 
@@ -29,6 +31,13 @@ class DummyCompose:
         self.calls.append(("restart", (service,)))
 
 
+class DummyPostgres:
+    def __init__(self, config):
+        self.config = config
+
+    def ping(self, db_name: str):
+        return None
+
 CONFIG = """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    update_modules: [sale]\n    sanitize: true\n"""
 
 
@@ -46,6 +55,7 @@ def test_deploy_production_runs_backup_pull_update_and_records_metadata(tmp_path
     monkeypatch.setattr(deploy_cmd, "backup_execute", lambda environment, config_path: events.append(("backup", (environment, config_path))) or "production_2026")
     monkeypatch.setattr(deploy_cmd, "git_commit", lambda: "feedbeef")
     monkeypatch.setattr(deploy_cmd, "run", lambda args, stream=True: events.append(("run", (tuple(args), stream))))
+    monkeypatch.setattr(deploy_cmd, "PostgresAdapter", DummyPostgres)
     monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda compose_file: compose)
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda compose_obj, service, db_name, modules: events.append(("update", (service, db_name, tuple(modules)))))
     monkeypatch.setattr(deploy_cmd, "check_url", lambda url, **kwargs: events.append(("healthcheck", (url, kwargs["timeout"], kwargs["retries"], kwargs["interval"]))))
@@ -79,6 +89,7 @@ def test_deploy_production_restarts_on_failure_and_records_message(tmp_path: Pat
     monkeypatch.setattr(deploy_cmd, "backup_execute", lambda environment, config_path: "production_2026")
     monkeypatch.setattr(deploy_cmd, "git_commit", lambda: "feedbeef")
     monkeypatch.setattr(deploy_cmd, "run", lambda args, stream=True: None)
+    monkeypatch.setattr(deploy_cmd, "PostgresAdapter", DummyPostgres)
     monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda compose_file: compose)
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
@@ -113,6 +124,7 @@ def test_deploy_production_records_recovery_restart_failure_honestly(tmp_path: P
     monkeypatch.setattr(deploy_cmd, "backup_execute", lambda environment, config_path: "production_2026")
     monkeypatch.setattr(deploy_cmd, "git_commit", lambda: "feedbeef")
     monkeypatch.setattr(deploy_cmd, "run", lambda args, stream=True: None)
+    monkeypatch.setattr(deploy_cmd, "PostgresAdapter", DummyPostgres)
     monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda compose_file: compose)
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
@@ -203,6 +215,35 @@ def test_deploy_missing_target_paths_fails_preflight(tmp_path: Path, monkeypatch
     assert called == []
 
 
+def test_deploy_unreachable_database_fails_before_rollout(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    called = []
+    monkeypatch.setattr(deploy_cmd, "backup_execute", lambda *args, **kwargs: called.append("backup"))
+    monkeypatch.setattr(deploy_cmd, "run", lambda *args, **kwargs: called.append("run"))
+    monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    class FailingPostgres(DummyPostgres):
+        def ping(self, db_name: str):
+            called.append("postgres")
+            raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(deploy_cmd, "PostgresAdapter", FailingPostgres)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        deploy_cmd.execute("production", "main", str(config))
+
+    assert "Postgres connectivity check failed for database 'odoo_prod'" in str(exc_info.value)
+    assert "localhost:5432" in str(exc_info.value)
+    assert "connection refused" in str(exc_info.value)
+
+    assert called == ["postgres"]
+
+
 def test_deploy_missing_env_vars_fails_preflight_before_rollout(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
@@ -232,6 +273,7 @@ def test_deploy_emits_stage_progress_messages(tmp_path: Path, monkeypatch, capsy
     monkeypatch.setattr(deploy_cmd, "backup_execute", lambda environment, config_path: "production_2026")
     monkeypatch.setattr(deploy_cmd, "git_commit", lambda: "feedbeef")
     monkeypatch.setattr(deploy_cmd, "run", lambda args, stream=True: None)
+    monkeypatch.setattr(deploy_cmd, "PostgresAdapter", DummyPostgres)
     monkeypatch.setattr(deploy_cmd, "DockerComposeAdapter", lambda compose_file: DummyCompose(compose_file))
     monkeypatch.setattr(deploy_cmd, "update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr(deploy_cmd, "check_url", lambda *args, **kwargs: None)

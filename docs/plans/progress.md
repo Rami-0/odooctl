@@ -156,6 +156,19 @@
 - Blockers/open questions: real Docker experiment-stack verification still not run.
 - Next recommended task: run Docker experiment-stack verification for backup/clone/restore/update-modules; if not feasible, start M5 PyPI metadata/install docs.
 
+### 2026-05-26T22:34:42+00:00 — M5 PyPI metadata and install docs
+
+- Completed the first M5 distribution slice: added PyPI-facing package metadata, project URLs, classifiers, keywords, author/license declarations, and the optional `s3` extra.
+- Updated operator installation docs to make `pipx install odooctl` the primary path, document `uv tool install`, explain Docker vs host PostgreSQL runtime prerequisites, and point users at `project add` + `doctor` after install.
+- Files changed: `pyproject.toml`, `README.md`, `docs/installation.md`, `docs/plans/progress.md`.
+- Verification:
+  - `python -m pytest -q` — 127 passed.
+  - `uv pip install build && python -m build --sdist --wheel` — successfully built `odooctl-0.1.0.tar.gz` and `odooctl-0.1.0-py3-none-any.whl`.
+- Commit SHA: 81c48d5 (`Add package metadata and install docs`).
+- Push status: pending.
+- Blockers/open questions: `uv pip install build` updated the local development venv only; no repo file changes from that install. Real Docker experiment-stack verification remains outstanding.
+- Next recommended task: add the schedule command for systemd timer / cron generation, then continue M5 redaction precision.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -195,7 +208,7 @@
 
 ### M5 — Distribution, scheduling, polish
 
-- [ ] Add PyPI metadata and install docs.
+- [x] Add PyPI metadata and install docs.
 - [ ] Add schedule command for systemd timer / cron generation.
 - [ ] Improve redaction precision.
 - [ ] Add real S3 optional adapter.

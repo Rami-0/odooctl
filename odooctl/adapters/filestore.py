@@ -15,6 +15,7 @@ class FilestoreBackend(Protocol):
     def archive(self, filestore_path: str, output: str | Path) -> None: ...
     def restore_archive(self, archive_path: str | Path, target_path: str) -> None: ...
     def copy(self, source: str, target: str) -> None: ...
+    def delete(self, filestore_path: str) -> None: ...
 
 
 class FilestoreAdapter:
@@ -55,6 +56,11 @@ class FilestoreAdapter:
             if dst.exists():
                 shutil.rmtree(dst)
             shutil.move(str(staged), dst)
+
+    def delete(self, filestore_path: str) -> None:
+        path = Path(filestore_path)
+        if path.exists():
+            shutil.rmtree(path)
 
 
 class DockerVolumeFilestore:
@@ -107,6 +113,10 @@ class DockerVolumeFilestore:
             ["sh", "-lc", f"mkdir -p {self.root}/filestore && rm -rf {dst} && cp -a {src} {dst}"],
             stream=True,
         )
+
+    def delete(self, filestore_path: str) -> None:
+        target = self._container_filestore_dir(filestore_path)
+        self.compose.exec(self.service, ["rm", "-rf", target], stream=True)
 
 
 def make_filestore_adapter(context: ProjectContext, env: EnvironmentConfig) -> FilestoreBackend:

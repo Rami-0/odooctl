@@ -12,6 +12,7 @@ class DbAdapter(Protocol):
     def ping(self, db_name: str) -> None: ...
     def dump(self, db_name: str, output: str | Path) -> None: ...
     def restore(self, db_name: str, dump_path: str | Path) -> None: ...
+    def drop(self, db_name: str) -> None: ...
     def drop_create(self, db_name: str) -> None: ...
     def psql_file(self, db_name: str, sql_file: str | Path) -> None: ...
     def psql(self, db_name: str, sql: str) -> None: ...
@@ -20,8 +21,15 @@ class DbAdapter(Protocol):
 class HostPostgresAdapter(PostgresAdapter):
     """Host PostgreSQL adapter kept for backward-compatible host execution."""
 
+    def drop(self, db_name: str) -> None:
+        from odooctl.odoo.db_swap import drop_database, terminate_connections
+
+        terminate_connections(self, db_name)
+        drop_database(self, db_name)
+
 
 class DockerPostgresAdapter:
+
     """PostgreSQL adapter that executes client tools inside the compose DB service."""
 
     def __init__(self, ctx: ProjectContext):
@@ -73,6 +81,12 @@ class DockerPostgresAdapter:
             env=self._password_env(),
             stdin_path=dump_path,
         )
+
+    def drop(self, db_name: str) -> None:
+        from odooctl.odoo.db_swap import drop_database, terminate_connections
+
+        terminate_connections(self, db_name)
+        drop_database(self, db_name)
 
     def drop_create(self, db_name: str) -> None:
         run(self._cmd("dropdb", *self.base_args(), db_name, "--if-exists"), cwd=self.project_dir, env=self._password_env(), stream=True)

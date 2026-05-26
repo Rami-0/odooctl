@@ -10,6 +10,8 @@ from rich.console import Console
 from rich.table import Table
 
 from odooctl.commands import clone as clone_cmd
+from odooctl.adapters.db import make_db_adapter
+from odooctl.adapters.filestore import make_filestore_adapter
 from odooctl.config import load_config
 from odooctl.context import ProjectContext
 from odooctl.registry import resolve_project_context
@@ -172,7 +174,7 @@ def create_env(
 @app.command("destroy")
 def destroy_env(
     name: str,
-    purge: bool = typer.Option(False, "--purge", help="Also purge DB/filestore (guarded; implementation currently config-only)."),
+    purge: bool = typer.Option(False, "--purge", help="Also purge the non-production DB and filestore before removing config."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Confirm destructive config removal."),
     config: str = "odooctl.yml",
 ):
@@ -184,8 +186,14 @@ def destroy_env(
         raise click.ClickException(f"Unknown environment: {name}")
     if not yes:
         raise click.ClickException("Pass --yes to confirm environment removal")
+    cfg = load_config(path)
+    env = cfg.env(name)
     if purge:
-        raise click.ClickException("--purge DB/filestore destruction is not implemented yet; remove config without --purge or purge manually")
+        ctx = ProjectContext(path.parent, path, cfg)
+        db = make_db_adapter(ctx)
+        fs = make_filestore_adapter(ctx, env)
+        db.drop(env.db_name)
+        fs.delete(str(env.filestore_path))
     updated = deepcopy(data)
     del updated["environments"][name]
     from odooctl.config import OdooCtlConfig

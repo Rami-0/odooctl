@@ -143,6 +143,19 @@
 - Blockers/open questions: destructive `env destroy --purge` still needs implementation against the DB and filestore adapter factories, with production guards and tests.
 - Next recommended task: implement guarded non-production `env destroy --purge` adapter execution, then run Docker experiment-stack verification for backup/clone/restore/update-modules.
 
+### 2026-05-26T21:52:38+00:00 — M4 guarded env purge
+
+- Completed the M4 purge follow-up: `odooctl env destroy --purge --yes <env>` now refuses production via the existing destroy guard, drops the non-production database through the selected host/Docker DB adapter, deletes the matching host-path or Docker-volume filestore, then removes the environment config only after purge succeeds.
+- Added `drop()` to DB adapters using the existing terminate/drop SQL helpers and added `delete()` to host and Docker-volume filestore adapters.
+- Files changed: `odooctl/adapters/db.py`, `odooctl/adapters/filestore.py`, `odooctl/commands/env.py`, `tests/test_env_cmd.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_env_cmd.py tests/test_filestore_volume.py tests/test_clone_swap.py` — 10 passed.
+  - `pytest -q` — 127 passed.
+- Commit SHA: 1f3ea96 (`Implement guarded environment purge`).
+- Push status: pending in this run.
+- Blockers/open questions: real Docker experiment-stack verification still not run.
+- Next recommended task: run Docker experiment-stack verification for backup/clone/restore/update-modules; if not feasible, start M5 PyPI metadata/install docs.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene

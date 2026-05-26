@@ -124,8 +124,8 @@
 - Verification:
   - `pytest -q tests/test_registry.py tests/test_cli_smoke.py` — 12 passed.
   - `pytest -q` — 122 passed.
-- Commit SHA: 3d02faa (`Add project registry commands`).
-- Push status: pending in this run.
+- Commit SHA: 3d02faa (`Add project registry commands`); progress follow-up commit 8bd01c7.
+- Push status: pushed to `origin/master` through 8bd01c7 (`d231673..8bd01c7`).
 - Blockers/open questions: real Docker experiment-stack verification remains outstanding; M4 env lifecycle commands are not implemented yet.
 - Next recommended task: implement `env list/show/create/destroy` config editing with production destroy guards and mocked clone provisioning tests.
 

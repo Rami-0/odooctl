@@ -20,4 +20,13 @@ def execute(environment: str, modules: list[str] | None = None, config_path: str
     env = cfg.env(environment)
     selected = modules if modules is not None else env.update_modules
     compose = _compose_adapter(cfg.runtime.compose_file, context.root)
-    update_modules_compose(compose, cfg.odoo.service, env.db_name, selected)
+    update_modules_compose(
+        compose,
+        cfg.odoo.service,
+        env.db_name,
+        selected,
+        db_host=cfg.odoo.db_host,
+        db_user=cfg.odoo.db_user,
+        db_password_env=cfg.odoo.db_password_env,
+        config_path=cfg.odoo.config_path,
+    )

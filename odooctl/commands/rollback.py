@@ -10,7 +10,7 @@ from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.metadata.models import DeploymentMetadata
 from odooctl.metadata.store import MetadataStore
-from odooctl.odoo.healthcheck import check_url
+from odooctl.odoo.healthcheck import check_url, with_db_selector
 from odooctl.utils.logging import warn
 from odooctl.utils.shell import run
 
@@ -43,7 +43,9 @@ def _clean_worktree(operation: str, root: Path) -> None:
 
 
 def _verify_health(cfg, environment: str) -> None:
-    url = public_url(cfg.env(environment).domain) + cfg.healthcheck.path
+    env = cfg.env(environment)
+    scheme = cfg.healthcheck.scheme or env.scheme
+    url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
     print("[rollback] verify")
     check_url(
         url,
@@ -69,7 +71,8 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         raise FileNotFoundError(f"Compose file not found: {compose_path}")
 
     env = cfg.env(environment)
-    url = public_url(env.domain) + cfg.healthcheck.path
+    scheme = cfg.healthcheck.scheme or env.scheme
+    url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
     compose = _compose_adapter(cfg.runtime.compose_file, context.root)
     store = _store(context.state_dir)
     status = "failed"

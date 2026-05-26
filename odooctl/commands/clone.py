@@ -9,7 +9,7 @@ from odooctl.adapters.reverse_proxy import public_url
 from odooctl.context import ProjectContext
 from odooctl.odoo.sanitize import sanitize_database
 from odooctl.odoo.module_update import update_modules_compose
-from odooctl.odoo.healthcheck import check_url
+from odooctl.odoo.healthcheck import check_url, with_db_selector
 
 
 def _compose_adapter(compose_file: str, project_root: Path):
@@ -44,7 +44,8 @@ def execute(
     if not compose_path.exists():
         raise FileNotFoundError(f"Compose file not found: {compose_path}")
 
-    base_url = public_url(dst.domain)
+    scheme = cfg.healthcheck.scheme or dst.scheme
+    base_url = public_url(dst.domain, scheme=scheme, port=dst.port)
     if preview:
         print("[clone] preview")
         print(
@@ -74,11 +75,23 @@ def execute(
     if should_sanitize:
         sanitize_database(pg, dst.db_name, dst, cfg, sanitization_profile, sql_files=context.sanitization_sql_files())
     compose = _compose_adapter(cfg.runtime.compose_file, context.root)
-    update_modules_compose(compose, cfg.odoo.service, dst.db_name, dst.update_modules)
+    try:
+        update_modules_compose(
+            compose,
+            cfg.odoo.service,
+            dst.db_name,
+            dst.update_modules,
+            db_host=cfg.odoo.db_host,
+            db_user=cfg.odoo.db_user,
+            db_password_env=cfg.odoo.db_password_env,
+            config_path=cfg.odoo.config_path,
+        )
+    except TypeError:
+        update_modules_compose(compose, cfg.odoo.service, dst.db_name, dst.update_modules)
     compose.restart(cfg.odoo.service)
     running_services = compose.ps()
     if cfg.odoo.service not in running_services:
         raise RuntimeError(f"Target service is not running after clone: {cfg.odoo.service}")
-    url = base_url + cfg.healthcheck.path
+    url = with_db_selector(base_url + cfg.healthcheck.path, dst.db_name if dst.db_selector else None)
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
     return base_url

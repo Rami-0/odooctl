@@ -10,7 +10,7 @@ from odooctl.commands.backup import execute as backup_execute, git_commit
 from odooctl.context import ProjectContext
 from odooctl.metadata.models import DeploymentMetadata
 from odooctl.metadata.store import MetadataStore
-from odooctl.odoo.healthcheck import check_url
+from odooctl.odoo.healthcheck import check_url, with_db_selector
 from odooctl.odoo.module_update import update_modules_compose
 from odooctl.utils.shell import run
 
@@ -91,7 +91,8 @@ def execute(environment: str, branch: str | None = None, config_path: str = "odo
     backup_id = None
     status = "failed"
     message = None
-    url = public_url(env.domain) + cfg.healthcheck.path
+    scheme = cfg.healthcheck.scheme or env.scheme
+    url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
     compose = _compose_adapter(cfg.runtime.compose_file, context.root)
     try:
         if environment == "production":
@@ -103,7 +104,19 @@ def execute(environment: str, branch: str | None = None, config_path: str = "odo
         _run(["git", "pull", "--ff-only"], stream=True, cwd=context.root)
         compose.pull(cfg.odoo.service)
         compose.up(cfg.odoo.service)
-        update_modules_compose(compose, cfg.odoo.service, env.db_name, env.update_modules)
+        try:
+            update_modules_compose(
+                compose,
+                cfg.odoo.service,
+                env.db_name,
+                env.update_modules,
+                db_host=cfg.odoo.db_host,
+                db_user=cfg.odoo.db_user,
+                db_password_env=cfg.odoo.db_password_env,
+                config_path=cfg.odoo.config_path,
+            )
+        except TypeError:
+            update_modules_compose(compose, cfg.odoo.service, env.db_name, env.update_modules)
         print("[deploy] verify")
         check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
         status = "success"

@@ -9,6 +9,7 @@ from odooctl.adapters.reverse_proxy import public_url
 from odooctl.commands.backup import git_commit
 from odooctl.context import ProjectContext
 from odooctl.metadata.store import MetadataStore
+from odooctl.odoo.healthcheck import with_db_selector
 
 
 def _compose_adapter(compose_file: str, project_root):
@@ -58,10 +59,12 @@ def execute(config_path: str = "odooctl.yml", environment: str | None = None, *,
     def build_environment_payload(name: str, env) -> dict:
         dep = store.latest_deployment(name) or {}
         backup = store.latest_backup(name) or {}
-        health_url = dep.get("health_check_url", public_url(env.domain) + cfg.healthcheck.path)
+        scheme = cfg.healthcheck.scheme or env.scheme
+        env_url = public_url(env.domain, scheme=scheme, port=env.port)
+        health_url = dep.get("health_check_url", with_db_selector(env_url + cfg.healthcheck.path, env.db_name if env.db_selector else None))
         return {
             "name": name,
-            "url": public_url(env.domain),
+            "url": env_url,
             "branch": env.branch,
             "commit": dep.get("commit", backup.get("git_commit", "unknown")),
             "image": dep.get("docker_image", backup.get("docker_image", cfg.odoo.image)),

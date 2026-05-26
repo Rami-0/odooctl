@@ -73,6 +73,20 @@
 - Blockers/open questions: `runtime.execution_mode` currently remains backward-compatible default `host`; switching the product default to `docker` needs broader test fixture updates and may be best done with the remaining M2 command wiring.
 - Next recommended task: finish M2 command behavior by adding scheme/port/db-selector URL handling, Odoo module-update DB flags, and tests around container-mode backup/restore command arguments.
 
+### 2026-05-26T18:07:52+00:00 — M2 module-update flags and URL handling
+
+- Completed the remaining M2 command-behavior slice: module updates now build official-image-safe Odoo invocations with `-c`, `--db_host`, `--db_user`, and `--db_password` from config/env, and deploy/clone/update-modules pass those settings through.
+- Added scheme/port-aware URL construction plus optional `?db=<db_name>` selector support for deploy, clone, restore, rollback, status, and sanitization base-url rewrites; status continues to use `cfg.postgres.service` for PostgreSQL service state.
+- Files changed: `odooctl/adapters/reverse_proxy.py`, `odooctl/commands/clone.py`, `odooctl/commands/deploy.py`, `odooctl/commands/restore.py`, `odooctl/commands/rollback.py`, `odooctl/commands/status.py`, `odooctl/commands/update_modules.py`, `odooctl/odoo/healthcheck.py`, `odooctl/odoo/module_update.py`, `odooctl/odoo/sanitize.py`, `tests/test_module_update.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_module_update.py tests/test_status.py tests/test_healthcheck.py` — 8 passed.
+  - `pytest -q` — 109 passed.
+  - `ODOO_DB_PASSWORD=ambient-secret pytest -q` — 109 passed.
+- Commit SHA: pending this run.
+- Push status: pending this run.
+- Blockers/open questions: no Docker integration run in this tick; real experiment-stack verification remains needed for container backup/restore/update-modules acceptance.
+- Next recommended task: start M3 with temp-DB clone/sanitize/swap choreography and `db_selector` multi-db validation tests.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -93,8 +107,8 @@
 - [x] Add config fields: `execution_mode`, container DB settings, per-env scheme.
 - [x] Add binary-safe command runner.
 - [x] Add Docker PostgreSQL adapter.
-- [ ] Fix module update DB flags.
-- [ ] Fix status DB service name.
+- [x] Fix module update DB flags.
+- [x] Fix status DB service name.
 
 ### M3 — Safe clone + multi-db + filestore volumes
 

@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from odooctl.context import ProjectContext
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    name: str
+    ok: bool
+    message: str
+
+
+def _exists_check(name: str, path: Path, *, kind: str) -> CheckResult:
+    if path.exists():
+        return CheckResult(name, True, f"{kind} exists: {path}")
+    return CheckResult(name, False, f"{kind} missing: {path}")
+
+
+def run_preflight(ctx: ProjectContext) -> list[CheckResult]:
+    """Run side-effect-free project readiness checks.
+
+    These checks intentionally avoid network calls and container execution so
+    `odooctl doctor` is safe on developer machines and CI. Deeper execution-mode
+    checks will be added as Docker-native backends land.
+    """
+
+    cfg = ctx.config
+    checks: list[CheckResult] = [
+        CheckResult("config", True, f"config loaded: {ctx.config_path}"),
+        _exists_check("project_root", ctx.root, kind="project root"),
+        _exists_check("compose_file", ctx.compose_file, kind="compose file"),
+    ]
+
+    missing_env = cfg.missing_env_vars()
+    if missing_env:
+        checks.append(CheckResult("environment", False, "missing environment variables: " + ", ".join(missing_env)))
+    else:
+        checks.append(CheckResult("environment", True, "all referenced environment variables are set"))
+
+    for sql_file in ctx.sanitization_sql_files():
+        checks.append(_exists_check(f"sanitization_sql:{sql_file.name}", sql_file, kind="sanitization SQL file"))
+
+    return checks
+
+
+def checks_ok(checks: list[CheckResult]) -> bool:
+    return all(check.ok for check in checks)

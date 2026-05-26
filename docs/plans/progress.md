@@ -68,8 +68,8 @@
 - Verification:
   - `pytest -q tests/test_db_adapter.py tests/test_shell.py tests/test_config.py` — 22 passed.
   - `pytest -q` — 107 passed.
-- Commit SHA: pending this run.
-- Push status: pending this run.
+- Commit SHA: 704a50c (`Add Docker PostgreSQL adapter foundation`).
+- Push status: pushed to `origin/master` (`a60f9a8..704a50c`).
 - Blockers/open questions: `runtime.execution_mode` currently remains backward-compatible default `host`; switching the product default to `docker` needs broader test fixture updates and may be best done with the remaining M2 command wiring.
 - Next recommended task: finish M2 command behavior by adding scheme/port/db-selector URL handling, Odoo module-update DB flags, and tests around container-mode backup/restore command arguments.
 

@@ -164,8 +164,8 @@
 - Verification:
   - `python -m pytest -q` — 127 passed.
   - `uv pip install build && python -m build --sdist --wheel` — successfully built `odooctl-0.1.0.tar.gz` and `odooctl-0.1.0-py3-none-any.whl`.
-- Commit SHA: 81c48d5 (`Add package metadata and install docs`).
-- Push status: pending.
+- Commit SHA: 6691d63 (`Add package metadata and install docs`).
+- Push status: pushed to `origin/master` (`9d4ba02..6691d63`); follow-up progress-status commit may be pushed separately.
 - Blockers/open questions: `uv pip install build` updated the local development venv only; no repo file changes from that install. Real Docker experiment-stack verification remains outstanding.
 - Next recommended task: add the schedule command for systemd timer / cron generation, then continue M5 redaction precision.
 

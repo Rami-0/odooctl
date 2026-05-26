@@ -1,7 +1,7 @@
 from __future__ import annotations
 import tempfile
 from pathlib import Path
-from odooctl.adapters.filestore import FilestoreAdapter
+from odooctl.adapters.filestore import FilestoreAdapter, make_filestore_adapter
 from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
@@ -63,7 +63,7 @@ def execute(
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
 
     pg = make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
-    fs = FilestoreAdapter()
+    fs = make_filestore_adapter(context, dst) if dst.filestore_volume else FilestoreAdapter()
     temp_db = f"{dst.db_name}{cfg.sanitization.temp_db_suffix}"
     if temp_db == dst.db_name:
         raise RuntimeError("Configured sanitization.temp_db_suffix must produce a temporary database distinct from the target")
@@ -77,7 +77,9 @@ def execute(
             pg.restore(temp_db, tmp_dump)
         finally:
             tmp_dump.unlink(missing_ok=True)
-    fs.copy(str(context.resolve_path(src.filestore_path)), str(context.resolve_path(dst.filestore_path)))
+    src_filestore = src.filestore_path if src.filestore_volume else str(context.resolve_path(src.filestore_path))
+    dst_filestore = dst.filestore_path if dst.filestore_volume else str(context.resolve_path(dst.filestore_path))
+    fs.copy(src_filestore, dst_filestore)
     if should_sanitize:
         sanitize_database(pg, temp_db, dst, cfg, sanitization_profile, sql_files=context.sanitization_sql_files())
     swap_temp_database(pg, temp_db=temp_db, target_db=dst.db_name, target_env_name=target)

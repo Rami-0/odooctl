@@ -102,6 +102,20 @@
 - Blockers/open questions: Docker experiment-stack verification still not run; filestore named-volume adapter remains outstanding for M3.
 - Next recommended task: add explicit config tests for `db_selector` multi-db sharing and then implement Docker volume filestore adapter.
 
+### 2026-05-26T19:39:39+00:00 — M3 multi-db validation and Docker volume filestore
+
+- Completed the remaining unit-level M3 configuration and filestore slice: added explicit tests for same-stack `db_selector` domain sharing, named-volume filestore identity validation, and Docker-volume filestore archive/restore/copy command construction.
+- Added `filestore_volume` to environment config and wired backup, restore, and clone to choose a Docker-volume filestore backend when configured, while preserving host-path behavior and existing command monkeypatch compatibility.
+- Implemented Docker-volume filestore streaming through `docker compose exec -T` using tar/zstd byte streams, so hosts do not need a bind-mounted Odoo filestore path.
+- Files changed: `odooctl/config.py`, `odooctl/adapters/filestore.py`, `odooctl/commands/backup.py`, `odooctl/commands/clone.py`, `odooctl/commands/restore.py`, `tests/test_config.py`, `tests/test_filestore_volume.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_config.py tests/test_filestore_volume.py` — 20 passed.
+  - `pytest -q` — 118 passed.
+- Commit SHA: f9b2dc2 (`Add Docker volume filestore support`).
+- Push status: pending push in this run.
+- Blockers/open questions: Docker experiment-stack verification still not run; unit coverage verifies command construction only.
+- Next recommended task: run real experiment-stack verification for Docker backup/clone/restore/update-modules, then start M4 project registry if the stack passes.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -128,8 +142,8 @@
 ### M3 — Safe clone + multi-db + filestore volumes
 
 - [x] Implement temp DB clone/sanitize/swap.
-- [ ] Support multi-db mode with `db_selector`.
-- [ ] Add Docker volume filestore adapter.
+- [x] Support multi-db mode with `db_selector`.
+- [x] Add Docker volume filestore adapter.
 - [x] Expand sanitization for queue jobs and mail spool.
 
 ### M4 — Global project registry + env lifecycle

@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import re
-from odooctl.adapters.filestore import FilestoreAdapter
+from odooctl.adapters.filestore import FilestoreAdapter, make_filestore_adapter
 from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.s3 import S3Adapter
@@ -83,9 +83,10 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
     backup_id = f"{environment}_{ts}"
     backup_dir = ensure_dir(context.backups_dir / backup_id)
     pg = make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
-    fs = FilestoreAdapter()
+    fs = make_filestore_adapter(context, env) if env.filestore_volume else FilestoreAdapter()
     pg.dump(env.db_name, backup_dir / "db.dump")
-    fs.archive(str(context.resolve_path(env.filestore_path)), backup_dir / "filestore.tar.zst")
+    filestore_path = env.filestore_path if env.filestore_volume else str(context.resolve_path(env.filestore_path))
+    fs.archive(filestore_path, backup_dir / "filestore.tar.zst")
     if context.odoo_config_path.exists():
         text = context.odoo_config_path.read_text()
         (backup_dir / "odoo.conf.redacted").write_text(redact_config_snapshot(text))

@@ -29,6 +29,7 @@ class EnvironmentConfig(BaseModel):
     port: int | None = None
     db_name: str
     filestore_path: str
+    filestore_volume: str | None = None
     db_selector: bool = False
     clone_from: str | None = None
     sanitize: bool = False
@@ -148,7 +149,7 @@ class OdooCtlConfig(BaseModel):
             self.odoo.db_password_env = self.postgres.password_env
 
         seen_db_names: dict[str, str] = {}
-        seen_filestore_paths: dict[str, str] = {}
+        seen_filestores: dict[str, str] = {}
         seen_domains: dict[str, str] = {}
         seen_branches: dict[str, str] = {}
 
@@ -172,13 +173,18 @@ class OdooCtlConfig(BaseModel):
                 )
             seen_db_names[env.db_name] = name
 
-            if env.filestore_path in seen_filestore_paths:
-                first_env = seen_filestore_paths[env.filestore_path]
+            filestore_identity = (
+                f"volume:{env.filestore_volume}:{env.filestore_path}"
+                if env.filestore_volume
+                else f"path:{env.filestore_path}"
+            )
+            if filestore_identity in seen_filestores:
+                first_env = seen_filestores[filestore_identity]
                 raise ValueError(
-                    f"Environments '{first_env}' and '{name}' cannot share filestore_path '{env.filestore_path}'; "
+                    f"Environments '{first_env}' and '{name}' cannot share filestore '{filestore_identity}'; "
                     "clone and rollback operations replace target filestores"
                 )
-            seen_filestore_paths[env.filestore_path] = name
+            seen_filestores[filestore_identity] = name
 
             if env.domain in seen_domains:
                 first_env = seen_domains[env.domain]

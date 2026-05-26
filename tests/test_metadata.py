@@ -38,7 +38,7 @@ def test_metadata_store_writes_latest_files(tmp_path):
     assert store.latest_deployment("staging")["status"] == "success"
 
 
-def test_previous_successful_deployment_skips_latest_and_failures(tmp_path):
+def test_previous_successful_deployment_uses_success_before_current_failure(tmp_path):
     store = MetadataStore(tmp_path / ".odooctl")
     store.save_deployment(
         DeploymentMetadata(
@@ -75,3 +75,47 @@ def test_previous_successful_deployment_skips_latest_and_failures(tmp_path):
     assert previous is not None
     assert previous["commit"] == "old"
     assert store.previous_successful_deployment("development") is None
+
+
+def test_previous_successful_deployment_uses_success_before_current_success(tmp_path):
+    store = MetadataStore(tmp_path / ".odooctl")
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="production",
+            timestamp="2026-01-01T00:00:00Z",
+            branch="main",
+            commit="good",
+            status="success",
+        )
+    )
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="production",
+            timestamp="2026-01-02T00:00:00Z",
+            branch="main",
+            commit="bad-but-healthy",
+            status="success",
+        )
+    )
+
+    previous = store.previous_successful_deployment("production")
+    assert previous is not None
+    assert previous["commit"] == "good"
+
+
+def test_previous_successful_deployment_requires_prior_success(tmp_path):
+    store = MetadataStore(tmp_path / ".odooctl")
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="production",
+            timestamp="2026-01-01T00:00:00Z",
+            branch="main",
+            commit="current",
+            status="success",
+        )
+    )
+
+    assert store.previous_successful_deployment("production") is None

@@ -2,7 +2,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from odooctl.adapters.filestore import FilestoreAdapter
+from odooctl.adapters.filestore import FilestoreAdapter, make_filestore_adapter
 from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.context import ProjectContext
@@ -69,7 +69,9 @@ def execute(environment: str, backup: str = "latest", config_path: str = "odooct
     backup_dir = resolve_backup_dir(environment, backup, context.backups_dir)
     validate_backup_dir(backup_dir, expected_project=cfg.project.name, expected_environment=environment, restore_mode="full")
     (make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)).restore(env.db_name, backup_dir / "db.dump")
-    FilestoreAdapter().restore_archive(backup_dir / "filestore.tar.zst", str(context.resolve_path(env.filestore_path)))
+    target_filestore = env.filestore_path if env.filestore_volume else str(context.resolve_path(env.filestore_path))
+    fs = make_filestore_adapter(context, env) if env.filestore_volume else FilestoreAdapter()
+    fs.restore_archive(backup_dir / "filestore.tar.zst", target_filestore)
     scheme = cfg.healthcheck.scheme or env.scheme
     url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)

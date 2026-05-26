@@ -126,7 +126,7 @@ def test_environments_cannot_share_filestore_path(tmp_path: Path):
         load_config(path)
 
     message = str(exc_info.value)
-    assert "Environments 'production' and 'staging' cannot share filestore_path '/srv/filestore/shared'" in message
+    assert "Environments 'production' and 'staging' cannot share filestore 'path:/srv/filestore/shared'" in message
 
 
 def test_environments_cannot_share_domain(tmp_path: Path):
@@ -140,6 +140,52 @@ def test_environments_cannot_share_domain(tmp_path: Path):
 
     message = str(exc_info.value)
     assert "Environments 'production' and 'staging' cannot share domain 'odoo.example.com'" in message
+
+
+def test_same_stack_db_selector_environments_can_share_domain(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  qa:\n    stack: dev\n    branch: qa\n    domain: dev.example.com\n    db_name: odoo_qa\n    filestore_path: qa\n    db_selector: true\n  staging:\n    stack: dev\n    branch: staging\n    domain: dev.example.com\n    db_name: odoo_staging\n    filestore_path: staging\n    db_selector: true\n"""
+    )
+
+    cfg = load_config(path)
+
+    assert cfg.env("qa").domain == cfg.env("staging").domain
+
+
+def test_same_stack_environments_cannot_share_domain_without_db_selector(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  qa:\n    stack: dev\n    branch: qa\n    domain: dev.example.com\n    db_name: odoo_qa\n    filestore_path: qa\n  staging:\n    stack: dev\n    branch: staging\n    domain: dev.example.com\n    db_name: odoo_staging\n    filestore_path: staging\n"""
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(path)
+
+    assert "unless both use db_selector in the same stack" in str(exc_info.value)
+
+
+def test_named_volume_filestore_identity_includes_volume_name(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  qa:\n    stack: dev\n    branch: qa\n    domain: qa.example.com\n    db_name: odoo_qa\n    filestore_path: odoo\n    filestore_volume: qa-data\n  staging:\n    stack: stage\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: odoo\n    filestore_volume: staging-data\n"""
+    )
+
+    cfg = load_config(path)
+
+    assert cfg.env("qa").filestore_volume == "qa-data"
+
+
+def test_environments_cannot_share_named_volume_filestore_identity(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  qa:\n    stack: dev\n    branch: qa\n    domain: qa.example.com\n    db_name: odoo_qa\n    filestore_path: odoo\n    filestore_volume: shared-data\n  staging:\n    stack: stage\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: odoo\n    filestore_volume: shared-data\n"""
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(path)
+
+    assert "cannot share filestore 'volume:shared-data:odoo'" in str(exc_info.value)
 
 
 def test_environments_cannot_share_branch(tmp_path: Path):

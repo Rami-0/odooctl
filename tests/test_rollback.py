@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import typer
@@ -23,9 +24,13 @@ class DummyCompose:
 class DummyStore:
     def __init__(self, previous: dict[str, object] | None):
         self.previous = previous
+        self.saved: list[Any] = []
 
     def previous_successful_deployment(self, environment: str):
         return self.previous
+
+    def save_deployment(self, deployment):
+        self.saved.append(deployment)
 
 
 CONFIG = """project:
@@ -72,13 +77,11 @@ def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path
     run_calls: list[list[str]] = []
     health_calls: list[tuple[str, int, int, int]] = []
 
+    store = DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"})
+
     monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
     monkeypatch.setattr(rollback_cmd, "restore_execute", lambda *args: restore_calls.append(args))
-    monkeypatch.setattr(
-        rollback_cmd,
-        "MetadataStore",
-        lambda: DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"}),
-    )
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
     monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: run_calls.append(list(args)))
     monkeypatch.setattr(
         rollback_cmd,
@@ -97,6 +100,17 @@ def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path
     assert "target commit: abc123" in output
     assert "recorded image: registry/odoo:good" in output
     assert "[rollback] verify" in output
+    assert len(store.saved) == 1
+    metadata = store.saved[0]
+    assert metadata.environment == "production"
+    assert metadata.branch == "main"
+    assert metadata.commit == "abc123"
+    assert metadata.docker_image == "registry/odoo:good"
+    assert metadata.backup is None
+    assert metadata.modules_updated == []
+    assert metadata.status == "success"
+    assert metadata.health_check_url == "https://odoo.example.com/web/health"
+    assert metadata.message == "rollback:code"
 
 
 def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, monkeypatch):
@@ -117,11 +131,15 @@ def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatc
     compose = DummyCompose("docker-compose.yml")
     events: list[tuple[str, tuple[object, ...]]] = []
 
+    store = DummyStore(None)
+
     monkeypatch.setattr(
         rollback_cmd,
         "DockerComposeAdapter",
         lambda compose_file: compose,
     )
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(rollback_cmd, "git_commit", lambda: "current123")
 
     def restore(environment: str, backup: str, config_path: str):
         events.append(("restore", (environment, backup, config_path)))
@@ -145,18 +163,26 @@ def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatc
         ("healthcheck", ("https://odoo.example.com/web/health", 10, 3, 1)),
     ]
     assert compose.calls == [("up", ("odoo",))]
-
+    assert len(store.saved) == 1
+    metadata = store.saved[0]
+    assert metadata.environment == "production"
+    assert metadata.branch == "main"
+    assert metadata.commit == "current123"
+    assert metadata.docker_image == "registry/odoo:latest"
+    assert metadata.backup == "production_2026"
+    assert metadata.modules_updated == []
+    assert metadata.status == "success"
+    assert metadata.health_check_url == "https://odoo.example.com/web/health"
+    assert metadata.message == "rollback:full"
 
 def test_rollback_fails_when_post_rollback_healthcheck_fails(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
     compose = DummyCompose("docker-compose.yml")
 
+    store = DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"})
+
     monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
-    monkeypatch.setattr(
-        rollback_cmd,
-        "MetadataStore",
-        lambda: DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"}),
-    )
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
     monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: None)
     monkeypatch.setattr(
         rollback_cmd,
@@ -168,7 +194,11 @@ def test_rollback_fails_when_post_rollback_healthcheck_fails(tmp_path: Path, mon
         rollback_cmd.execute("production", "code", None, str(config))
 
     assert compose.calls == [("up", ("odoo",))]
-
+    assert len(store.saved) == 1
+    metadata = store.saved[0]
+    assert metadata.status == "failed"
+    assert metadata.message == "rollback:code: healthcheck failed"
+    assert metadata.commit == "abc123"
 
 def test_rollback_full_mode_requires_backup(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)

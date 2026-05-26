@@ -6,7 +6,7 @@ from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.config import load_config
-from odooctl.odoo.sanitize import profile_sql
+from odooctl.odoo.sanitize import sanitize_database
 from odooctl.odoo.module_update import update_modules_compose
 from odooctl.odoo.healthcheck import check_url
 
@@ -56,8 +56,7 @@ def execute(
         tmp_dump.unlink(missing_ok=True)
     fs.copy(src.filestore_path, dst.filestore_path)
     if should_sanitize:
-        for sql in profile_sql(sanitization_profile, dst, cfg):
-            pg.psql(dst.db_name, sql)
+        sanitize_database(pg, dst.db_name, dst, cfg, sanitization_profile)
     compose = DockerComposeAdapter(cfg.runtime.compose_file)
     update_modules_compose(compose, cfg.odoo.service, dst.db_name, dst.update_modules)
     compose.restart(cfg.odoo.service)

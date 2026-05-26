@@ -128,6 +128,95 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
     assert not any("UPDATE ir_cron SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging")
 
 
+def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nsanitization:\n  sql_files: [.sanitize/extra.sql]\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    update_modules: [sale]\n    sanitize: true\n"""
+    )
+    (tmp_path / "docker-compose.yml").touch()
+    (tmp_path / ".sanitize").mkdir()
+    extra_sql = tmp_path / ".sanitize" / "extra.sql"
+    extra_sql.write_text("UPDATE res_partner SET email = NULL;\n")
+    events: list[tuple[str, tuple[object, ...]]] = []
+
+    class DummyPostgres:
+        def __init__(self, config):
+            pass
+
+        def dump(self, db_name, output):
+            pass
+
+        def restore(self, db_name, dump_path):
+            pass
+
+        def psql(self, db_name, sql):
+            events.append(("psql", (db_name, sql)))
+
+        def psql_file(self, db_name, path):
+            events.append(("psql_file", (db_name, Path(path))))
+
+    class DummyFilestore:
+        def copy(self, source, target):
+            pass
+
+    class DummyCompose:
+        def __init__(self, compose_file):
+            pass
+
+        def exec(self, service, args, *, stream=True):
+            pass
+
+        def restart(self, service):
+            pass
+
+        def ps(self):
+            return "odoo running"
+
+    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
+    monkeypatch.chdir(tmp_path)
+
+    execute("production", "staging", True, str(config))
+
+    assert ("psql_file", ("odoo_staging", Path(".sanitize/extra.sql"))) in events
+    assert [event for event, _ in events].index("psql_file") > [event for event, _ in events].index("psql")
+
+
+def test_clone_fails_when_configured_sanitization_sql_file_is_missing(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nsanitization:\n  sql_files: [.sanitize/missing.sql]\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    sanitize: true\n"""
+    )
+    (tmp_path / "docker-compose.yml").touch()
+
+    class DummyPostgres:
+        def __init__(self, config):
+            pass
+
+        def dump(self, db_name, output):
+            pass
+
+        def restore(self, db_name, dump_path):
+            pass
+
+        def psql(self, db_name, sql):
+            pass
+
+    class DummyFilestore:
+        def copy(self, source, target):
+            pass
+
+    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(FileNotFoundError, match="Configured sanitization SQL file does not exist"):
+        execute("production", "staging", True, str(config))
+
+
 def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(

@@ -107,6 +107,7 @@ class OdooCtlConfig(BaseModel):
     def validate_environment_graph(self) -> "OdooCtlConfig":
         seen_db_names: dict[str, str] = {}
         seen_filestore_paths: dict[str, str] = {}
+        seen_domains: dict[str, str] = {}
 
         for name, env in self.environments.items():
             if name == "production" and env.clone_from:
@@ -135,6 +136,14 @@ class OdooCtlConfig(BaseModel):
                     "clone and rollback operations replace target filestores"
                 )
             seen_filestore_paths[env.filestore_path] = name
+
+            if env.domain in seen_domains:
+                first_env = seen_domains[env.domain]
+                raise ValueError(
+                    f"Environments '{first_env}' and '{name}' cannot share domain '{env.domain}'; "
+                    "deploy and rollback healthchecks would target the wrong instance"
+                )
+            seen_domains[env.domain] = name
         return self
 
     def env(self, name: str) -> EnvironmentConfig:

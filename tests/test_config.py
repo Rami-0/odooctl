@@ -125,3 +125,16 @@ def test_environments_cannot_share_filestore_path(tmp_path: Path):
 
     message = str(exc_info.value)
     assert "Environments 'production' and 'staging' cannot share filestore_path '/srv/filestore/shared'" in message
+
+
+def test_environments_cannot_share_domain(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n  staging:\n    branch: staging\n    domain: odoo.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n"""
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(path)
+
+    message = str(exc_info.value)
+    assert "Environments 'production' and 'staging' cannot share domain 'odoo.example.com'" in message

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 SENSITIVE_MARKERS = ("PASSWORD", "SECRET", "TOKEN", "KEY", "PASSWD")
@@ -47,6 +48,58 @@ def run(args: Sequence[str], *, check: bool = True, cwd: str | None = None, env:
     if check and result.returncode != 0:
         raise CommandError(result)
     return result
+
+def _merged_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+    return merged_env
+
+
+def run_capture_bytes(
+    args: Sequence[str],
+    *,
+    cwd: str | None = None,
+    env: Mapping[str, str] | None = None,
+    stdout_path: str | Path,
+    check: bool = True,
+) -> CommandResult:
+    """Run a command and write raw stdout bytes to a file.
+
+    This is binary-safe for PostgreSQL custom-format dumps: stdout never passes
+    through Python text decoding or redaction.
+    """
+    merged_env = _merged_env(env)
+    output_path = Path(stdout_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("wb") as stdout:
+        proc = subprocess.run(list(args), cwd=cwd, env=merged_env, stdout=stdout, stderr=subprocess.PIPE)
+    stderr = redact(proc.stderr.decode(errors="replace"), merged_env)
+    result = CommandResult(list(args), proc.returncode, str(output_path), stderr)
+    if check and result.returncode != 0:
+        raise CommandError(result)
+    return result
+
+
+def run_pipe_stdin(
+    args: Sequence[str],
+    *,
+    cwd: str | None = None,
+    env: Mapping[str, str] | None = None,
+    stdin_path: str | Path,
+    check: bool = True,
+) -> CommandResult:
+    """Run a command with raw bytes from a file connected to stdin."""
+    merged_env = _merged_env(env)
+    with Path(stdin_path).open("rb") as stdin:
+        proc = subprocess.run(list(args), cwd=cwd, env=merged_env, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout = redact(proc.stdout.decode(errors="replace"), merged_env)
+    stderr = redact(proc.stderr.decode(errors="replace"), merged_env)
+    result = CommandResult(list(args), proc.returncode, stdout, stderr)
+    if check and result.returncode != 0:
+        raise CommandError(result)
+    return result
+
 
 def join_csv(values: Iterable[str]) -> str:
     return ",".join(v.strip() for v in values if v and v.strip())

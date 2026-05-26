@@ -2,6 +2,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from odooctl.adapters.filestore import FilestoreAdapter
+from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.reverse_proxy import public_url
@@ -59,7 +60,7 @@ def execute(
     if missing_env_vars:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
 
-    pg = PostgresAdapter(cfg.postgres)
+    pg = make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
     fs = FilestoreAdapter()
     # Direct dump/restore keeps db + filestore in one explicit clone flow.
     with tempfile.NamedTemporaryFile(prefix="odooctl-clone-", suffix=".dump", delete=False) as tmp:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from odooctl.adapters.docker_compose import DockerComposeAdapter
+from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.commands.backup import execute as backup_execute, git_commit
@@ -73,7 +74,7 @@ def _preflight(environment: str, branch: str | None, config_path: str):
     if not filestore_path.exists():
         raise FileNotFoundError(f"Target filestore path not found: {filestore_path}")
     try:
-        PostgresAdapter(cfg.postgres).ping(env.db_name)
+        (make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)).ping(env.db_name)
     except Exception as exc:
         raise RuntimeError(
             f"Postgres connectivity check failed for database '{env.db_name}' "

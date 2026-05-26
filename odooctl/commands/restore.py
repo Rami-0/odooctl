@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 from odooctl.adapters.filestore import FilestoreAdapter
+from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.context import ProjectContext
 from odooctl.odoo.healthcheck import check_url
@@ -67,7 +68,7 @@ def execute(environment: str, backup: str = "latest", config_path: str = "odooct
     env = cfg.env(environment)
     backup_dir = resolve_backup_dir(environment, backup, context.backups_dir)
     validate_backup_dir(backup_dir, expected_project=cfg.project.name, expected_environment=environment, restore_mode="full")
-    PostgresAdapter(cfg.postgres).restore(env.db_name, backup_dir / "db.dump")
+    (make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)).restore(env.db_name, backup_dir / "db.dump")
     FilestoreAdapter().restore_archive(backup_dir / "filestore.tar.zst", str(context.resolve_path(env.filestore_path)))
     url = public_url(env.domain) + cfg.healthcheck.path
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)

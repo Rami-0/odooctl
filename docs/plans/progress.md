@@ -111,8 +111,8 @@
 - Verification:
   - `pytest -q tests/test_config.py tests/test_filestore_volume.py` — 20 passed.
   - `pytest -q` — 118 passed.
-- Commit SHA: 67b3f32 (`Add Docker volume filestore support`); progress follow-up commit 7096faa (`Record filestore sprint progress`).
-- Push status: pending push in this run.
+- Commit SHA: 67b3f32 (`Add Docker volume filestore support`); progress follow-up commits 7096faa and a4d801a.
+- Push status: pushed to `origin/master` through a4d801a (`1064537..a4d801a`).
 - Blockers/open questions: Docker experiment-stack verification still not run; unit coverage verifies command construction only.
 - Next recommended task: run real experiment-stack verification for Docker backup/clone/restore/update-modules, then start M4 project registry if the stack passes.
 

@@ -27,6 +27,8 @@ def execute(
     if dst.clone_from != source:
         raise RuntimeError(f"Environment '{target}' must be cloned from '{dst.clone_from}', not '{source}'")
     should_sanitize = dst.sanitize if sanitize is None else sanitize
+    if source == "production" and not should_sanitize:
+        raise RuntimeError("Refusing to clone production data without sanitization enabled")
     base_url = public_url(dst.domain)
     if preview:
         print("[clone] preview")

@@ -1,0 +1,71 @@
+"""Shared pytest configuration for odooctl tests.
+
+The test suite should not depend on secrets exported in the developer or CI
+environment. Individual tests that need a secret can opt in by setting it with
+``monkeypatch.setenv`` inside the test body.
+"""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+from pytest import ExitCode
+
+
+# Environment variable names used by example configs and remote-backup tests.
+# Keep this intentionally broader than the current suite so new tests do not
+# accidentally inherit real operator credentials from the ambient environment.
+ISOLATED_ENV_VARS = (
+    "ODOO_DB_PASSWORD",
+    "S3_ENDPOINT",
+    "S3_ACCESS_KEY",
+    "S3_SECRET_KEY",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+)
+ORIGINAL_ENV = {name: os.environ[name] for name in ISOLATED_ENV_VARS if name in os.environ}
+
+
+@pytest.fixture(autouse=True)
+def isolate_operator_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove operator secrets from every test unless the test opts in.
+
+    Tests can still call ``monkeypatch.setenv`` after this fixture has run.
+    This prevents an exported ODOO_DB_PASSWORD from bypassing missing-env
+    assertions and reaching real host adapters such as psql/pg_dump.
+    """
+
+    for name in ISOLATED_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture
+def preserved_env(monkeypatch: pytest.MonkeyPatch):
+    """Temporarily restore selected real environment variables for opt-in tests.
+
+    Usage: ``preserved_env("ODOO_DB_PASSWORD")``. This is intentionally explicit
+    and currently unused by unit tests, but it gives future integration tests a
+    clean escape hatch without disabling the autouse isolation globally.
+    """
+
+    def restore(*names: str) -> None:
+        for name in names:
+            if name in ORIGINAL_ENV:
+                monkeypatch.setenv(name, ORIGINAL_ENV[name])
+
+    return restore
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int | ExitCode) -> None:
+    """Treat an empty integration suite as a clean collection result.
+
+    M0 registers the integration marker before any integration tests exist.
+    ``pytest -m integration`` should therefore be usable in CI/sprints as a
+    smoke collection command without failing solely because no integration tests
+    have landed yet.
+    """
+
+    if session.config.option.markexpr == "integration" and exitstatus == ExitCode.NO_TESTS_COLLECTED:
+        session.exitstatus = ExitCode.OK

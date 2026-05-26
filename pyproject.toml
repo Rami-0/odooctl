@@ -23,6 +23,12 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not integration'"
+markers = [
+  "unit: fast unit-level tests that do not require external services",
+  "integration: tests that require external services or real operator configuration",
+  "docker: tests that require Docker or docker compose",
+]
 
 [tool.ruff]
 line-length = 100

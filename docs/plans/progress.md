@@ -97,8 +97,8 @@
 - Verification:
   - `pytest -q tests/test_clone.py tests/test_clone_swap.py tests/test_sanitize.py tests/test_config.py` — 35 passed.
   - `pytest -q` — 112 passed.
-- Commit SHA: pending.
-- Push status: pending.
+- Commit SHA: 0ea2ad2 (`Add safe clone temp database swap`).
+- Push status: pushed to `origin/master` (`86f701a..0ea2ad2`).
 - Blockers/open questions: Docker experiment-stack verification still not run; filestore named-volume adapter remains outstanding for M3.
 - Next recommended task: add explicit config tests for `db_selector` multi-db sharing and then implement Docker volume filestore adapter.
 

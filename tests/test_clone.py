@@ -53,6 +53,7 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
     monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda compose, service, db_name, modules: events.append(("update", (service, db_name, tuple(modules)))))
     monkeypatch.setattr("odooctl.commands.clone.check_url", lambda url, **kwargs: events.append(("healthcheck", (url, kwargs["timeout"], kwargs["retries"], kwargs["interval"])) ))
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     url = execute("production", "staging", True, str(config))
 
@@ -121,6 +122,7 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
     monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     execute("production", "staging", True, str(config), sanitization_profile="minimal")
 
@@ -178,6 +180,7 @@ def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeyp
     monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     execute("production", "staging", True, str(config))
 
@@ -212,6 +215,7 @@ def test_clone_fails_when_configured_sanitization_sql_file_is_missing(tmp_path: 
     monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
     monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     with pytest.raises(FileNotFoundError, match="Configured sanitization SQL file does not exist"):
         execute("production", "staging", True, str(config))
@@ -257,6 +261,7 @@ def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: P
     monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
     monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
     with pytest.raises(RuntimeError, match="Target service is not running"):
         execute("production", "staging", True, str(config))
@@ -288,6 +293,25 @@ def test_clone_preview_is_readable_and_side_effect_free(tmp_path: Path, monkeypa
     assert "source_branch=main" in out
     assert "target_branch=staging" in out
     assert "clone_from=production" in out
+
+
+def test_clone_missing_env_vars_fails_before_dump(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    sanitize: true\n"""
+    )
+    (tmp_path / "docker-compose.yml").touch()
+
+    called: list[str] = []
+    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+    monkeypatch.delenv("ODOO_DB_PASSWORD", raising=False)
+
+    with pytest.raises(RuntimeError, match="Missing required environment variables: ODOO_DB_PASSWORD"):
+        execute("production", "staging", True, str(config))
+
+    assert called == []
 
 
 def test_clone_missing_compose_file_fails_before_dump(tmp_path: Path, monkeypatch):

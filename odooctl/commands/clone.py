@@ -44,6 +44,11 @@ def execute(
         print(f"affected_integrations={','.join(dst.update_modules) or 'none'}")
         print(f"production_source={'yes' if source == 'production' else 'no'}")
         return base_url
+
+    missing_env_vars = cfg.missing_env_vars()
+    if missing_env_vars:
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
+
     pg = PostgresAdapter(cfg.postgres)
     fs = FilestoreAdapter()
     # Direct dump/restore keeps db + filestore in one explicit clone flow.

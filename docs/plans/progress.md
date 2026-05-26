@@ -22,13 +22,26 @@
 - Created this progress tracker.
 - Current next target: M0 — test-harness hygiene.
 
+### 2026-05-26T15:02:31+00:00 — M0 test-harness hygiene
+
+- Completed the first M0 slice: added pytest environment isolation and registered unit/integration/docker markers.
+- Files changed: `tests/conftest.py`, `pyproject.toml`.
+- Verification:
+  - `pytest -q` — 97 passed.
+  - `ODOO_DB_PASSWORD=ambient-secret pytest -q` — 97 passed.
+  - `pytest -m integration` — 97 deselected / 0 selected, exit 0.
+- Commit SHA: recorded in final tick report after commit creation.
+- Push status: pending; push will be attempted before finishing this run.
+- Blockers/open questions: none.
+- Next recommended task: start M1 with `ProjectContext` and `doctor` tests.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
 
-- [ ] Add `tests/conftest.py` with environment isolation.
-- [ ] Register pytest markers for `unit`, `integration`, `docker`.
-- [ ] Ensure `pytest -q` passes with `ODOO_DB_PASSWORD` set and unset.
+- [x] Add `tests/conftest.py` with environment isolation.
+- [x] Register pytest markers for `unit`, `integration`, `docker`.
+- [x] Ensure `pytest -q` passes with `ODOO_DB_PASSWORD` set and unset.
 
 ### M1 — ProjectContext + doctor
 

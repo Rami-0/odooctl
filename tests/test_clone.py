@@ -12,6 +12,7 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
     config.write_text(
         """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    update_modules: [sale]\n    sanitize: true\n"""
     )
+    (tmp_path / "docker-compose.yml").touch()
 
     events: list[tuple[str, tuple[object, ...]]] = []
 
@@ -80,6 +81,7 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
     config.write_text(
         """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    update_modules: [sale]\n    sanitize: true\n"""
     )
+    (tmp_path / "docker-compose.yml").touch()
 
     events: list[tuple[str, tuple[object, ...]]] = []
 
@@ -131,6 +133,7 @@ def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: P
     config.write_text(
         """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    update_modules: [sale]\n    sanitize: true\n"""
     )
+    (tmp_path / "docker-compose.yml").touch()
 
     class DummyPostgres:
         def __init__(self, config):
@@ -175,6 +178,7 @@ def test_clone_preview_is_readable_and_side_effect_free(tmp_path: Path, monkeypa
     config.write_text(
         """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    update_modules: [sale]\n    sanitize: true\n"""
     )
+    (tmp_path / "docker-compose.yml").touch()
 
     called: list[str] = []
     monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
@@ -197,11 +201,46 @@ def test_clone_preview_is_readable_and_side_effect_free(tmp_path: Path, monkeypa
     assert "clone_from=production" in out
 
 
+def test_clone_missing_compose_file_fails_before_dump(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: missing-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    sanitize: true\n"""
+    )
+
+    called: list[str] = []
+    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    with pytest.raises(FileNotFoundError, match="Compose file not found"):
+        execute("production", "staging", True, str(config))
+
+    assert called == []
+
+
+def test_clone_preview_missing_compose_file_fails(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: missing-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    sanitize: true\n"""
+    )
+
+    called: list[str] = []
+    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+
+    with pytest.raises(FileNotFoundError, match="Compose file not found"):
+        execute("production", "staging", True, str(config), preview=True)
+
+    assert called == []
+
+
 def test_clone_respects_clone_from_mapping(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(
         """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    sanitize: true\n"""
     )
+    (tmp_path / "docker-compose.yml").touch()
 
     monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: None)
     monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: None)

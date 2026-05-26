@@ -87,3 +87,15 @@ def test_environment_clone_from_cannot_reference_itself(tmp_path: Path):
         load_config(path)
 
     assert "cannot clone_from itself" in str(exc_info.value)
+
+
+def test_production_cannot_be_a_clone_target(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    clone_from: staging\n"""
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        load_config(path)
+
+    assert "Environment 'production' cannot be a clone target" in str(exc_info.value)

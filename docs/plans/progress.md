@@ -129,6 +129,20 @@
 - Blockers/open questions: real Docker experiment-stack verification remains outstanding; M4 env lifecycle commands are not implemented yet.
 - Next recommended task: implement `env list/show/create/destroy` config editing with production destroy guards and mocked clone provisioning tests.
 
+### 2026-05-26T21:05:33+00:00 — M4 env lifecycle foundation
+
+- Completed the M4 env command foundation: added `odooctl env list/show/create/destroy`, wired the env sub-app into the CLI, and added config editing for environment creation/removal.
+- `env create` validates the full updated YAML before writing, inherits source stack/filestore volume/update modules where appropriate, supports shared-stack `--db-selector`, and provisions via the existing safe clone path unless `--no-provision` is passed.
+- `env destroy` refuses `production`, requires `--yes`, removes non-production config blocks, and deliberately guards `--purge` because DB/filestore purge execution is not yet implemented.
+- Files changed: `odooctl/commands/env.py`, `odooctl/main.py`, `tests/test_env_cmd.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_env_cmd.py tests/test_registry.py` — 9 passed.
+  - `pytest -q` — 127 passed.
+- Commit SHA: ab39002 (`Add environment lifecycle commands`).
+- Push status: pending this run.
+- Blockers/open questions: destructive `env destroy --purge` still needs implementation against the DB and filestore adapter factories, with production guards and tests.
+- Next recommended task: implement guarded non-production `env destroy --purge` adapter execution, then run Docker experiment-stack verification for backup/clone/restore/update-modules.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -163,7 +177,7 @@
 
 - [x] Add project registry.
 - [x] Add `project` command group.
-- [ ] Add `env` command group.
+- [x] Add `env` command group.
 - [x] Support `-p/--project` and `-C/--project-dir` UX.
 
 ### M5 — Distribution, scheduling, polish

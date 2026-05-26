@@ -20,6 +20,14 @@ class DummyCompose:
         self.calls.append(("restart", (service,)))
 
 
+class DummyStore:
+    def __init__(self, previous: dict[str, object] | None):
+        self.previous = previous
+
+    def previous_successful_deployment(self, environment: str):
+        return self.previous
+
+
 CONFIG = """project:
   name: demo
   odoo_version: "19.0"
@@ -57,19 +65,43 @@ def write_config(tmp_path: Path) -> Path:
     return config
 
 
-def test_rollback_code_mode_ups_service_without_restore(tmp_path: Path, monkeypatch, capsys):
+def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path, monkeypatch, capsys):
     config = write_config(tmp_path)
     compose = DummyCompose("docker-compose.yml")
     restore_calls: list[tuple[object, ...]] = []
+    run_calls: list[list[str]] = []
 
     monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
     monkeypatch.setattr(rollback_cmd, "restore_execute", lambda *args: restore_calls.append(args))
+    monkeypatch.setattr(
+        rollback_cmd,
+        "MetadataStore",
+        lambda: DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"}),
+    )
+    monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: run_calls.append(list(args)))
 
     rollback_cmd.execute("production", "code", None, str(config))
 
+    assert run_calls == [["git", "fetch", "--all"], ["git", "checkout", "abc123"]]
     assert compose.calls == [("up", ("odoo",))]
     assert restore_calls == []
-    assert "Code-only rollback" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Code-only rollback" in output
+    assert "target commit: abc123" in output
+    assert "recorded image: registry/odoo:good" in output
+
+
+def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: DummyStore(None))
+
+    with pytest.raises(RuntimeError, match="No previous successful deployment commit"):
+        rollback_cmd.execute("production", "code", None, str(config))
+
+    assert compose.calls == []
 
 
 def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatch):

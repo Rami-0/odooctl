@@ -26,6 +26,19 @@ class MetadataStore:
         path = self.root / "deployments" / f"{environment}-latest.json"
         return json.loads(path.read_text()) if path.exists() else None
 
+    def previous_successful_deployment(self, environment: str) -> dict | None:
+        deployments_dir = self.root / "deployments"
+        candidates = []
+        for path in deployments_dir.glob(f"{environment}-*.json"):
+            if path.name == f"{environment}-latest.json":
+                continue
+            data = json.loads(path.read_text())
+            if data.get("status") == "success":
+                candidates.append(data)
+        if not candidates:
+            return None
+        return max(candidates, key=lambda item: item.get("timestamp", ""))
+
     def latest_backup(self, environment: str) -> dict | None:
         path = self.root / "backups" / f"{environment}-latest.json"
         return json.loads(path.read_text()) if path.exists() else None

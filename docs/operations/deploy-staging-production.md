@@ -37,7 +37,7 @@ This is the working model for `odooctl` deployments.
 
 ### 4) Rollback decision
 
-- Use **code rollback** when the deploy failed or the new code is bad.
+- Use **code rollback** when the deploy failed or the new code is bad. It targets the last successful deployment commit recorded in metadata and refuses to run if no commit is available.
 - Use **full rollback** when database/filestore state must be restored.
 - Keep the previous backup id and deployment metadata attached to the release.
 

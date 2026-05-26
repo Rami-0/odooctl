@@ -29,7 +29,8 @@ def default_sql(env: EnvironmentConfig, config: OdooCtlConfig) -> list[str]:
         "WHERE key ILIKE '%api_key%' OR key ILIKE '%secret%' OR key ILIKE '%token%' OR key ILIKE '%password%';"
     )
     if config.sanitization.rewrite_base_url:
-        url = public_url(env.domain).replace("'", "''")
+        scheme = config.healthcheck.scheme or env.scheme
+        url = public_url(env.domain, scheme=scheme, port=env.port).replace("'", "''")
         stmts.append("UPDATE ir_config_parameter SET value = '%s' WHERE key = 'web.base.url';" % url)
     return stmts
 

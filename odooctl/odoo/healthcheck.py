@@ -1,7 +1,17 @@
 from __future__ import annotations
 import time
+from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+
+
+def with_db_selector(url: str, db_name: str | None = None) -> str:
+    if not db_name:
+        return url
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["db"] = db_name
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def check_url(url: str, *, timeout: int = 5, retries: int = 12, interval: int = 5) -> bool:

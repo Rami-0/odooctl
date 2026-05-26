@@ -70,6 +70,7 @@ def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path
     compose = DummyCompose("docker-compose.yml")
     restore_calls: list[tuple[object, ...]] = []
     run_calls: list[list[str]] = []
+    health_calls: list[tuple[str, int, int, int]] = []
 
     monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
     monkeypatch.setattr(rollback_cmd, "restore_execute", lambda *args: restore_calls.append(args))
@@ -79,16 +80,23 @@ def test_rollback_code_mode_checks_out_previous_successful_commit(tmp_path: Path
         lambda: DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"}),
     )
     monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: run_calls.append(list(args)))
+    monkeypatch.setattr(
+        rollback_cmd,
+        "check_url",
+        lambda url, *, timeout, retries, interval: health_calls.append((url, timeout, retries, interval)),
+    )
 
     rollback_cmd.execute("production", "code", None, str(config))
 
     assert run_calls == [["git", "fetch", "--all"], ["git", "checkout", "abc123"]]
     assert compose.calls == [("up", ("odoo",))]
+    assert health_calls == [("https://odoo.example.com/web/health", 10, 3, 1)]
     assert restore_calls == []
     output = capsys.readouterr().out
     assert "Code-only rollback" in output
     assert "target commit: abc123" in output
     assert "recorded image: registry/odoo:good" in output
+    assert "[rollback] verify" in output
 
 
 def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, monkeypatch):
@@ -122,15 +130,43 @@ def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatc
         events.append(("up", (service,)))
         compose.calls.append(("up", (service,)))
 
+    def record_health(url: str, *, timeout: int, retries: int, interval: int):
+        events.append(("healthcheck", (url, timeout, retries, interval)))
+
     compose.up = record_up  # type: ignore[method-assign]
     monkeypatch.setattr(rollback_cmd, "restore_execute", restore)
+    monkeypatch.setattr(rollback_cmd, "check_url", record_health)
 
     rollback_cmd.execute("production", "full", "production_2026", str(config))
 
     assert events == [
         ("restore", ("production", "production_2026", str(config))),
         ("up", ("odoo",)),
+        ("healthcheck", ("https://odoo.example.com/web/health", 10, 3, 1)),
     ]
+    assert compose.calls == [("up", ("odoo",))]
+
+
+def test_rollback_fails_when_post_rollback_healthcheck_fails(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(
+        rollback_cmd,
+        "MetadataStore",
+        lambda: DummyStore({"status": "success", "commit": "abc123", "docker_image": "registry/odoo:good"}),
+    )
+    monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: None)
+    monkeypatch.setattr(
+        rollback_cmd,
+        "check_url",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="healthcheck failed"):
+        rollback_cmd.execute("production", "code", None, str(config))
+
     assert compose.calls == [("up", ("odoo",))]
 
 

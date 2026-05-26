@@ -119,3 +119,79 @@ def test_previous_successful_deployment_requires_prior_success(tmp_path):
     )
 
     assert store.previous_successful_deployment("production") is None
+
+
+def test_previous_successful_deployment_ignores_prefix_sibling_environment(tmp_path):
+    store = MetadataStore(tmp_path / ".odooctl")
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="prod",
+            timestamp="2026-01-01T00:00:00Z",
+            branch="main",
+            commit="prod-current",
+            status="success",
+        )
+    )
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="prod-eu",
+            timestamp="2026-01-02T00:00:00Z",
+            branch="main",
+            commit="prod-eu-old",
+            status="success",
+        )
+    )
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="prod-eu",
+            timestamp="2026-01-03T00:00:00Z",
+            branch="main",
+            commit="prod-eu-current",
+            status="success",
+        )
+    )
+
+    assert store.previous_successful_deployment("prod") is None
+
+
+def test_previous_successful_deployment_prefers_same_environment_over_prefix_sibling(tmp_path):
+    store = MetadataStore(tmp_path / ".odooctl")
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="prod",
+            timestamp="2026-01-01T00:00:00Z",
+            branch="main",
+            commit="prod-previous",
+            status="success",
+        )
+    )
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="prod",
+            timestamp="2026-01-02T00:00:00Z",
+            branch="main",
+            commit="prod-current",
+            status="failed",
+        )
+    )
+    store.save_deployment(
+        DeploymentMetadata(
+            project="p",
+            environment="prod-eu",
+            timestamp="2026-01-03T00:00:00Z",
+            branch="main",
+            commit="prod-eu-current",
+            status="success",
+        )
+    )
+
+    previous = store.previous_successful_deployment("prod")
+
+    assert previous is not None
+    assert previous["environment"] == "prod"
+    assert previous["commit"] == "prod-previous"

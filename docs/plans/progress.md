@@ -42,8 +42,8 @@
 - Verification:
   - `pytest -q tests/test_context.py tests/test_doctor.py tests/test_cli_smoke.py` — 12 passed.
   - `pytest -q` — 101 passed.
-- Commit SHA: pending at time of progress entry; see final report for committed SHA.
-- Push status: pending at time of progress entry; see final report for push result.
+- Commit SHA: 5c3dc39 (`Add ProjectContext and doctor preflight`).
+- Push status: pushed to `origin/master` (`7e956d3..5c3dc39`).
 - Blockers/open questions: none.
 - Next recommended task: thread `ProjectContext` through existing commands so compose, metadata, backups, git, sanitization SQL, and config paths stop depending on process cwd.
 

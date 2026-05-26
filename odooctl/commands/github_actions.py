@@ -10,9 +10,10 @@ from odooctl.utils.logging import success
 WORKFLOW_FILENAME = "odooctl-deploy.yml"
 
 
-def render_workflow(environment_names: list[str] | None = None, default_branch: str = "main", config_path: str = "odooctl.yml") -> str:
-    environment_names = environment_names or ["staging", "production"]
-    options = "\n".join(f"          - {name}" for name in environment_names)
+def render_workflow(environments: dict[str, str] | None = None, default_branch: str = "main", config_path: str = "odooctl.yml") -> str:
+    environments = environments or {"staging": "staging", "production": "main"}
+    options = "\n".join(f"          - {name}" for name in environments)
+    branch_cases = "\n".join(f'            {name}) expected_branch="{branch}" ;;' for name, branch in environments.items())
     return f"""name: odooctl deploy
 
 on:
@@ -34,6 +35,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce branch/environment mapping
+        run: |
+          case "${{{{ inputs.environment }}}}" in
+{branch_cases}
+            *) echo "::error::Unknown environment '${{{{ inputs.environment }}}}'"; exit 1 ;;
+          esac
+          if [ "${{{{ inputs.branch }}}}" != "$expected_branch" ]; then
+            echo "::error::Branch '${{{{ inputs.branch }}}}' is not allowed for environment '${{{{ inputs.environment }}}}' (expected '$expected_branch')"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -52,9 +63,9 @@ jobs:
 
 def run(config: str = "odooctl.yml", output: str = f".github/workflows/{WORKFLOW_FILENAME}", dry_run: bool = False, force: bool = False) -> str:
     parsed = load_config(config)
-    environment_names = sorted(parsed.environments)
+    environments = {name: parsed.environments[name].branch for name in sorted(parsed.environments)}
     default_branch = parsed.environments.get("production", next(iter(parsed.environments.values()))).branch
-    content = render_workflow(environment_names, default_branch, config_path=config)
+    content = render_workflow(environments, default_branch, config_path=config)
     path = Path(output)
     if dry_run:
         return content

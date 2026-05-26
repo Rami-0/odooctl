@@ -138,8 +138,8 @@
 - Verification:
   - `pytest -q tests/test_env_cmd.py tests/test_registry.py` — 9 passed.
   - `pytest -q` — 127 passed.
-- Commit SHA: ab39002 (`Add environment lifecycle commands`).
-- Push status: pending this run.
+- Commit SHA: aa9e95b (`Add environment lifecycle commands`).
+- Push status: pushed to `origin/master` (`7512ca0..aa9e95b`); follow-up progress-status commit may be pushed separately.
 - Blockers/open questions: destructive `env destroy --purge` still needs implementation against the DB and filestore adapter factories, with production guards and tests.
 - Next recommended task: implement guarded non-production `env destroy --purge` adapter execution, then run Docker experiment-stack verification for backup/clone/restore/update-modules.
 

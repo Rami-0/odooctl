@@ -41,8 +41,14 @@ def profile_sql(profile: str, env: EnvironmentConfig, config: OdooCtlConfig) -> 
     return stmts
 
 
-def sanitize_database(pg: PostgresAdapter, db_name: str, env: EnvironmentConfig, config: OdooCtlConfig) -> None:
-    for sql in default_sql(env, config):
+def sanitize_database(
+    pg: PostgresAdapter,
+    db_name: str,
+    env: EnvironmentConfig,
+    config: OdooCtlConfig,
+    profile: str = "normal",
+) -> None:
+    for sql in profile_sql(profile, env, config):
         pg.psql(db_name, sql)
     for file_name in config.sanitization.sql_files:
         path = Path(file_name)

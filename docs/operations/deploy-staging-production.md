@@ -39,6 +39,7 @@ This is the working model for `odooctl` deployments.
 
 - Use **code rollback** when the deploy failed or the new code is bad. It targets the last successful deployment commit recorded in metadata and refuses to run if no commit is available.
 - Use **full rollback** when database/filestore state must be restored.
+- A failed production deploy may restart the Odoo service as a recovery attempt, but it does **not** automatically roll back code or data; run `odooctl rollback production --mode code` or `odooctl rollback production --mode full` deliberately after deciding which state must be restored.
 - Keep the previous backup id and deployment metadata attached to the release.
 
 ## Git repo integration

@@ -59,8 +59,8 @@ def execute(environment: str, branch: str | None = None, config_path: str = "odo
         if environment == "production":
             try:
                 compose.restart(cfg.odoo.service)
-            except Exception as rollback_exc:
-                message = f"{message}; rollback restart failed: {rollback_exc}"
+            except Exception as recovery_exc:
+                message = f"{message}; recovery restart failed: {recovery_exc}"
         raise
     finally:
         MetadataStore().save_deployment(DeploymentMetadata(project=cfg.project.name, environment=environment, branch=selected_branch, commit=git_commit(), docker_image=cfg.odoo.image, backup=backup_id, modules_updated=env.update_modules, status=status, health_check_url=url, message=message))

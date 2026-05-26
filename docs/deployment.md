@@ -2,6 +2,8 @@
 
 `odooctl deploy production --branch main` performs a pre-deploy backup, checks out/pulls the branch, pulls and starts Docker Compose services, runs module updates, performs health checks, and stores deployment metadata.
 
+If a production deploy fails, `odooctl deploy` may restart the service as a recovery attempt, but it does not automatically roll back code or data; use `odooctl rollback production --mode code` or `odooctl rollback production --mode full` for an explicit rollback.
+
 `odooctl deploy staging --branch staging` follows the same flow without mandatory production backup.
 
 `odooctl restore staging --backup latest` restores the selected backup, verifies checksums, runs the health check, and prints the restored backup id.

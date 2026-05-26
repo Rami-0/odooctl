@@ -152,7 +152,7 @@ def test_env_destroy_refuses_production_and_removes_non_production(tmp_path: Pat
     assert "qa" not in yaml.safe_load(config.read_text())["environments"]
 
 
-def test_env_destroy_purge_is_guarded(tmp_path: Path):
+def test_env_destroy_purge_drops_db_and_filestore_before_removing_config(tmp_path: Path, monkeypatch):
     repo = tmp_path / "repo"
     repo.mkdir()
     config = _write_config(repo)
@@ -166,8 +166,20 @@ def test_env_destroy_purge_is_guarded(tmp_path: Path):
         "sanitize": True,
     }
     config.write_text(yaml.safe_dump(data, sort_keys=False))
+    calls = []
+
+    class FakeDb:
+        def drop(self, db_name: str) -> None:
+            calls.append(("drop-db", db_name))
+
+    class FakeFilestore:
+        def delete(self, filestore_path: str) -> None:
+            calls.append(("delete-filestore", filestore_path))
+
+    monkeypatch.setattr("odooctl.commands.env.make_db_adapter", lambda ctx: FakeDb())
+    monkeypatch.setattr("odooctl.commands.env.make_filestore_adapter", lambda ctx, env: FakeFilestore())
 
     result = runner.invoke(app, ["--project-dir", str(repo), "env", "destroy", "qa", "--yes", "--purge"])
-    assert result.exit_code != 0
-    assert "--purge DB/filestore destruction is not implemented yet" in result.output
-    assert "qa" in yaml.safe_load(config.read_text())["environments"]
+    assert result.exit_code == 0, result.output
+    assert calls == [("drop-db", "acme_qa"), ("delete-filestore", "/var/lib/odoo/filestore/acme_qa")]
+    assert "qa" not in yaml.safe_load(config.read_text())["environments"]

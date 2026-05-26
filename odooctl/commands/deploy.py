@@ -14,6 +14,13 @@ from odooctl.odoo.module_update import update_modules_compose
 from odooctl.utils.shell import run
 
 
+def _assert_clean_worktree() -> None:
+    result = run(["git", "status", "--porcelain"], check=False)
+    dirty_paths = result.stdout.strip()
+    if dirty_paths:
+        raise RuntimeError(f"Git worktree is dirty; commit or stash changes before deploy:\n{dirty_paths}")
+
+
 def _preflight(environment: str, branch: str | None, config_path: str):
     cfg = load_config(config_path)
     missing_env_vars = cfg.missing_env_vars()
@@ -36,6 +43,7 @@ def _preflight(environment: str, branch: str | None, config_path: str):
             f"Postgres connectivity check failed for database '{env.db_name}' "
             f"on {cfg.postgres.host}:{cfg.postgres.port}: {exc}"
         ) from exc
+    _assert_clean_worktree()
     return cfg, env, selected_branch
 
 

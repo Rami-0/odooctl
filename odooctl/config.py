@@ -18,13 +18,18 @@ class RuntimeConfig(BaseModel):
     type: Literal["docker_compose"] = "docker_compose"
     compose_file: str = "docker-compose.yml"
     reverse_proxy: str = "traefik"
+    execution_mode: Literal["docker", "host"] = "host"
 
 
 class EnvironmentConfig(BaseModel):
+    stack: str = "default"
     branch: str
+    scheme: Literal["http", "https"] = "https"
     domain: str
+    port: int | None = None
     db_name: str
     filestore_path: str
+    db_selector: bool = False
     clone_from: str | None = None
     sanitize: bool = False
     update_modules: list[str] = Field(default_factory=list)
@@ -36,11 +41,31 @@ class PostgresConfig(BaseModel):
     user: str = "odoo"
     password_env: str = "ODOO_DB_PASSWORD"
     service: str = "postgres"
+    internal_host: str | None = None
+    service_user: str | None = None
+    service_password_env: str | None = None
+
+    @model_validator(mode="after")
+    def fill_container_defaults(self) -> "PostgresConfig":
+        if self.internal_host is None:
+            self.internal_host = self.service
+        if self.service_user is None:
+            self.service_user = self.user
+        if self.service_password_env is None:
+            self.service_password_env = self.password_env
+        return self
 
     def password(self) -> str:
         value = os.getenv(self.password_env)
         if not value:
             raise RuntimeError(f"Missing required environment variable: {self.password_env}")
+        return value
+
+    def service_password(self) -> str:
+        env_name = self.service_password_env or self.password_env
+        value = os.getenv(env_name)
+        if not value:
+            raise RuntimeError(f"Missing required environment variable: {env_name}")
         return value
 
 
@@ -49,6 +74,11 @@ class OdooConfig(BaseModel):
     config_path: str = "./odoo.conf"
     addons_paths: list[str] = Field(default_factory=list)
     service: str = "odoo"
+    db_host: str | None = None
+    db_user: str | None = None
+    db_password_env: str | None = None
+    filestore_container_path: str = "/var/lib/odoo"
+    without_demo: str = "True"
 
 
 class RemoteBackupConfig(BaseModel):
@@ -82,6 +112,7 @@ class SanitizationConfig(BaseModel):
 
 class HealthcheckConfig(BaseModel):
     path: str = "/web/login"
+    scheme: Literal["http", "https"] | None = None
     timeout_seconds: int = 5
     retries: int = 12
     interval_seconds: int = 5
@@ -106,6 +137,13 @@ class OdooCtlConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_environment_graph(self) -> "OdooCtlConfig":
+        if self.odoo.db_host is None:
+            self.odoo.db_host = self.postgres.internal_host
+        if self.odoo.db_user is None:
+            self.odoo.db_user = self.postgres.user
+        if self.odoo.db_password_env is None:
+            self.odoo.db_password_env = self.postgres.password_env
+
         seen_db_names: dict[str, str] = {}
         seen_filestore_paths: dict[str, str] = {}
         seen_domains: dict[str, str] = {}
@@ -165,6 +203,10 @@ class OdooCtlConfig(BaseModel):
 
     def referenced_env_vars(self) -> list[str]:
         refs = {self.postgres.password_env}
+        if self.postgres.service_password_env:
+            refs.add(self.postgres.service_password_env)
+        if self.odoo.db_password_env:
+            refs.add(self.odoo.db_password_env)
         if self.backups.remote:
             remote = self.backups.remote
             for value in (remote.endpoint_env, remote.access_key_env, remote.secret_key_env):

@@ -60,6 +60,19 @@
 - Blockers/open questions: none.
 - Next recommended task: start M2 with additive config fields for execution mode and container PostgreSQL/Odoo connection settings.
 
+### 2026-05-26T17:23:37+00:00 — M2 Docker DB adapter foundation
+
+- Completed an M2 foundation slice: added additive execution-mode/container DB/Odoo config fields, binary-safe command helpers, Docker Compose byte stream helpers, and a DB adapter factory with host and Docker PostgreSQL implementations.
+- Threaded the DB adapter selection into backup, restore, clone, and deploy preflight while preserving host-mode/backward-compatible test behavior for existing configs.
+- Files changed: `odooctl/config.py`, `odooctl/utils/shell.py`, `odooctl/adapters/docker_compose.py`, `odooctl/adapters/db.py`, `odooctl/commands/backup.py`, `odooctl/commands/clone.py`, `odooctl/commands/deploy.py`, `odooctl/commands/restore.py`, `odooctl/odoo/sanitize.py`, `tests/test_db_adapter.py`, `tests/test_shell.py`, `docs/plans/progress.md`.
+- Verification:
+  - `pytest -q tests/test_db_adapter.py tests/test_shell.py tests/test_config.py` — 22 passed.
+  - `pytest -q` — 107 passed.
+- Commit SHA: pending this run.
+- Push status: pending this run.
+- Blockers/open questions: `runtime.execution_mode` currently remains backward-compatible default `host`; switching the product default to `docker` needs broader test fixture updates and may be best done with the remaining M2 command wiring.
+- Next recommended task: finish M2 command behavior by adding scheme/port/db-selector URL handling, Odoo module-update DB flags, and tests around container-mode backup/restore command arguments.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -77,9 +90,9 @@
 
 ### M2 — Docker-native execution mode
 
-- [ ] Add config fields: `execution_mode`, container DB settings, per-env scheme.
-- [ ] Add binary-safe command runner.
-- [ ] Add Docker PostgreSQL adapter.
+- [x] Add config fields: `execution_mode`, container DB settings, per-env scheme.
+- [x] Add binary-safe command runner.
+- [x] Add Docker PostgreSQL adapter.
 - [ ] Fix module update DB flags.
 - [ ] Fix status DB service name.
 

@@ -1,8 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Protocol
 from odooctl.config import OdooCtlConfig, EnvironmentConfig
-from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.reverse_proxy import public_url
+
+
+class PsqlAdapter(Protocol):
+    def psql(self, db_name: str, sql: str) -> None: ...
+    def psql_file(self, db_name: str, sql_file: str | Path) -> None: ...
 
 
 def default_sql(env: EnvironmentConfig, config: OdooCtlConfig) -> list[str]:
@@ -42,7 +47,7 @@ def profile_sql(profile: str, env: EnvironmentConfig, config: OdooCtlConfig) -> 
 
 
 def sanitize_database(
-    pg: PostgresAdapter,
+    pg: PsqlAdapter,
     db_name: str,
     env: EnvironmentConfig,
     config: OdooCtlConfig,

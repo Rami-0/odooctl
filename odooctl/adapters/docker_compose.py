@@ -1,5 +1,6 @@
 from __future__ import annotations
-from odooctl.utils.shell import run
+from pathlib import Path
+from odooctl.utils.shell import run, run_capture_bytes, run_pipe_stdin
 
 class DockerComposeAdapter:
     def __init__(self, compose_file: str = "docker-compose.yml", project_dir: str | None = None):
@@ -36,3 +37,9 @@ class DockerComposeAdapter:
 
     def exec(self, service: str, args: list[str], *, stream: bool = True) -> None:
         run(self._cmd("exec", "-T", service, *args), cwd=self.project_dir, stream=stream)
+
+    def exec_capture_bytes(self, service: str, args: list[str], *, stdout_path: str | Path) -> None:
+        run_capture_bytes(self._cmd("exec", "-T", service, *args), cwd=self.project_dir, stdout_path=stdout_path)
+
+    def exec_pipe_stdin(self, service: str, args: list[str], *, stdin_path: str | Path) -> None:
+        run_pipe_stdin(self._cmd("exec", "-T", service, *args), cwd=self.project_dir, stdin_path=stdin_path)

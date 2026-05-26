@@ -28,16 +28,16 @@ class MetadataStore:
 
     def previous_successful_deployment(self, environment: str) -> dict | None:
         deployments_dir = self.root / "deployments"
-        candidates = []
+        history = []
         for path in deployments_dir.glob(f"{environment}-*.json"):
             if path.name == f"{environment}-latest.json":
                 continue
-            data = json.loads(path.read_text())
+            history.append(json.loads(path.read_text()))
+        history.sort(key=lambda item: item.get("timestamp", ""), reverse=True)
+        for data in history[1:]:
             if data.get("status") == "success":
-                candidates.append(data)
-        if not candidates:
-            return None
-        return max(candidates, key=lambda item: item.get("timestamp", ""))
+                return data
+        return None
 
     def latest_backup(self, environment: str) -> dict | None:
         path = self.root / "backups" / f"{environment}-latest.json"

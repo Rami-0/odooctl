@@ -27,6 +27,10 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         raise typer.BadParameter("--mode must be code or full")
     if mode == "full" and not backup:
         raise typer.BadParameter("Full rollback requires --backup")
+    if mode == "full":
+        missing_env_vars = cfg.missing_env_vars()
+        if missing_env_vars:
+            raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env_vars)}")
 
     env = cfg.env(environment)
     url = public_url(env.domain) + cfg.healthcheck.path

@@ -64,6 +64,11 @@ environments:
 """
 
 
+@pytest.fixture(autouse=True)
+def clean_worktree(monkeypatch):
+    monkeypatch.setattr(rollback_cmd, "_assert_clean_worktree", lambda: None)
+
+
 def write_config(tmp_path: Path) -> Path:
     config = tmp_path / "odooctl.yml"
     config.write_text(CONFIG)
@@ -132,6 +137,52 @@ def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, 
         rollback_cmd.execute("production", "code", None, str(config))
 
     assert compose.calls == []
+
+
+def test_rollback_code_mode_requires_clean_worktree_before_git_side_effects(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    write_compose(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+    store = DummyStore({"status": "success", "commit": "abc123", "branch": "main"})
+    run_calls: list[list[str]] = []
+
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: run_calls.append(list(args)))
+    monkeypatch.setattr(
+        rollback_cmd,
+        "_assert_clean_worktree",
+        lambda: (_ for _ in ()).throw(RuntimeError("Git worktree is dirty; commit or stash changes before deploy")),
+    )
+
+    with pytest.raises(RuntimeError, match="Git worktree is dirty"):
+        rollback_cmd.execute("production", "code", None, str(config))
+
+    assert run_calls == []
+    assert compose.calls == []
+    assert store.saved == []
+
+
+def test_rollback_full_mode_does_not_require_clean_worktree(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    write_compose(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+    store = DummyStore(None)
+    clean_checks: list[str] = []
+
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(rollback_cmd, "git_commit", lambda: "current123")
+    monkeypatch.setattr(rollback_cmd, "restore_execute", lambda *args: None)
+    monkeypatch.setattr(rollback_cmd, "check_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr(rollback_cmd, "_assert_clean_worktree", lambda: clean_checks.append("checked"))
+
+    rollback_cmd.execute("production", "full", "production_2026", str(config))
+
+    assert clean_checks == []
+    assert compose.calls == [("up", ("odoo",))]
+    assert store.saved[0].status == "success"
 
 
 def test_rollback_code_mode_rejects_branch_mismatch(tmp_path: Path, monkeypatch):

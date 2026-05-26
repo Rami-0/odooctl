@@ -10,6 +10,7 @@ from odooctl.commands import (
     clone as clone_cmd,
     deploy as deploy_cmd,
     doctor as doctor_cmd,
+    env as env_cmd,
     github_actions as gha_cmd,
     init as init_cmd,
     logs as logs_cmd,
@@ -27,6 +28,7 @@ app = typer.Typer(
     add_completion=False,
 )
 app.add_typer(project_cmd.app, name="project")
+app.add_typer(env_cmd.app, name="env")
 
 
 def _context_config(config: str) -> str:

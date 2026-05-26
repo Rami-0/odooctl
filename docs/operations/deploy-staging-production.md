@@ -20,11 +20,12 @@ This is the working model for `odooctl` deployments.
 
 ### 2) Deploy staging first
 
-1. Clone or refresh staging from the chosen source environment.
-2. Apply sanitization.
-3. Restart the Odoo service.
-4. Run module updates if the environment requires them.
-5. Verify the healthcheck URL.
+1. Preview the clone first and confirm the printed mapping: source, target, `clone_from`, source branch, and target branch.
+2. Clone or refresh staging from the configured source environment.
+3. Apply sanitization.
+4. Restart the Odoo service.
+5. Run module updates if the environment requires them.
+6. Verify the healthcheck URL.
 
 ### 3) Promote to production
 

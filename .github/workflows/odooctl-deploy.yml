@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - staging
           - production
+          - staging
       branch:
         description: Git branch to deploy
         required: true
@@ -20,6 +20,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce branch/environment mapping
+        run: |
+          case "${{ inputs.environment }}" in
+            production) expected_branch="main" ;;
+            staging) expected_branch="staging" ;;
+            *) echo "::error::Unknown environment '${{ inputs.environment }}'"; exit 1 ;;
+          esac
+          if [ "${{ inputs.branch }}" != "$expected_branch" ]; then
+            echo "::error::Branch '${{ inputs.branch }}' is not allowed for environment '${{ inputs.environment }}' (expected '$expected_branch')"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

@@ -134,6 +134,54 @@ def test_rollback_code_mode_requires_recorded_successful_commit(tmp_path: Path, 
     assert compose.calls == []
 
 
+def test_rollback_code_mode_rejects_branch_mismatch(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    write_compose(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+    run_calls: list[list[str]] = []
+    store = DummyStore({"status": "success", "commit": "abc123", "branch": "release", "docker_image": "registry/odoo:good"})
+
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: run_calls.append(list(args)))
+
+    with pytest.raises(RuntimeError, match="refusing code rollback across branches"):
+        rollback_cmd.execute("production", "code", None, str(config))
+
+    assert run_calls == []
+    assert compose.calls == []
+    assert store.saved == []
+
+
+def test_rollback_code_mode_allows_matching_branch(tmp_path: Path, monkeypatch):
+    config = write_config(tmp_path)
+    write_compose(tmp_path)
+    compose = DummyCompose("docker-compose.yml")
+    run_calls: list[list[str]] = []
+    health_calls: list[tuple[str, int, int, int]] = []
+    store = DummyStore({"status": "success", "commit": "abc123", "branch": "main", "docker_image": "registry/odoo:good"})
+
+    monkeypatch.setattr(rollback_cmd, "DockerComposeAdapter", lambda compose_file: compose)
+    monkeypatch.setattr(rollback_cmd, "MetadataStore", lambda: store)
+    monkeypatch.setattr(rollback_cmd, "run", lambda args, **kwargs: run_calls.append(list(args)))
+    monkeypatch.setattr(
+        rollback_cmd,
+        "check_url",
+        lambda url, *, timeout, retries, interval: health_calls.append((url, timeout, retries, interval)),
+    )
+
+    rollback_cmd.execute("production", "code", None, str(config))
+
+    assert run_calls == [["git", "fetch", "--all"], ["git", "checkout", "abc123"]]
+    assert compose.calls == [("up", ("odoo",))]
+    assert health_calls == [("https://odoo.example.com/web/health", 10, 3, 1)]
+    assert len(store.saved) == 1
+    metadata = store.saved[0]
+    assert metadata.status == "success"
+    assert metadata.branch == "main"
+    assert metadata.commit == "abc123"
+
+
 def test_rollback_full_mode_restores_then_ups_service(tmp_path: Path, monkeypatch):
     config = write_config(tmp_path)
     write_compose(tmp_path)

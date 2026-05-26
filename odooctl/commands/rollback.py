@@ -51,6 +51,13 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         previous = store.previous_successful_deployment(environment)
         if not previous or not previous.get("commit"):
             raise RuntimeError(f"No previous successful deployment commit recorded for environment '{environment}'")
+        recorded_branch = previous.get("branch")
+        if recorded_branch and recorded_branch != env.branch:
+            raise RuntimeError(
+                f"Previous successful deployment for '{environment}' was on branch "
+                f"'{recorded_branch}', but the environment now maps to '{env.branch}'; "
+                "refusing code rollback across branches"
+            )
         commit = str(previous["commit"])
         previous_image = previous.get("docker_image")
         image = str(previous_image) if previous_image else cfg.odoo.image

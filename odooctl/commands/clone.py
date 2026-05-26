@@ -29,6 +29,10 @@ def execute(
     should_sanitize = dst.sanitize if sanitize is None else sanitize
     if source == "production" and not should_sanitize:
         raise RuntimeError("Refusing to clone production data without sanitization enabled")
+    compose_path = Path(config_path).parent / cfg.runtime.compose_file
+    if not compose_path.exists():
+        raise FileNotFoundError(f"Compose file not found: {compose_path}")
+
     base_url = public_url(dst.domain)
     if preview:
         print("[clone] preview")

@@ -106,6 +106,11 @@ class OdooCtlConfig(BaseModel):
     @model_validator(mode="after")
     def validate_environment_graph(self) -> "OdooCtlConfig":
         for name, env in self.environments.items():
+            if name == "production" and env.clone_from:
+                raise ValueError(
+                    "Environment 'production' cannot be a clone target; "
+                    "cloning drops and recreates the target database without a backup"
+                )
             if env.clone_from and env.clone_from not in self.environments:
                 known = ", ".join(sorted(self.environments))
                 raise ValueError(f"Environment '{name}' clone_from '{env.clone_from}' is not defined. Known: {known}")

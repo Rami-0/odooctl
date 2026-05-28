@@ -62,10 +62,12 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
     assert events[1][0] == "dump" and events[1][1][0] == "odoo_prod" and str(events[1][1][1]).endswith(".dump")
     assert events[2][0] == "restore" and events[2][1][0] == "odoo_staging_incoming" and str(events[2][1][1]).endswith(".dump")
     assert events[3] == ("copy", ("/srv/filestore/prod", "/srv/filestore/staging"))
-    assert events[4] == ("psql", ("odoo_staging_incoming", "UPDATE ir_mail_server SET active = false;"))
-    assert events[5] == ("psql", ("odoo_staging_incoming", "UPDATE fetchmail_server SET active = false;"))
-    assert events[6] == ("psql", ("odoo_staging_incoming", "UPDATE ir_cron SET active = false WHERE active = true;"))
-    assert events[7] == ("psql", ("odoo_staging_incoming", "UPDATE payment_provider SET state = 'disabled' WHERE state != 'disabled';"))
+    assert events[4][0] == "psql"
+    assert events[4][1][0] == "odoo_staging_incoming"
+    assert "ir_mail_server" in str(events[4][1][1])
+    assert events[5][0] == "psql" and "fetchmail_server" in str(events[5][1][1])
+    assert events[6][0] == "psql" and "ir_cron" in str(events[6][1][1])
+    assert events[7][0] == "psql" and "payment_provider" in str(events[7][1][1])
     psql_sql = [str(args[1]) for event, args in events if event == "psql" and args[0] == "odoo_staging_incoming"]
     assert "UPDATE ir_config_parameter SET value = 'https://staging.example.com' WHERE key = 'web.base.url';" in psql_sql
     assert any("webhook" in sql and "callback" in sql for sql in psql_sql)

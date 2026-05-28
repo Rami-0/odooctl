@@ -1,5 +1,6 @@
 from __future__ import annotations
 import time
+from http.client import HTTPException
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -23,7 +24,11 @@ def check_url(url: str, *, timeout: int = 5, retries: int = 12, interval: int = 
                 if 200 <= response.status < 400:
                     return True
                 last_error = f"unexpected HTTP status {response.status}"
-        except (URLError, HTTPError, TimeoutError) as exc:
+        except HTTPError as exc:
+            if 300 <= exc.code < 400:
+                return True
+            last_error = exc
+        except (URLError, TimeoutError, ConnectionError, OSError, HTTPException) as exc:
             last_error = exc
         time.sleep(interval)
     if last_error:

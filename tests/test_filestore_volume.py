@@ -73,15 +73,15 @@ def test_docker_volume_filestore_streams_archive_restore_and_copy(tmp_path: Path
     monkeypatch.setattr(filestore_module, "DockerComposeAdapter", lambda *args, **kwargs: compose)
     adapter = DockerVolumeFilestore(ctx, ctx.config)
 
-    adapter.archive("odoo_staging", tmp_path / "filestore.tar.zst")
-    adapter.restore_archive(tmp_path / "filestore.tar.zst", "odoo_staging")
+    adapter.archive("odoo_staging", tmp_path / "filestore.tar")
+    adapter.restore_archive(tmp_path / "filestore.tar", "odoo_staging")
     adapter.copy("odoo_prod", "odoo_staging")
 
     assert compose.calls[0] == (
         "capture",
         "odoo",
-        ["tar", "--zstd", "-cf", "-", "-C", "/var/lib/odoo/filestore", "odoo_staging"],
-        tmp_path / "filestore.tar.zst",
+        ["tar", "-cf", "-", "-C", "/var/lib/odoo/filestore", "odoo_staging"],
+        tmp_path / "filestore.tar",
     )
     assert compose.calls[1][0:3] == (
         "exec",
@@ -91,8 +91,8 @@ def test_docker_volume_filestore_streams_archive_restore_and_copy(tmp_path: Path
     assert compose.calls[2] == (
         "stdin",
         "odoo",
-        ["tar", "--zstd", "-xf", "-", "-C", "/var/lib/odoo/filestore"],
-        tmp_path / "filestore.tar.zst",
+        ["tar", "-xf", "-", "-C", "/var/lib/odoo/filestore"],
+        tmp_path / "filestore.tar",
     )
     assert compose.calls[3][0:3] == (
         "exec",

@@ -1,5 +1,5 @@
 project:
-  name: odoo19-community-staging-experiment
+  name: local-multidb-example
   odoo_version: "19.0"
 
 runtime:
@@ -9,8 +9,6 @@ runtime:
   execution_mode: docker
 
 postgres:
-  host: localhost
-  port: 5432
   user: odoo
   password_env: ODOO_DB_PASSWORD
   service: db
@@ -37,11 +35,11 @@ environments:
     branch: main
     scheme: http
     domain: localhost
-    port: 18069
+    port: 8069
     db_selector: true
     db_name: odoo_prod
     filestore_path: filestore/odoo_prod
-    filestore_volume: odoo19-community-staging_odoo-data
+    filestore_volume: odoo-data
     update_modules:
       - base
   staging:
@@ -49,19 +47,17 @@ environments:
     branch: staging
     scheme: http
     domain: localhost
-    port: 18069
+    port: 8069
     db_selector: true
     db_name: odoo_staging
     filestore_path: filestore/odoo_staging
-    filestore_volume: odoo19-community-staging_odoo-data
+    filestore_volume: odoo-data
     clone_from: production
     sanitize: true
     update_modules:
       - base
 
 sanitization:
-  sql_files:
-    - .sanitize/staging.sql
   disable_mail_servers: true
   disable_fetchmail: true
   disable_crons: true
@@ -70,10 +66,10 @@ sanitization:
   disable_queue_jobs: true
   purge_mail_queue: true
   temp_db_suffix: _incoming
+
 healthcheck:
   scheme: http
   path: /web/login
-  timeout_seconds: 10
   retries: 12
   interval_seconds: 3
 

@@ -68,7 +68,7 @@ def test_docker_postgres_dump_uses_binary_capture(monkeypatch, tmp_path: Path):
     DockerPostgresAdapter(ctx).dump("odoo_prod", tmp_path / "db.dump")
 
     args, cwd, env, stdout_path, check = calls[0]
-    assert args[:7] == ["docker", "compose", "-f", str(ctx.compose_file), "exec", "-T", "db"]
+    assert args[:9] == ["docker", "compose", "-f", str(ctx.compose_file), "exec", "-T", "-e", "PGPASSWORD", "db"]
     assert args[-5:] == ["-h", "db", "-U", "postgres", "-Fc", "-d", "odoo_prod"][-5:]
     assert "pg_dump" in args
     assert cwd == str(tmp_path)

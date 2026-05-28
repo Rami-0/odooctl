@@ -10,7 +10,7 @@ def test_backup_manifest_round_trip_includes_artifacts_and_version():
         db_name="odoo",
         odoo_version="19.0",
         filestore_path="/srv/filestore/odoo",
-        artifact_paths=["db.dump", "filestore.tar.zst"],
+        artifact_paths=["db.dump", "filestore.tar"],
         checksums={"db.dump": "abc"},
         backup_mode="full",
     )
@@ -22,7 +22,7 @@ def test_backup_manifest_round_trip_includes_artifacts_and_version():
     assert restored.schema_version == 1
     assert restored.filestore_path == "/srv/filestore/odoo"
     assert restored.backup_mode == "full"
-    assert restored.artifact_paths == ["db.dump", "filestore.tar.zst"]
+    assert restored.artifact_paths == ["db.dump", "filestore.tar"]
     assert restored.checksums == {"db.dump": "abc"}
 
 

@@ -9,7 +9,7 @@ from odooctl.context import ProjectContext
 from odooctl.odoo.healthcheck import check_url, with_db_selector
 from odooctl.adapters.reverse_proxy import public_url
 
-REQUIRED_BACKUP_FILES = ("db.dump", "filestore.tar.zst", "manifest.json")
+REQUIRED_BACKUP_FILES = ("db.dump", "filestore.tar", "manifest.json")
 
 
 def sha256_file(path: Path) -> str:
@@ -53,7 +53,7 @@ def validate_backup_dir(
     if restore_mode == "full" and manifest.get("backup_mode", "full") != "full":
         raise RuntimeError(f"Unsupported backup mode for full restore: {manifest.get('backup_mode')}")
     checksums = manifest.get("checksums") or {}
-    for key, file_name in (("db_dump", "db.dump"), ("filestore", "filestore.tar.zst")):
+    for key, file_name in (("db_dump", "db.dump"), ("filestore", "filestore.tar")):
         expected = checksums.get(key)
         if not expected:
             raise RuntimeError(f"Backup manifest is missing checksum for {file_name}")
@@ -71,7 +71,7 @@ def execute(environment: str, backup: str = "latest", config_path: str = "odooct
     (make_context_db_adapter(context) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)).restore(env.db_name, backup_dir / "db.dump")
     target_filestore = env.filestore_path if env.filestore_volume else str(context.resolve_path(env.filestore_path))
     fs = make_filestore_adapter(context, env) if env.filestore_volume else FilestoreAdapter()
-    fs.restore_archive(backup_dir / "filestore.tar.zst", target_filestore)
+    fs.restore_archive(backup_dir / "filestore.tar", target_filestore)
     scheme = cfg.healthcheck.scheme or env.scheme
     url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
     check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)

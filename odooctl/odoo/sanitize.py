@@ -10,16 +10,26 @@ class PsqlAdapter(Protocol):
     def psql_file(self, db_name: str, sql_file: str | Path) -> None: ...
 
 
+def guarded_update(table: str, sql: str) -> str:
+    escaped = sql.replace("'", "''")
+    return (
+        "DO $$ BEGIN "
+        f"IF to_regclass('public.{table}') IS NOT NULL THEN "
+        f"EXECUTE '{escaped}'; "
+        "END IF; END $$;"
+    )
+
+
 def default_sql(env: EnvironmentConfig, config: OdooCtlConfig) -> list[str]:
     stmts: list[str] = []
     if config.sanitization.disable_mail_servers:
-        stmts.append("UPDATE ir_mail_server SET active = false;")
+        stmts.append(guarded_update("ir_mail_server", "UPDATE ir_mail_server SET active = false;"))
     if config.sanitization.disable_fetchmail:
-        stmts.append("UPDATE fetchmail_server SET active = false;")
+        stmts.append(guarded_update("fetchmail_server", "UPDATE fetchmail_server SET active = false;"))
     if config.sanitization.disable_crons:
-        stmts.append("UPDATE ir_cron SET active = false WHERE active = true;")
+        stmts.append(guarded_update("ir_cron", "UPDATE ir_cron SET active = false WHERE active = true;"))
     if config.sanitization.disable_payment_providers:
-        stmts.append("UPDATE payment_provider SET state = 'disabled' WHERE state != 'disabled';")
+        stmts.append(guarded_update("payment_provider", "UPDATE payment_provider SET state = 'disabled' WHERE state != 'disabled';"))
     if config.sanitization.disable_queue_jobs:
         stmts.append(
             "DO $$ BEGIN "

@@ -85,9 +85,12 @@ class OdooConfig(BaseModel):
 class RemoteBackupConfig(BaseModel):
     type: str = "s3"
     bucket: str | None = None
+    region: str | None = None
+    prefix: str = ""
     endpoint_env: str | None = None
     access_key_env: str | None = None
     secret_key_env: str | None = None
+    region_env: str | None = None
 
 
 class RetentionConfig(BaseModel):
@@ -114,6 +117,11 @@ class SanitizationConfig(BaseModel):
     temp_db_suffix: str = "_incoming"
 
 
+class RedactionConfig(BaseModel):
+    min_secret_length: int = 6
+    ignore_values: list[str] = Field(default_factory=lambda: ["odoo", "admin", "postgres", "password", "secret", "changeme"])
+
+
 class HealthcheckConfig(BaseModel):
     path: str = "/web/login"
     scheme: Literal["http", "https"] | None = None
@@ -131,6 +139,7 @@ class OdooCtlConfig(BaseModel):
     backups: BackupsConfig = Field(default_factory=BackupsConfig)
     sanitization: SanitizationConfig = Field(default_factory=SanitizationConfig)
     healthcheck: HealthcheckConfig = Field(default_factory=HealthcheckConfig)
+    redaction: RedactionConfig = Field(default_factory=RedactionConfig)
 
     @field_validator("environments")
     @classmethod
@@ -221,7 +230,7 @@ class OdooCtlConfig(BaseModel):
             refs.add(self.odoo.db_password_env)
         if self.backups.remote:
             remote = self.backups.remote
-            for value in (remote.endpoint_env, remote.access_key_env, remote.secret_key_env):
+            for value in (remote.endpoint_env, remote.access_key_env, remote.secret_key_env, remote.region_env):
                 if value:
                     refs.add(value)
         return sorted(refs)
@@ -262,6 +271,15 @@ backups:
     endpoint_env: ODOO_S3_ENDPOINT
     access_key_env: ODOO_S3_ACCESS_KEY
     secret_key_env: ODOO_S3_SECRET_KEY
+    region: eu-central-1
+    prefix: demo-odoo
+
+redaction:
+  min_secret_length: 6
+  ignore_values:
+    - odoo
+    - admin
+    - postgres
 
 odoo:
   image: registry.example.com/odoo:19.0

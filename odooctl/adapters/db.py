@@ -48,6 +48,8 @@ class DockerPostgresAdapter:
             str(self.ctx.compose_file),
             "exec",
             "-T",
+            "-e",
+            "PGPASSWORD",
             self.config.service,
             *args,
         ]
@@ -89,11 +91,29 @@ class DockerPostgresAdapter:
         drop_database(self, db_name)
 
     def drop_create(self, db_name: str) -> None:
+        escaped = db_name.replace("'", "''")
+        terminate_sql = (
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            f"WHERE datname = '{escaped}' AND pid <> pg_backend_pid();"
+        )
+        run(
+            self._cmd("psql", *self.base_args(), "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", terminate_sql),
+            cwd=self.project_dir,
+            env=self._password_env(),
+            stream=True,
+        )
         run(self._cmd("dropdb", *self.base_args(), db_name, "--if-exists"), cwd=self.project_dir, env=self._password_env(), stream=True)
         run(self._cmd("createdb", *self.base_args(), db_name), cwd=self.project_dir, env=self._password_env(), stream=True)
 
     def psql_file(self, db_name: str, sql_file: str | Path) -> None:
-        run(self._cmd("psql", *self.base_args(), "-d", db_name, "-v", "ON_ERROR_STOP=1", "-f", str(sql_file)), cwd=self.project_dir, env=self._password_env(), stream=True)
+        from odooctl.utils.shell import run_pipe_stdin
+
+        run_pipe_stdin(
+            self._cmd("psql", *self.base_args(), "-d", db_name, "-v", "ON_ERROR_STOP=1", "-f", "-"),
+            cwd=self.project_dir,
+            env=self._password_env(),
+            stdin_path=sql_file,
+        )
 
     def psql(self, db_name: str, sql: str) -> None:
         run(self._cmd("psql", *self.base_args(), "-d", db_name, "-v", "ON_ERROR_STOP=1", "-c", sql), cwd=self.project_dir, env=self._password_env(), stream=True)

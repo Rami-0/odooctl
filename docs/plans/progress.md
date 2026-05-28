@@ -201,7 +201,7 @@
   - `uv run ruff check .` — passed.
   - `uv run python -m build` — built sdist and wheel successfully.
 - Claude audit result: pending in this run before commit.
-- Commit SHA: d94941a (`Complete M5 production readiness`).
+- Commit SHA: 57ce68d (`Complete M5 production readiness`); this progress note is finalized in the follow-up progress commit.
 - Push status: pending after commit.
 - Claude audit result: PARTIAL initially; valid blockers were stale checklist, missing getting-started/version/multidb docs, env-set pytest recheck, and uncommitted/unpushed state. Addressed the docs/checklist/env-test blockers before commit.
 - Remaining deferrals: `scripts/install.sh` is deferred because `pipx install odooctl` and `uv tool install odooctl` are the supported install paths; integration CI is deferred because the Docker/Odoo fixture is heavyweight and should be added as an explicit opt-in workflow rather than a default PR gate.

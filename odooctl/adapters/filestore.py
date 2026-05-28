@@ -24,7 +24,7 @@ class FilestoreAdapter:
         if not source.exists():
             raise FileNotFoundError(f"Filestore path does not exist: {filestore_path}")
         ensure_dir(Path(output).parent)
-        run(["tar", "--zstd", "-cf", str(output), "-C", str(source.parent), source.name], stream=True)
+        run(["tar", "-cf", str(output), "-C", str(source.parent), source.name], stream=True)
 
     def restore_archive(self, archive_path: str | Path, target_path: str) -> None:
         archive = Path(archive_path)
@@ -33,7 +33,7 @@ class FilestoreAdapter:
         target = Path(target_path)
         ensure_dir(target.parent)
         with tempfile.TemporaryDirectory(dir=target.parent, prefix=f".{target.name}.restore-") as tmpdir:
-            run(["tar", "--zstd", "-xf", str(archive), "-C", tmpdir], stream=True)
+            run(["tar", "-xf", str(archive), "-C", tmpdir], stream=True)
             extracted = Path(tmpdir) / target.name
             if not extracted.exists():
                 children = list(Path(tmpdir).iterdir())

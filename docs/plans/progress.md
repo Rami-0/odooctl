@@ -239,8 +239,8 @@
   - `docker compose ps` in `experiments/odoo19-community-staging/` — PostgreSQL healthy and Odoo running.
   - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
 - Claude audit result: PASS; no blockers, M5 production readiness confirmed. Claude noted this tick checked the current live stack rather than freshly replaying the full backup/clone/restore sequence.
-- Commit SHA: pending for this progress-only verification note.
-- Push status: pending for this progress-only verification note.
+- Commit SHA: 18b9562 (`Record final M5 cron verification`).
+- Push status: pushed to `origin/master` (`d9bcb07..18b9562`); final status recorded in follow-up progress-only commit.
 - Remaining blockers/open questions: none.
 - Next recommended task: M5 is production-ready; stop the autonomous build sprint unless a release/publishing task is requested.
 

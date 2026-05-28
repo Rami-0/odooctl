@@ -287,8 +287,8 @@
   - `docker compose ps` in `experiments/odoo19-community-staging/` — PostgreSQL healthy and Odoo running.
   - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
 - Claude audit result: PASS; no blockers. Claude verified clean/up-to-date git state, tests/lint/build, live Odoo HTTP response, docs/checklist, real S3 adapter, and host/Docker plain-tar filestore consistency. Non-blocking caveat: the full backup→restore→clone→update-modules mutation sequence was not freshly replayed in this tick because code has not changed since the successful live verification.
-- Commit SHA: pending for this progress-only audit note.
-- Push status: pending for this progress-only audit note.
+- Commit SHA: 25c26ce (`Record redundant M5 production audit`); final push status recorded in follow-up progress-only commit.
+- Push status: pushed to `origin/master` (`69f56b1..25c26ce`).
 - Remaining blockers/open questions: none.
 - Next recommended task: M5 is production-ready; stop the autonomous build sprint unless a release/publishing task is requested.
 

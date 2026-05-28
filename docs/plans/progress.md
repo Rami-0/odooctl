@@ -223,10 +223,10 @@
   - Docker-volume filestore smoke via `DockerVolumeFilestore.archive`/`restore_archive` against `odoo_staging` — `file /tmp/odooctl-docker-filestore-smoke.tar` reported `POSIX tar archive (GNU)`.
   - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
 - Claude audit result: PARTIAL; first audit found the host zstd blocker, and the follow-up audit confirmed the fix but still required commit/push and live evidence. Live host and Docker-volume evidence were captured after that audit.
-- Commit SHA: pending.
-- Push status: pending.
-- Remaining blockers/open questions: commit/push this corrective slice and record the SHA/push result.
-- Next recommended task: final M5 declaration once this fix is pushed and the worktree is clean.
+- Commit SHA: ab46f40 (`Use plain tar for host filestore archives`).
+- Push status: pushed to `origin/master` (`ef70a2d..ab46f40`).
+- Remaining blockers/open questions: none.
+- Next recommended task: M5 is production-ready; continue only if a release/publishing task is requested.
 
 ## Milestone checklist
 

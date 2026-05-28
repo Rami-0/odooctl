@@ -276,6 +276,22 @@
 - Remaining blockers/open questions: none.
 - Next recommended task: M5 is production-ready; stop the autonomous build sprint unless a release/publishing task is requested.
 
+### 2026-05-28T20:09:39+00:00 — M5 redundant production-ready audit
+
+- Re-audited the already-completed M5 production-ready state without product code changes. Worktree started clean at `69f56b1`, and required docs/examples are present (`docs/getting-started.md`, `docs/odoo-versions.md`, `examples/multidb/README.md`, `examples/multidb/odooctl.yml`).
+- Verification:
+  - `uv run pytest -q` — 136 passed.
+  - `ODOO_DB_PASSWORD=odoo uv run pytest -q` — 136 passed.
+  - `uv run ruff check .` — passed.
+  - `uv run python -m build` — built sdist and wheel successfully.
+  - `docker compose ps` in `experiments/odoo19-community-staging/` — PostgreSQL healthy and Odoo running.
+  - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
+- Claude audit result: PASS; no blockers. Claude verified clean/up-to-date git state, tests/lint/build, live Odoo HTTP response, docs/checklist, real S3 adapter, and host/Docker plain-tar filestore consistency. Non-blocking caveat: the full backup→restore→clone→update-modules mutation sequence was not freshly replayed in this tick because code has not changed since the successful live verification.
+- Commit SHA: pending for this progress-only audit note.
+- Push status: pending for this progress-only audit note.
+- Remaining blockers/open questions: none.
+- Next recommended task: M5 is production-ready; stop the autonomous build sprint unless a release/publishing task is requested.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene

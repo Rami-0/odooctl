@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 from odooctl.context import ProjectContext
@@ -39,6 +40,25 @@ def run_preflight(ctx: ProjectContext) -> list[CheckResult]:
         checks.append(CheckResult("environment", False, "missing environment variables: " + ", ".join(missing_env)))
     else:
         checks.append(CheckResult("environment", True, "all referenced environment variables are set"))
+
+    weak_secret_vars: list[str] = []
+    ignored_secret_vars: list[str] = []
+    ignored_values = set(cfg.redaction.ignore_values)
+    for env_name in cfg.referenced_env_vars():
+        value = os.getenv(env_name)
+        if not value:
+            continue
+        if len(value) < cfg.redaction.min_secret_length:
+            weak_secret_vars.append(env_name)
+        if value in ignored_values:
+            ignored_secret_vars.append(env_name)
+    if weak_secret_vars or ignored_secret_vars:
+        details = []
+        if weak_secret_vars:
+            details.append("short/common length: " + ", ".join(sorted(weak_secret_vars)))
+        if ignored_secret_vars:
+            details.append("ignored by redaction policy: " + ", ".join(sorted(ignored_secret_vars)))
+        checks.append(CheckResult("redaction_secret_quality", True, "warning: " + "; ".join(details)))
 
     for sql_file in ctx.sanitization_sql_files():
         checks.append(_exists_check(f"sanitization_sql:{sql_file.name}", sql_file, kind="sanitization SQL file"))

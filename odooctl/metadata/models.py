@@ -17,7 +17,7 @@ class BackupManifest(BaseModel):
     filestore_path: str | None = None
     artifact_paths: list[str] = Field(default_factory=list)
     db_dump: str = "db.dump"
-    filestore: str = "filestore.tar.zst"
+    filestore: str = "filestore.tar"
     git_commit: str | None = None
     docker_image: str | None = None
     odoo_version: str

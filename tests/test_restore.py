@@ -21,7 +21,7 @@ def write_manifest(path: Path, *, project: str = "p", environment: str = "stagin
                 "odoo_version": "19.0",
                 "checksums": {
                     "db_dump": sha256_file(backup / "db.dump"),
-                    "filestore": sha256_file(backup / "filestore.tar.zst"),
+                    "filestore": sha256_file(backup / "filestore.tar"),
                 },
             }
         )
@@ -32,7 +32,7 @@ def make_backup(root: Path, name: str, *, project: str = "p") -> Path:
     backup = root / name
     backup.mkdir(parents=True)
     (backup / "db.dump").write_bytes(b"db")
-    (backup / "filestore.tar.zst").write_bytes(b"fs")
+    (backup / "filestore.tar").write_bytes(b"fs")
     write_manifest(backup / "manifest.json", project=project)
     return backup
 
@@ -57,8 +57,8 @@ def test_restore_preflight_requires_db_dump_before_destructive_restore(tmp_path:
 
 def test_restore_preflight_requires_filestore_before_destructive_restore(tmp_path: Path):
     backup = make_backup(tmp_path, "staging_1")
-    (backup / "filestore.tar.zst").unlink()
-    with pytest.raises(FileNotFoundError, match="filestore.tar.zst"):
+    (backup / "filestore.tar").unlink()
+    with pytest.raises(FileNotFoundError, match="filestore.tar"):
         validate_backup_dir(backup, expected_project="p")
 
 
@@ -129,5 +129,5 @@ def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, mo
     assert execute("staging", backup.name, str(config)) == backup.name
     assert events[0] == ("postgres_init", ("localhost", 5432, "odoo"))
     assert events[1] == ("restore", ("odoo_staging", "db.dump"))
-    assert events[2] == ("filestore_restore", ("filestore.tar.zst", "/var/lib/odoo/filestore/odoo_staging"))
+    assert events[2] == ("filestore_restore", ("filestore.tar", "/var/lib/odoo/filestore/odoo_staging"))
     assert events[3][0] == "healthcheck"

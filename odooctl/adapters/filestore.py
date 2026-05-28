@@ -87,7 +87,7 @@ class DockerVolumeFilestore:
         name = self._relative_name(filestore_path)
         self.compose.exec_capture_bytes(
             self.service,
-            ["tar", "--zstd", "-cf", "-", "-C", f"{self.root}/filestore", name],
+            ["tar", "-cf", "-", "-C", f"{self.root}/filestore", name],
             stdout_path=output,
         )
 
@@ -101,7 +101,7 @@ class DockerVolumeFilestore:
         )
         self.compose.exec_pipe_stdin(
             self.service,
-            ["tar", "--zstd", "-xf", "-", "-C", parent],
+            ["tar", "-xf", "-", "-C", parent],
             stdin_path=archive_path,
         )
 

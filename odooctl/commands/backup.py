@@ -86,7 +86,7 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
     fs = make_filestore_adapter(context, env) if env.filestore_volume else FilestoreAdapter()
     pg.dump(env.db_name, backup_dir / "db.dump")
     filestore_path = env.filestore_path if env.filestore_volume else str(context.resolve_path(env.filestore_path))
-    fs.archive(filestore_path, backup_dir / "filestore.tar.zst")
+    fs.archive(filestore_path, backup_dir / "filestore.tar")
     if context.odoo_config_path.exists():
         text = context.odoo_config_path.read_text()
         (backup_dir / "odoo.conf.redacted").write_text(redact_config_snapshot(text))
@@ -99,14 +99,14 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
         environment=environment,
         db_name=env.db_name,
         filestore_path=env.filestore_path,
-        artifact_paths=["db.dump", "filestore.tar.zst"],
+        artifact_paths=["db.dump", "filestore.tar"],
         backup_mode="full",
         git_commit=commit,
         docker_image=cfg.odoo.image,
         odoo_version=cfg.project.odoo_version,
         checksums={
             "db_dump": sha256_file(backup_dir / "db.dump"),
-            "filestore": sha256_file(backup_dir / "filestore.tar.zst"),
+            "filestore": sha256_file(backup_dir / "filestore.tar"),
         },
     )
     (backup_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2))

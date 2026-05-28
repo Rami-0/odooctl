@@ -4,12 +4,17 @@
 
 It focuses on the operational workflow that generic deploy tools miss: PostgreSQL backups, filestore consistency, module updates, staging clones, sanitization, rollback, metadata, and health checks.
 
-## MVP commands
+## Commands
 
 ```bash
 odooctl init
 odooctl init --dry-run
 odooctl validate
+odooctl doctor
+odooctl project add acme --path /srv/odoo/acme
+odooctl project list
+odooctl env list
+odooctl env create staging --clone-from production --sanitize
 odooctl deploy staging --branch staging
 odooctl deploy production --branch main
 odooctl backup production
@@ -65,4 +70,4 @@ pytest -q
 
 ## Status
 
-This is an MVP foundation: local backups, Docker Compose orchestration, PostgreSQL/filestore operations, staging sanitization, metadata, examples, docs, and tests. Remote backup mirroring is implemented locally as a verifiable MVP stand-in for S3 uploads.
+M5 has productized the MVP foundation: Docker-native PostgreSQL/filestore operations, project/env management, scheduled operation generation, PyPI/pipx install metadata, precise secret redaction, optional real S3 uploads, docs, metadata, examples, and tests.

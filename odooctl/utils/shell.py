@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 SENSITIVE_MARKERS = ("PASSWORD", "SECRET", "TOKEN", "KEY", "PASSWD")
+DEFAULT_REDACTION_MIN_SECRET_LENGTH = 6
+DEFAULT_REDACTION_IGNORE_VALUES = frozenset({"odoo", "admin", "postgres", "password", "secret", "changeme"})
 
 @dataclass(slots=True)
 class CommandResult:
@@ -20,12 +22,22 @@ class CommandError(RuntimeError):
         super().__init__(f"Command failed ({result.returncode}): {' '.join(result.args)}\n{result.stderr}")
         self.result = result
 
-def redact(text: str, env: Mapping[str, str] | None = None) -> str:
+def redact(
+    text: str,
+    env: Mapping[str, str] | None = None,
+    *,
+    min_secret_length: int = DEFAULT_REDACTION_MIN_SECRET_LENGTH,
+    ignore_values: Iterable[str] = DEFAULT_REDACTION_IGNORE_VALUES,
+) -> str:
     env = env or os.environ
+    ignored = {value for value in ignore_values if value}
     redacted = text
     for key, value in env.items():
-        if value and any(marker in key.upper() for marker in SENSITIVE_MARKERS):
-            redacted = redacted.replace(value, "***REDACTED***")
+        if not value or not any(marker in key.upper() for marker in SENSITIVE_MARKERS):
+            continue
+        if len(value) < min_secret_length or value in ignored:
+            continue
+        redacted = redacted.replace(value, "***REDACTED***")
     return redacted
 
 def run(args: Sequence[str], *, check: bool = True, cwd: str | None = None, env: Mapping[str, str] | None = None, stream: bool = False) -> CommandResult:

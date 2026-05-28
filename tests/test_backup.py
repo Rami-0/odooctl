@@ -62,3 +62,64 @@ def test_s3_adapter_mirrors_backup_tree_locally(tmp_path):
 
     assert uploaded == tmp_path / "remote" / "bucket-name" / "backup_2026"
     assert (uploaded / "manifest.json").read_text() == "{}"
+
+
+class FakeS3Client:
+    def __init__(self):
+        self.uploads = []
+
+    def upload_file(self, filename, bucket, key):
+        self.uploads.append((filename, bucket, key))
+
+
+class FakeBoto3:
+    def __init__(self):
+        self.client_kwargs = None
+        self.s3 = FakeS3Client()
+
+    def client(self, service, **kwargs):
+        assert service == "s3"
+        self.client_kwargs = kwargs
+        return self.s3
+
+
+def test_s3_adapter_uploads_backup_tree_with_boto3(tmp_path, monkeypatch):
+    backup_dir = tmp_path / "backup_2026"
+    backup_dir.mkdir()
+    (backup_dir / "manifest.json").write_text("{}")
+    nested = backup_dir / "nested"
+    nested.mkdir()
+    (nested / "db.dump").write_text("dump")
+    monkeypatch.setenv("AWS_REGION", "eu-central-1")
+    fake = FakeBoto3()
+    adapter = S3Adapter(
+        RemoteBackupConfig(bucket="bucket-name", prefix="odoo/prod"),
+        root=tmp_path / "remote",
+        boto3_module=fake,
+    )
+
+    uploaded = adapter.upload_backup(backup_dir)
+
+    assert uploaded == "s3://bucket-name/odoo/prod/backup_2026"
+    assert fake.client_kwargs == {"region_name": "eu-central-1"}
+    assert sorted((bucket, key) for _, bucket, key in fake.s3.uploads) == [
+        ("bucket-name", "odoo/prod/backup_2026/manifest.json"),
+        ("bucket-name", "odoo/prod/backup_2026/nested/db.dump"),
+    ]
+
+
+def test_s3_adapter_falls_back_to_local_mirror_when_boto3_missing(tmp_path):
+    backup_dir = tmp_path / "backup_2026"
+    backup_dir.mkdir()
+    (backup_dir / "manifest.json").write_text("{}")
+    adapter = S3Adapter(
+        RemoteBackupConfig(bucket="bucket-name"),
+        root=tmp_path / "remote",
+        boto3_module=None,
+    )
+    adapter._load_boto3 = lambda: None
+
+    uploaded = adapter.upload_backup(backup_dir)
+
+    assert uploaded == tmp_path / "remote" / "bucket-name" / "backup_2026"
+    assert (uploaded / "manifest.json").read_text() == "{}"

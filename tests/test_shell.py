@@ -36,3 +36,16 @@ def test_run_pipe_stdin_preserves_binary_stdin(tmp_path):
 
     assert result.stdout.strip() == "8"
     assert result.stderr == "255"
+
+
+def test_redact_skips_short_and_ignored_values():
+    env = {"ODOO_DB_PASSWORD": "odoo", "API_TOKEN": "abc", "LONG_SECRET": "very-long-secret-value"}
+    text = "odoo abc very-long-secret-value"
+
+    assert redact(text, env) == "odoo abc ***REDACTED***"
+
+
+def test_redact_allows_custom_policy():
+    env = {"ODOO_DB_PASSWORD": "odoo"}
+
+    assert redact("password=odoo", env, min_secret_length=4, ignore_values=[]) == "password=***REDACTED***"

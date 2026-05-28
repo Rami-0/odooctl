@@ -182,6 +182,32 @@
 - Blockers/open questions: real Docker experiment-stack verification remains outstanding.
 - Next recommended task: improve redaction precision with configurable minimum secret length/ignored values, then continue toward real S3 optional adapter.
 
+### 2026-05-28T18:05:46+00:00 — M5 production readiness verification
+
+- Resolved the filestore archive decision to plain `filestore.tar` end-to-end, including Docker-volume archive/restore streams, backup manifests, restore validation, tests, docs, and the Odoo 19 experiment config. This avoids writing zstd bytes to a `.tar` filename and avoids requiring `zstd` inside official Odoo containers.
+- Kept the broader uncommitted M5 production-readiness slice coherent: configurable redaction policy is present in config/preflight/runtime shell redaction, the optional S3 adapter is backed by real `boto3` when installed, and operator docs/examples cover execution modes, backup/restore, doctor, security, and environments.
+- Real Docker verification on `experiments/odoo19-community-staging/` passed after the format decision:
+  - `docker compose ps` — PostgreSQL healthy, Odoo running on `localhost:18069`.
+  - `ODOO_DB_PASSWORD=odoo uv run python -m odooctl validate --config odooctl.yml` — passed.
+  - `ODOO_DB_PASSWORD=odoo uv run python -m odooctl doctor --config odooctl.yml` — passed, with expected redaction warning that the test password `odoo` is intentionally ignored by policy.
+  - `ODOO_DB_PASSWORD=odoo uv run python -m odooctl backup production --config odooctl.yml` — created `production_2026-05-28_180402` with `filestore.tar` detected as a POSIX tar archive.
+  - `ODOO_DB_PASSWORD=odoo uv run python -m odooctl restore production --backup production_2026-05-28_180402 --config odooctl.yml` — passed.
+  - `ODOO_DB_PASSWORD=odoo uv run python -m odooctl clone production staging --sanitize --config odooctl.yml` — passed temp DB restore/sanitize/swap, filestore copy, module update, and restart.
+  - `ODOO_DB_PASSWORD=odoo uv run python -m odooctl update-modules staging --modules base --config odooctl.yml` — passed with explicit Docker DB flags.
+  - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
+- Full repo verification:
+  - `uv run pytest -q` — 135 passed.
+  - `ODOO_DB_PASSWORD=odoo uv run pytest -q` — 135 passed.
+  - `uv run ruff check .` — passed.
+  - `uv run python -m build` — built sdist and wheel successfully.
+- Claude audit result: pending in this run before commit.
+- Commit SHA: d94941a (`Complete M5 production readiness`).
+- Push status: pending after commit.
+- Claude audit result: PARTIAL initially; valid blockers were stale checklist, missing getting-started/version/multidb docs, env-set pytest recheck, and uncommitted/unpushed state. Addressed the docs/checklist/env-test blockers before commit.
+- Remaining deferrals: `scripts/install.sh` is deferred because `pipx install odooctl` and `uv tool install odooctl` are the supported install paths; integration CI is deferred because the Docker/Odoo fixture is heavyweight and should be added as an explicit opt-in workflow rather than a default PR gate.
+- Remaining blockers/open questions: none besides commit/push completion for this slice.
+- Next recommended task: commit and push this M5 production-readiness slice, then final M5 can be declared production-ready if worktree is clean.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene
@@ -223,6 +249,9 @@
 
 - [x] Add PyPI metadata and install docs.
 - [x] Add schedule command for systemd timer / cron generation.
-- [ ] Improve redaction precision.
-- [ ] Add real S3 optional adapter.
-- [ ] Update operator docs.
+- [x] Improve redaction precision.
+- [x] Add real S3 optional adapter.
+- [x] Update operator docs.
+- [x] Verify real Docker backup/restore/clone/update-modules after filestore format decision.
+- [x] Add getting-started, Odoo-version, and multi-db example docs.
+- [x] Explicitly defer optional install script and integration CI with rationale.

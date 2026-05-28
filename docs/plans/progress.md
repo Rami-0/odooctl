@@ -260,6 +260,22 @@
 - Remaining blockers/open questions: none.
 - Next recommended task: M5 is production-ready; stop the autonomous build sprint unless a release/publishing task is requested.
 
+### 2026-05-28T19:11:24+00:00 — M5 final no-change verification
+
+- Re-verified the already-completed M5 production-ready state without product code changes. Worktree started clean at `e677c9f`, required docs/examples are present, and the Docker fixture remains healthy.
+- Verification:
+  - `uv run pytest -q` — 136 passed.
+  - `ODOO_DB_PASSWORD=odoo uv run pytest -q` — 136 passed.
+  - `uv run ruff check .` — passed.
+  - `uv run python -m build` — built sdist and wheel successfully.
+  - `docker compose ps` in `experiments/odoo19-community-staging/` — PostgreSQL healthy and Odoo running.
+  - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
+- Claude audit result: PASS; no blockers. Claude independently verified clean/up-to-date git state, test/lint/build gates, Docker fixture health, M5 docs/checklist, and accepted the prior full backup/clone/restore/update-modules evidence because only progress docs changed since that live mutation sequence.
+- Commit SHA: pending for this progress-only verification entry.
+- Push status: pending for this progress-only verification entry.
+- Remaining blockers/open questions: none.
+- Next recommended task: M5 is production-ready; stop the autonomous build sprint unless a release/publishing task is requested.
+
 ## Milestone checklist
 
 ### M0 — Test-harness hygiene

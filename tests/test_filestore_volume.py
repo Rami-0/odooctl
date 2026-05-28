@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from odooctl.adapters import filestore as filestore_module
-from odooctl.adapters.filestore import DockerVolumeFilestore, make_filestore_adapter
+from odooctl.adapters.filestore import DockerVolumeFilestore, FilestoreAdapter, make_filestore_adapter
 from odooctl.context import ProjectContext
 
 
@@ -65,6 +65,36 @@ def test_make_filestore_adapter_selects_docker_volume_backend(tmp_path: Path, mo
     assert isinstance(adapter, DockerVolumeFilestore)
     assert created[0].compose_file == "docker-compose.yml"
     assert created[0].project_dir == str(tmp_path)
+
+
+def test_host_filestore_uses_plain_tar_archive(tmp_path: Path, monkeypatch):
+    source = tmp_path / "filestore" / "odoo_staging"
+    source.mkdir(parents=True)
+    archive = tmp_path / "backups" / "filestore.tar"
+    target = tmp_path / "restored" / "odoo_staging"
+    archive.parent.mkdir()
+    target.parent.mkdir()
+    archive.write_bytes(b"tar")
+    calls = []
+
+    def fake_run(args, *, stream=True):
+        calls.append((args, stream))
+        if args[:2] == ["tar", "-xf"]:
+            extracted = Path(args[-1]) / "odoo_staging"
+            extracted.mkdir()
+
+    monkeypatch.setattr(filestore_module, "run", fake_run)
+
+    adapter = FilestoreAdapter()
+    adapter.archive(str(source), archive)
+    adapter.restore_archive(archive, str(target))
+
+    assert calls[0] == (["tar", "-cf", str(archive), "-C", str(source.parent), source.name], True)
+    assert calls[1][0][:3] == ["tar", "-xf", str(archive)]
+    assert calls[1][0][3] == "-C"
+    assert calls[1][1] is True
+    assert "--zstd" not in calls[0][0]
+    assert "--zstd" not in calls[1][0]
 
 
 def test_docker_volume_filestore_streams_archive_restore_and_copy(tmp_path: Path, monkeypatch):

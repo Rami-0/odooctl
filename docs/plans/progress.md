@@ -106,7 +106,7 @@
 
 - Completed the remaining unit-level M3 configuration and filestore slice: added explicit tests for same-stack `db_selector` domain sharing, named-volume filestore identity validation, and Docker-volume filestore archive/restore/copy command construction.
 - Added `filestore_volume` to environment config and wired backup, restore, and clone to choose a Docker-volume filestore backend when configured, while preserving host-path behavior and existing command monkeypatch compatibility.
-- Implemented Docker-volume filestore streaming through `docker compose exec -T` using tar/zstd byte streams, so hosts do not need a bind-mounted Odoo filestore path.
+- Implemented Docker-volume filestore streaming through `docker compose exec -T` using plain tar byte streams, so hosts do not need a bind-mounted Odoo filestore path.
 - Files changed: `odooctl/config.py`, `odooctl/adapters/filestore.py`, `odooctl/commands/backup.py`, `odooctl/commands/clone.py`, `odooctl/commands/restore.py`, `tests/test_config.py`, `tests/test_filestore_volume.py`, `docs/plans/progress.md`.
 - Verification:
   - `pytest -q tests/test_config.py tests/test_filestore_volume.py` — 20 passed.
@@ -207,6 +207,26 @@
 - Remaining deferrals: `scripts/install.sh` is deferred because `pipx install odooctl` and `uv tool install odooctl` are the supported install paths; integration CI is deferred because the Docker/Odoo fixture is heavyweight and should be added as an explicit opt-in workflow rather than a default PR gate.
 - Remaining blockers/open questions: none besides commit/push completion for this slice.
 - Next recommended task: commit and push this M5 production-readiness slice, then final M5 can be declared production-ready if worktree is clean.
+
+### 2026-05-28T18:27:28+00:00 — M5 host filestore format audit fix
+
+- Fixed the Claude audit blocker: the host-path `FilestoreAdapter` now writes and restores plain POSIX `filestore.tar` with `tar -cf` / `tar -xf`, matching the Docker-volume backend and the documented M5 archive decision.
+- Added unit coverage pinning host filestore archive/restore command construction and ensuring `--zstd` is not used; updated install docs and the v-next plan notes so no current operator guidance requires zstd for filestore archives.
+- Verification:
+  - `uv run pytest -q tests/test_filestore_volume.py` — 3 passed.
+  - Host filestore smoke via `FilestoreAdapter.archive`/`restore_archive` on a temp directory — restored content matched and `file filestore.tar` reported `POSIX tar archive (GNU)`.
+  - `uv run pytest -q` — 136 passed.
+  - `ODOO_DB_PASSWORD=odoo uv run pytest -q` — 136 passed.
+  - `uv run ruff check .` — passed.
+  - `uv run python -m build` — built sdist and wheel successfully.
+  - Docker daemon/fixture smoke: `docker version --format '{{.Server.Version}}'` — 29.4.2; `docker compose ps` — PostgreSQL healthy and Odoo running.
+  - Docker-volume filestore smoke via `DockerVolumeFilestore.archive`/`restore_archive` against `odoo_staging` — `file /tmp/odooctl-docker-filestore-smoke.tar` reported `POSIX tar archive (GNU)`.
+  - `curl -I http://localhost:18069/web/login?db=odoo_staging` — HTTP `302 FOUND`, acceptable for Odoo login.
+- Claude audit result: PARTIAL; first audit found the host zstd blocker, and the follow-up audit confirmed the fix but still required commit/push and live evidence. Live host and Docker-volume evidence were captured after that audit.
+- Commit SHA: pending.
+- Push status: pending.
+- Remaining blockers/open questions: commit/push this corrective slice and record the SHA/push result.
+- Next recommended task: final M5 declaration once this fix is pushed and the worktree is clean.
 
 ## Milestone checklist
 

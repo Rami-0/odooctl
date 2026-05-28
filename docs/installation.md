@@ -59,7 +59,7 @@ Required for Docker Compose projects:
 
 - Docker Engine with the Compose plugin (`docker compose version`).
 - Access to the project repo that contains `odooctl.yml` and `docker-compose.yml`.
-- `tar` with zstd support for filestore archives.
+- `tar` for plain `filestore.tar` filestore archives.
 
 Database tooling depends on `runtime.execution_mode`:
 

@@ -61,7 +61,7 @@ These are not nitpicks — each one changes what the implementing agent must tou
 ### 1.3 Adapters (`odooctl/adapters/`)
 - `docker_compose.py` — `DockerComposeAdapter(compose_file, project_dir=None)`; `pull/build/up/restart/logs/ps/exec`. **`exec` already uses `-T`.** Every method passes `cwd=self.project_dir` — but callers never set `project_dir`.
 - `postgres.py` — `PostgresAdapter` shells to **host** `psql/pg_dump/pg_restore/dropdb/createdb` with `PGPASSWORD`. `dump()` uses `-Fc -f <file>`; `restore()` does `drop_create` then `pg_restore <file>`. **No container backend** (root cause of gaps #1, #5).
-- `filestore.py` — `FilestoreAdapter`: host-path `tar --zstd` + `shutil`. **No Docker-volume awareness** (gap #6).
+- `filestore.py` — originally host-path `tar --zstd` + `shutil`; M5 resolves archives to plain `filestore.tar` for both host and Docker-volume backends. **No Docker-volume awareness** was gap #6.
 - `reverse_proxy.py` — `public_url(domain)` hardcodes `https://` when no scheme present (gap #3). Ignores `runtime.reverse_proxy`.
 - `s3.py` — `S3Adapter` is a **local-mirror stub** (copies into `.odooctl/remote-backups/<bucket>/`), not real S3.
 
@@ -236,7 +236,7 @@ redaction:                      # NEW block (M5)
 - **npm wrapper** — odooctl is Python; an npm shim adds a Node runtime dependency and a second pipeline for zero benefit and does nothing for the real dependency pain (pg-client/docker). Do not build it.
 - **Long-running daemon (`odooctld`)** — unnecessary; the CLI is on-demand. For *scheduled* work, generate **systemd timers** (preferred on servers) or **cron** entries that invoke `odooctl backup` / `odooctl doctor --json`. A daemon is only justified if we later add inbound webhooks or a web UI (out of scope).
 
-**The binary-dependency trap (address in docs + doctor):** pipx/uv install only Python. They will **not** bring `pg_dump`, `pg_restore`, `psql`, `docker`, or `tar --zstd`. Mitigation:
+**The binary-dependency trap (address in docs + doctor):** pipx/uv install only Python. They will **not** bring `pg_dump`, `pg_restore`, `psql`, `docker`, or `tar`. Mitigation:
 - **Default `execution_mode: docker`** so DB tooling runs *inside the `db` container* (image already ships the pg client). Removes the host pg-client requirement for the common case — directly fixing gap #1.
 - `host` mode remains for operators whose PG is not in compose; `doctor` then checks host binaries and prints exact install hints.
 - Optional thin `scripts/install.sh` (installs pipx/uv then odooctl) for a single curl-able command. Canonical instruction stays `pipx install odooctl`.
@@ -291,7 +291,7 @@ Each milestone ships on its own and leaves the tool working. **TDD throughout** 
 - docker + `docker compose` present; daemon reachable.
 - compose file exists at project root; declared `odoo`/`db` services exist in it.
 - execution-mode-appropriate DB connectivity (host `psql` ping OR `exec <db> pg_isready`).
-- required host binaries **only if** `execution_mode: host` (`pg_dump/pg_restore/psql/createdb/dropdb`, `tar` w/ zstd) — print an install hint per missing binary.
+- required host binaries **only if** `execution_mode: host` (`pg_dump/pg_restore/psql/createdb/dropdb`, `tar`) — print an install hint per missing binary.
 - referenced env vars present (reuse `missing_env_vars`).
 - filestore reachable (host path exists OR named volume exists OR container path readable).
 - healthcheck URL scheme + reachability per env (**warn**, don't fail, if down).
@@ -350,7 +350,7 @@ Each milestone ships on its own and leaves the tool working. **TDD throughout** 
 - Modify `odooctl/commands/clone.py` — **temp-DB choreography**: restore/clone into `<db_name><temp_db_suffix>`; disable crons/mail/queue there; sanitize there; then **atomic swap** (terminate target connections → drop live target → `ALTER DATABASE … RENAME` temp→target) before restart/expose. Preview output shape unchanged.
 - Create `odooctl/odoo/db_swap.py` — `terminate_connections` (`pg_terminate_backend` via `pg_stat_activity`), `rename_db`, guard against renaming onto `production`.
 - Modify `odooctl/config.py` — relaxed domain/branch uniqueness for shared-`stack` + `db_selector` envs (§4); add `stack`.
-- Modify `odooctl/adapters/filestore.py` — add `DockerVolumeFilestore`: archive via `exec -T <odoo> tar --zstd -cf - -C <filestore_container_path> filestore/<db>` → `run_capture_bytes`; restore reverse; clone via in-container `cp -a` or tar pipe. Factory `make_filestore_adapter(ctx, env)` picks host-path vs volume by `filestore_volume`.
+- Modify `odooctl/adapters/filestore.py` — add `DockerVolumeFilestore`: archive via `exec -T <odoo> tar -cf - -C <filestore_container_path> filestore/<db>` → `run_capture_bytes`; restore reverse; clone via in-container `cp -a` or tar pipe. Factory `make_filestore_adapter(ctx, env)` picks host-path vs volume by `filestore_volume`.
 - Modify `odooctl/odoo/sanitize.py` — add `disable_queue_jobs` (`queue_job` if present) and `purge_mail_queue` (`DELETE FROM mail_mail WHERE state != 'sent'`), guarded by `to_regclass` existence checks so they no-op on Community without those tables.
 - Modify healthcheck callers — multi-db envs probe `?db=<db_name>`.
 - Tests: `tests/test_clone_swap.py`, `tests/test_filestore_volume.py`; update `test_config` (multi-db validation), `test_clone`, `test_sanitize`.

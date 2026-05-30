@@ -4,6 +4,10 @@
 
 Define and implement the platform security model before exposing API/UI surfaces.
 
+## V1 security boundary
+
+V1 is single-host Docker Compose. The privileged runner runs locally on the same host as Docker. The web/API process stays socket-free. Remote runners and hosted multi-tenant worker pools are explicitly future work.
+
 ## Principles
 
 - Web/API process never mounts Docker socket.

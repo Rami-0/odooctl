@@ -12,6 +12,13 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — V1 scope hardened
+
+- Locked v1 deployment mode: single-host Docker Compose only.
+- Locked v1 reverse proxy: Traefik adapter behind explicit reverse proxy abstraction.
+- Locked v1 UI: FastAPI API + static SPA served by `odooctl serve`.
+- Locked import safety contract: read-only detection, no restart/redeploy/DB writes/volume changes/secret printing, preview-first, backup-after-adoption.
+
 ### 2026-05-30 — Plan reset
 
 - Cleared old M0–M5 implementation plan pack from `docs/plans/`.
@@ -49,6 +56,8 @@ Primary plan index: `docs/plans/README.md`
 - [ ] Run doctor and verified backup after import.
 - [ ] Add newcomer `odooctl setup` wizard.
 - [ ] Verify import against Odoo 19 fixture.
+- [ ] Add tests enforcing import detection has no mutating command calls.
+- [ ] Document the import safety contract in CLI help and docs.
 
 ### M9 — Environment/branch model
 
@@ -78,6 +87,7 @@ Primary plan index: `docs/plans/README.md`
 ### M12 — API and runner
 
 - [ ] Add optional FastAPI service.
+- [ ] Serve static SPA assets from `odooctl serve`.
 - [ ] Add durable queue handoff.
 - [ ] Add privileged runner.
 - [ ] Add operation event streaming.
@@ -97,6 +107,8 @@ Primary plan index: `docs/plans/README.md`
 ### M14 — Domain/SSL and backup UX
 
 - [ ] Add domain attach/verify/detach service.
+- [ ] Add `ReverseProxyAdapter` abstraction.
+- [ ] Add Traefik adapter as the only v1 implementation.
 - [ ] Add Traefik ACME/DNS-01 support path.
 - [ ] Add restore-point browser service.
 - [ ] Add restore-to-staging flow.

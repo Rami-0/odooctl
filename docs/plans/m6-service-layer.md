@@ -6,6 +6,10 @@
 
 Extract command orchestration into reusable service modules so CLI, API, runner, and web UI can all call the same engine.
 
+## V1 scope constraints
+
+Service abstractions must support **single-host Docker Compose** first. Do not add remote runner or multi-host abstractions in M6 beyond clean interfaces. The service layer should make future adapters possible without expanding v1 scope.
+
 ## Why
 
 Current command modules contain business logic directly. That blocks a safe UI/API because the frontend would either shell out to CLI or duplicate logic. M6 creates the seam.

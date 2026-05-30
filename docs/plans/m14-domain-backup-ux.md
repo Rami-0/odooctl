@@ -4,6 +4,17 @@
 
 Give operators a product-grade domain/TLS and backup/restore experience.
 
+## Locked reverse proxy support
+
+V1 supports **Traefik only**, but implementation must go through an explicit reverse proxy abstraction.
+
+Required shape:
+
+- `ReverseProxyAdapter` protocol/interface.
+- `TraefikAdapter` implementation.
+- Domain/SSL services call the interface, not Traefik directly.
+- Nginx/Caddy are future adapters and must not be implemented in v1.
+
 ## Domain/SSL scope
 
 - Attach domain to environment.
@@ -24,6 +35,7 @@ Give operators a product-grade domain/TLS and backup/restore experience.
 ## Files to create
 
 - `odooctl/domains/__init__.py`
+- `odooctl/domains/base.py`
 - `odooctl/domains/traefik.py`
 - `odooctl/services/domain.py`
 - `odooctl/services/restore_points.py`
@@ -44,7 +56,7 @@ Give operators a product-grade domain/TLS and backup/restore experience.
 
 ## Acceptance criteria
 
-- Domain verify reports DNS/cert/proxy status.
+- Domain verify reports DNS/cert/proxy status through the reverse proxy abstraction.
 - Restore-to-staging uses temp DB swap and never touches production.
 - DR drill restores latest backup into throwaway DB, healthchecks, then cleans up.
 - Encrypted remote backup manifests record encryption metadata.

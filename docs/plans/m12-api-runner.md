@@ -4,6 +4,15 @@
 
 Expose services over an optional local API and execute mutations through a privileged runner.
 
+## Locked technology and deployment scope
+
+- API framework: FastAPI.
+- UI delivery: static SPA served by `odooctl serve`.
+- Installation: FastAPI/uvicorn remain optional extras.
+- Deployment mode: single-host Docker Compose only in v1.
+- Runner: local privileged runner on the same host.
+- Out of scope for v1: remote SSH runner, multi-host runner fleet, Kubernetes, hosted SaaS worker pool.
+
 ## Files to create
 
 - `odooctl/api/__init__.py`
@@ -16,6 +25,7 @@ Expose services over an optional local API and execute mutations through a privi
 - `odooctl/runner/__init__.py`
 - `odooctl/runner/worker.py`
 - `odooctl/commands/serve.py`
+- `odooctl/api/static.py` or equivalent static asset mount for SPA files
 - `odooctl/commands/runner.py`
 - `docs/api.md`
 
@@ -36,7 +46,7 @@ Expose services over an optional local API and execute mutations through a privi
 
 ## Commands
 
-- `odooctl serve --host 127.0.0.1 --port 8787`
+- `odooctl serve --host 127.0.0.1 --port 8787` serves API and static SPA
 - `odooctl runner`
 - `odooctl runner --once`
 
@@ -53,6 +63,6 @@ Expose services over an optional local API and execute mutations through a privi
 - API can enqueue backup/clone.
 - Runner executes queued operation.
 - Event streaming works.
-- API is localhost-only by default.
+- API is localhost-only by default and serves the static SPA from the same process.
 - Unauthenticated request fails.
 - Viewer token cannot enqueue mutating operation.

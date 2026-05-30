@@ -4,6 +4,20 @@
 
 Build a web dashboard on top of the API that gives users Odoo.sh-like workflows without duplicating backend logic.
 
+## Locked UI technology
+
+Use a **static SPA served by `odooctl serve`**. The backend API is FastAPI from M12.
+
+Rules:
+
+- UI talks only to API endpoints.
+- UI does not shell out to CLI.
+- UI does not import service/adapters directly.
+- No Django-style monolith.
+- No server-rendered app logic that duplicates services.
+- Built SPA assets are packaged and served by FastAPI.
+
+
 ## UX lessons to borrow
 
 From `community-sh`, borrow:
@@ -57,7 +71,7 @@ Do not borrow:
 
 ## Acceptance criteria
 
-- `odooctl serve` serves UI.
+- `odooctl serve` serves the FastAPI API and packaged static SPA.
 - UI reads projects/environments through API.
 - Clone production → staging enqueues operation and streams events.
 - Backups and operations render live data.

@@ -23,6 +23,57 @@ Current engine is already verified for Odoo Docker operations:
 
 The next work is not another CLI-only hardening pass. The next work is a product/control-plane pass.
 
+
+## Locked v1 product decisions
+
+These are now hard constraints for the plan pack. Do not broaden scope unless Rami explicitly changes them.
+
+### 1. Supported deployment mode
+
+**v1 supports single-host Docker Compose only.**
+
+- One host/server.
+- One local Docker Engine / Docker Compose context.
+- Multiple Odoo environments may run on the same host.
+- Remote SSH runners, multi-host fleets, Kubernetes, and SaaS worker pools are explicitly out of v1 scope.
+- Keep adapter seams clean so remote runners can be added later, but do not implement them in M6–M15.
+
+### 2. Reverse proxy support
+
+**v1 uses a Traefik adapter behind an explicit reverse-proxy abstraction.**
+
+- Implement `ReverseProxyAdapter` interface.
+- Ship `TraefikAdapter` first.
+- Nginx and Caddy are future adapters, not v1 deliverables.
+- Domain/SSL commands must be written against the abstraction, not directly hardcoded to Traefik in service callers.
+
+### 3. UI technology
+
+**v1 uses FastAPI API + static SPA served by `odooctl serve`.**
+
+- FastAPI is an optional extra.
+- Static SPA assets are served by the API process.
+- The SPA talks only to API endpoints.
+- No Django-style monolith.
+- No server-side UI logic that duplicates service-layer logic.
+
+### 4. Import safety contract
+
+`odooctl import` detection is strictly read-only.
+
+Non-negotiable rules:
+
+- read-only during detection
+- no restart
+- no redeploy
+- no DB writes
+- no volume changes
+- no secret printing
+- preview-first
+- backup-after-adoption
+
+Any implementation that violates these rules is incorrect, even if tests pass.
+
 ## Product thesis
 
 Build an open-source Odoo.sh-style control plane for self-hosted Odoo:

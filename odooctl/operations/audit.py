@@ -1,6 +1,7 @@
 """Append-only audit trail with SHA-256 hash chain."""
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 from pathlib import Path
@@ -20,12 +21,17 @@ class AuditStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def append(self, entry: AuditEntry) -> AuditEntry:
-        prev_hash = self._last_hash()
-        entry.prev_hash = prev_hash
-        entry_dict = entry.to_dict()
-        entry.current_hash = _hash_entry(entry_dict, prev_hash)
-        with self.path.open("a") as f:
-            f.write(entry.to_json() + "\n")
+        # Exclusive lock on a sidecar file guards the read-last-hash + write as one
+        # atomic unit across threads and processes, preventing audit-chain forks.
+        lock_path = self.path.with_suffix(".lock")
+        with lock_path.open("w") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            prev_hash = self._last_hash()
+            entry.prev_hash = prev_hash
+            entry_dict = entry.to_dict()
+            entry.current_hash = _hash_entry(entry_dict, prev_hash)
+            with self.path.open("a") as f:
+                f.write(entry.to_json() + "\n")
         return entry
 
     def _last_hash(self) -> str:

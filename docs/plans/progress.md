@@ -37,8 +37,10 @@ Primary plan index: `docs/plans/README.md`
 **Result:** M7 operation engine complete — every mutating command records an operation, emits events, appends audit chain, uses per-environment lock
 **Implementation commit SHA:** 4e5c483
 **Push status:** failed — `git push origin HEAD` returned `fatal: could not read Username for 'https://github.com': No such device or address`
-**Blockers:** push requires authenticated HTTPS; use `gh auth setup-git` or SSH to push
-**Next step:** M8 import/takeover + setup wizard
+**Blockers (post-review fixes):**
+- `AuditStore.append()` was non-atomic under concurrent access; fixed with `fcntl.flock` exclusive lock on a sidecar `.lock` file. New test `test_audit_append_concurrent_preserves_chain_integrity` reproduces and verifies the fix.
+- "Verify live backup/clone emits events and audit" was incorrectly marked done; only unit/fake coverage exists. Unchecked in checklist as a required follow-up before M7 can be considered fully DONE.
+**Next step:** M8 import/takeover + setup wizard (after live Odoo 19 fixture run for M7 sign-off)
 
 ### 2026-05-30 14:57 UTC — M6 review gate approved
 
@@ -170,14 +172,14 @@ Primary plan index: `docs/plans/README.md`
 - [x] Verify existing CLI output remains compatible (159 tests pass).
 - [x] Run full tests/ruff/build.
 
-### M7 — Operation engine ✓ DONE
+### M7 — Operation engine (unit/fake complete; live fixture pending)
 
 - [x] Add operation models/store/events/audit/locks.
 - [x] Wrap mutating services in `run_operation`.
 - [x] Add `odooctl ops list/show/logs/cancel`.
 - [x] Add per-environment lock tests.
-- [x] Add audit-chain tests.
-- [x] Verify live backup/clone emits events and audit.
+- [x] Add audit-chain tests (including concurrent-append atomicity fix).
+- [ ] Verify live backup/clone emits events and audit — **BLOCKER**: only unit/fake coverage exists; requires a real Odoo 19 fixture run to confirm end-to-end event emission and audit chain integrity. Follow-up before M7 is marked fully DONE.
 
 ### M8 — Import/takeover + setup wizard
 

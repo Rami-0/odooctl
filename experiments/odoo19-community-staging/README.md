@@ -13,6 +13,7 @@ Deploy a real local Odoo 19 Community Edition stack, exercise `odooctl` against 
 - `docker-compose.yml` — local Odoo 19.0 + PostgreSQL 17 stack.
 - `odooctl.yml` — experiment config targeting `production` and `staging` environments.
 - `.sanitize/staging.sql` — harmless placeholder sanitization SQL hook.
+- `2026-05-30-m7-live-fixture-verification.md` — live M7 proof that backup/restore/clone/update-modules emit operation events and append a valid audit chain.
 - `README.md` — this report.
 
 ## Environment verified

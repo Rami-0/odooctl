@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 17:52 UTC — M8 safety/security review approved + hardening tests
+
+**Changed files:**
+- `tests/test_import_hardening.py` — added explicit M8 safety regression guards proving import detection/preview does not invoke subprocess/shell mutation paths, does not write files, and never stores/renders literal DB password values (including `${VAR:-default}` secrets).
+- `docs/plans/progress.md` — recorded the M8 security review result and updated the M8 checklist.
+
+**Review scope:** `a1dc5f8` plus the new hardening tests in this entry.
+**Tests:** Claude Code read-only security review — approved; `uv run pytest tests/test_import_hardening.py -q` — 7 passed; `uv run pytest tests/test_import_detect.py tests/test_import_report.py tests/test_import_adopt.py tests/test_import_hardening.py tests/test_setup.py -q` — 58 passed; `uv run pytest -q` — 268 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully.
+**Result:** M8 safety contract approved — detection/preview remain file-read-only with no subprocess/Docker/DB/volume mutation path, preview is default, adoption writes config/registry only after explicit `--yes`, secrets are referenced by env-var name only, overwrite requires `--force`, and validate/doctor/backup run after adoption unless explicitly skipped.
+**Blockers:** none found in the M8 safety contract. Informational follow-ups for later: consider documenting that non-secret DB host/user values are rendered as detected, and decide whether “verified backup” should mean an additional verify command beyond manifest/checksum creation.
+**Next step:** M8 review-required handoff for the added hardening tests, then proceed to M9 environment/branch model after approval.
+
 ### 2026-05-30 17:44 UTC — Hourly Kanban manager check
 
 - Active task: `t_242010a5` — M8 safety/security review assigned to `odoo-security`; status `running` after this manager pass completed the M8 implementation card and dispatched the child review gate.
@@ -263,15 +275,15 @@ Primary plan index: `docs/plans/README.md`
 
 ### M8 — Import/takeover + setup wizard
 
-- [ ] Add compose/Odoo detector.
-- [ ] Add import preview report.
-- [ ] Generate config without redeploy.
-- [ ] Register imported project.
-- [ ] Run doctor and verified backup after import.
-- [ ] Add newcomer `odooctl setup` wizard.
-- [ ] Verify import against Odoo 19 fixture.
-- [ ] Add tests enforcing import detection has no mutating command calls.
-- [ ] Document the import safety contract in CLI help and docs.
+- [x] Add compose/Odoo detector.
+- [x] Add import preview report.
+- [x] Generate config without redeploy.
+- [x] Register imported project.
+- [x] Run doctor and verified backup after import.
+- [x] Add newcomer `odooctl setup` wizard.
+- [x] Verify import against Odoo 19 fixture.
+- [x] Add tests enforcing import detection has no mutating command calls.
+- [x] Document the import safety contract in CLI help and docs.
 
 ### M9 — Environment/branch model
 

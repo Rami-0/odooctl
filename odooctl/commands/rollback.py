@@ -2,8 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from odooctl.commands.backup import git_commit
-from odooctl.commands.deploy import _assert_clean_worktree
+from odooctl.services.backup import git_commit
+from odooctl.services.deploy import _assert_clean_worktree
 from odooctl.commands.restore import execute as restore_execute
 from odooctl.context import ProjectContext
 from odooctl.adapters.docker_compose import DockerComposeAdapter

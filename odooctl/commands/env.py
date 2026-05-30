@@ -9,7 +9,6 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from odooctl.commands import clone as clone_cmd
 from odooctl.adapters.db import make_db_adapter
 from odooctl.adapters.filestore import make_filestore_adapter
 from odooctl.config import load_config
@@ -167,7 +166,9 @@ def create_env(
     typer.echo(f"Created environment {name} in {path}")
 
     if provision:
-        clone_cmd.execute(clone_from, name, sanitize, str(path))
+        from odooctl.services.clone import run_clone
+        from odooctl.services.context import ServiceContext
+        run_clone(ServiceContext.from_config_path(str(path)), clone_from, name, sanitize=sanitize)
         typer.echo(f"Provisioned {name} from {clone_from}")
 
 

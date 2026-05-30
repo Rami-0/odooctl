@@ -12,6 +12,40 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M6 service layer complete
+
+**Changed files:**
+- `odooctl/services/__init__.py` — new package init
+- `odooctl/services/models.py` — ServiceResult, BackupResult, RestoreResult, CloneResult, DeployResult, DoctorReport, StatusReport, EnvironmentSummary, ProjectSummary
+- `odooctl/services/context.py` — ServiceContext wrapping ProjectContext
+- `odooctl/services/project.py` — get_status() returning StatusReport
+- `odooctl/services/environment.py` — list_environments() read-only query
+- `odooctl/services/backup.py` — run_backup(), git_commit(), prune_backups(), redact_config_snapshot()
+- `odooctl/services/restore.py` — run_restore(), sha256_file(), resolve_backup_dir(), validate_backup_dir()
+- `odooctl/services/clone.py` — run_clone() with sanitization and healthcheck
+- `odooctl/services/deploy.py` — run_deploy() with preflight, backup, rollout, verify
+- `odooctl/commands/backup.py` — thin wrapper; re-exports service utilities for backward compat
+- `odooctl/commands/restore.py` — thin wrapper; re-exports sha256_file etc.
+- `odooctl/commands/clone.py` — thin wrapper calling run_clone()
+- `odooctl/commands/status.py` — thin wrapper rendering StatusReport
+- `odooctl/commands/doctor.py` — thin wrapper rendering DoctorReport
+- `odooctl/commands/deploy.py` — thin wrapper calling run_deploy()
+- `odooctl/commands/env.py` — updated provision to use run_clone() service
+- `odooctl/commands/rollback.py` — updated imports from services
+- `tests/test_services.py` — 23 new service tests (TDD; written first, ran RED, then GREEN)
+- `tests/test_status.py` — updated patches to project service module
+- `tests/test_deploy.py` — updated patches to deploy service module
+- `tests/test_clone.py` — updated patches to clone service module
+- `tests/test_restore.py` — updated patches to restore service module
+- `tests/test_env_cmd.py` — updated provision mock to use run_clone service
+
+**Tests:** 159 passed (136 original + 23 new), 0 failed
+**Ruff:** 0 errors
+**Build:** no pyproject.toml changes
+**Result:** M6 service layer complete — commands are thin wrappers, services hold all business logic
+**Blockers:** none
+**Next step:** M7 operation engine — add operation models/store/events/audit/locks, wrap mutating services in run_operation
+
 ### 2026-05-30 14:02 UTC — Workers rerouted through Claude Code CLI
 
 - Updated all specialist Hermes profiles (`odoo-backend`, `odoo-docker`, `odoo-docs`, `odoo-frontend`, `odoo-planner`, `odoo-reviewer`, `odoo-security`) so Hermes no longer uses the Anthropic API for worker control-plane execution.
@@ -69,16 +103,16 @@ Primary plan index: `docs/plans/README.md`
 
 ## Milestone checklist
 
-### M6 — Service layer
+### M6 — Service layer ✓ DONE
 
-- [ ] Create `odooctl/services/` package.
-- [ ] Add structured result models.
-- [ ] Extract project/status/doctor services.
-- [ ] Extract backup/restore/clone/deploy services.
-- [ ] Convert CLI commands into thin wrappers.
-- [ ] Add service tests.
-- [ ] Verify existing CLI output remains compatible.
-- [ ] Run full tests/ruff/build.
+- [x] Create `odooctl/services/` package.
+- [x] Add structured result models.
+- [x] Extract project/status/doctor services.
+- [x] Extract backup/restore/clone/deploy services.
+- [x] Convert CLI commands into thin wrappers.
+- [x] Add service tests (23 new, TDD).
+- [x] Verify existing CLI output remains compatible (159 tests pass).
+- [x] Run full tests/ruff/build.
 
 ### M7 — Operation engine
 

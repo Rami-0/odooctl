@@ -121,9 +121,9 @@ def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, mo
         def restore_archive(self, archive_path, target_path):
             events.append(("filestore_restore", (Path(archive_path).name, target_path)))
 
-    monkeypatch.setattr("odooctl.commands.restore.PostgresAdapter", DummyPostgres)
-    monkeypatch.setattr("odooctl.commands.restore.FilestoreAdapter", DummyFilestore)
-    monkeypatch.setattr("odooctl.commands.restore.check_url", lambda *args, **kwargs: events.append(("healthcheck", args)))
+    monkeypatch.setattr("odooctl.services.restore.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.restore.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.restore.check_url", lambda *args, **kwargs: events.append(("healthcheck", args)))
     monkeypatch.chdir(tmp_path)
 
     assert execute("staging", backup.name, str(config)) == backup.name

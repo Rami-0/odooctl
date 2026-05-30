@@ -34,7 +34,7 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
             events.append(("copy", (source, target)))
 
     class DummyCompose:
-        def __init__(self, compose_file):
+        def __init__(self, compose_file, **kwargs):
             events.append(("compose_init", (compose_file,)))
 
         def exec(self, service, args, *, stream=True):
@@ -47,11 +47,11 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
             events.append(("ps", ()))
             return "odoo running"
 
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
-    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda compose, service, db_name, modules: events.append(("update", (service, db_name, tuple(modules)))))
-    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda url, **kwargs: events.append(("healthcheck", (url, kwargs["timeout"], kwargs["retries"], kwargs["interval"])) ))
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.services.clone.update_modules_compose", lambda compose, service, db_name, modules, **kwargs: events.append(("update", (service, db_name, tuple(modules)))))
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda url, **kwargs: events.append(("healthcheck", (url, kwargs["timeout"], kwargs["retries"], kwargs["interval"])) ))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
@@ -106,7 +106,7 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
             pass
 
     class DummyCompose:
-        def __init__(self, compose_file):
+        def __init__(self, compose_file, **kwargs):
             pass
 
         def exec(self, service, args, *, stream=True):
@@ -118,11 +118,11 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
         def ps(self):
             return "odoo running"
 
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
-    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.services.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda *args, **kwargs: None)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
@@ -164,7 +164,7 @@ def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeyp
             pass
 
     class DummyCompose:
-        def __init__(self, compose_file):
+        def __init__(self, compose_file, **kwargs):
             pass
 
         def exec(self, service, args, *, stream=True):
@@ -176,11 +176,11 @@ def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeyp
         def ps(self):
             return "odoo running"
 
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
-    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.services.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda *args, **kwargs: None)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
@@ -214,8 +214,8 @@ def test_clone_fails_when_configured_sanitization_sql_file_is_missing(tmp_path: 
         def copy(self, source, target):
             pass
 
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", DummyFilestore)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
@@ -248,7 +248,7 @@ def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: P
             pass
 
     class DummyCompose:
-        def __init__(self, compose_file):
+        def __init__(self, compose_file, **kwargs):
             pass
 
         def restart(self, service):
@@ -257,11 +257,11 @@ def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: P
         def ps(self):
             return "postgres running"
 
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", DummyPostgres)
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", DummyFilestore)
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", DummyCompose)
-    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.services.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda *args, **kwargs: None)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
 
@@ -277,10 +277,10 @@ def test_clone_preview_is_readable_and_side_effect_free(tmp_path: Path, monkeypa
     (tmp_path / "docker-compose.yml").touch()
 
     called: list[str] = []
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
-    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: called.append("health"))
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda *args, **kwargs: called.append("health"))
 
     url = execute("production", "staging", True, str(config), sanitization_profile="normal", preview=True)
 
@@ -305,9 +305,9 @@ def test_clone_missing_env_vars_fails_before_dump(tmp_path: Path, monkeypatch):
     (tmp_path / "docker-compose.yml").touch()
 
     called: list[str] = []
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
     monkeypatch.delenv("ODOO_DB_PASSWORD", raising=False)
 
     with pytest.raises(RuntimeError, match="Missing required environment variables: ODOO_DB_PASSWORD"):
@@ -323,9 +323,9 @@ def test_clone_missing_compose_file_fails_before_dump(tmp_path: Path, monkeypatc
     )
 
     called: list[str] = []
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
 
     with pytest.raises(FileNotFoundError, match="Compose file not found"):
         execute("production", "staging", True, str(config))
@@ -340,9 +340,9 @@ def test_clone_preview_missing_compose_file_fails(tmp_path: Path, monkeypatch):
     )
 
     called: list[str] = []
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", lambda *args, **kwargs: called.append("postgres"))
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", lambda *args, **kwargs: called.append("filestore"))
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", lambda *args, **kwargs: called.append("compose"))
 
     with pytest.raises(FileNotFoundError, match="Compose file not found"):
         execute("production", "staging", True, str(config), preview=True)
@@ -357,11 +357,11 @@ def test_clone_respects_clone_from_mapping(tmp_path: Path, monkeypatch):
     )
     (tmp_path / "docker-compose.yml").touch()
 
-    monkeypatch.setattr("odooctl.commands.clone.PostgresAdapter", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.FilestoreAdapter", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.DockerComposeAdapter", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.update_modules_compose", lambda *args, **kwargs: None)
-    monkeypatch.setattr("odooctl.commands.clone.check_url", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda *args, **kwargs: None)
 
     execute("production", "staging", True, str(config), preview=True)
 

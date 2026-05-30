@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 19:47 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_660859dd` — **M9 environment branch model** assigned to `odoo-backend`; status `running` with active worker run `#23`.
+- Done since last run: `t_242010a5` — M8 safety/security review cleared its review-required handoff, which promoted M9 and spawned the backend worker; no new completed cards after M9 started.
+- Board status: `done=6`, `running=1`, `blocked=0`, `ready=0`, `todo=13`; no stalled ready cards, and the next child gate remains dependency-linked as `t_8a3df0ce` (M9 review gate).
+- Current repo state: branch `master`; `HEAD` `8eee0ff` (`docs: update odooctl kanban progress`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree is **dirty because the active M9 worker has local implementation changes in progress** (`odooctl/config.py`, `odooctl/main.py`, `odooctl/operations/models.py`, `odooctl/services/models.py`, `odooctl/commands/env.py`, new `branch.py`/`promote.py` command+service files, related tests, and this progress file).
+- Tests/result: no new manager-run tests this tick. Current evidence comes from the active M9 worker handoff-in-progress: initial implementation plus review-fix pass recorded in `docs/plans/progress.md` with `uv run pytest tests/test_branch_status.py tests/test_promote.py tests/test_env_cmd.py -q` → 51 passed, `uv run pytest -q` → 314 passed, `uv run ruff check .` → passed, `uv run python -m build` → passed.
+- Push status: manager has not attempted a push for milestone code this tick because the M9 worker has not finished/committed yet; GitHub CLI auth is healthy for `Rami-0` and ready when the worker or manager needs to push.
+- Blockers: none on the board right now. The only live constraint is that M10+ remain dependency-gated until `t_660859dd` completes and promotes `t_8a3df0ce`.
+- Next step: let `odoo-backend` finish `t_660859dd`, verify its final commit/push metadata, then confirm `t_8a3df0ce` promotes to `ready`/`running` for the M9 review gate before advancing to M10.
+
 ### 2026-05-30 — M9 review findings fixed (blocking)
 
 **Changed files:**

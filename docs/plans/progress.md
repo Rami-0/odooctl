@@ -23,6 +23,16 @@ Primary plan index: `docs/plans/README.md`
 - Blocker: none currently marked blocked on the board; model-name 404 is a worker crash diagnostic to monitor.
 - Next step: let `odoo-backend` finish or block M6; then verify `t_26a59c73` M6 review gate promotes to ready for `odoo-reviewer`.
 
+### 2026-05-30 13:56 UTC — Kanban worker crash contained
+
+- Root cause found from `hermes kanban --board odooctl log t_abe7f5bf`:
+  - Initial crashes: invalid Anthropic short model id `claude-sonnet-4` returned HTTP 404.
+  - Corrected profile models to dated Anthropic ids: `claude-sonnet-4-20250514` and `claude-opus-4-20250514`.
+  - Follow-up blocker: Anthropic API returned HTTP 400 extra-usage/quota message: “Third-party apps now draw from your extra usage, not your plan limits. Add more at claude.ai/settings/usage and keep going.”
+- Reclaimed the active failing worker and manually blocked `t_abe7f5bf` to prevent retry loops and token/usage waste.
+- Board state after containment: no active diagnostics; `t_abe7f5bf` blocked; remaining 19 tasks dependency-gated in todo.
+- Next step: add Anthropic extra usage/credits or approve switching worker profiles to a fallback provider/model, then unblock `t_abe7f5bf`.
+
 ### 2026-05-30 13:49 UTC — Kanban sprint initialized
 
 - Created Kanban board `odooctl` for M6–M15 control-plane work.

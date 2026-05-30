@@ -43,6 +43,8 @@ Primary plan index: `docs/plans/README.md`
 **Ruff:** 0 errors
 **Build:** no pyproject.toml changes
 **Result:** M6 service layer complete — commands are thin wrappers, services hold all business logic
+**Commit SHA:** 919025b
+**Push status:** failed — no remote credentials in execution environment; push manually with `git push origin HEAD`
 **Blockers:** none
 **Next step:** M7 operation engine — add operation models/store/events/audit/locks, wrap mutating services in run_operation
 

@@ -5,7 +5,7 @@ The catalog is odooctl's registry of declarative manifests for stack templates, 
 ## Catalog commands
 
 ```
-odooctl catalog list              # Table of all catalog entries (bundled + session-loaded)
+odooctl catalog list              # Table of all bundled catalog entries
 odooctl catalog show <id>         # Full YAML dump of a catalog entry
 odooctl catalog add <manifest>    # Validate a user manifest and list the IDs it defines
 ```

@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 17:44 UTC — Hourly Kanban manager check
+
+- Active task: `t_242010a5` — M8 safety/security review assigned to `odoo-security`; status `running` after this manager pass completed the M8 implementation card and dispatched the child review gate.
+- Done since last run: `t_c6eb31b9` — M8 import takeover + setup wizard accepted as complete by manager verification. The blocked `review-required` handoff already had passing verification and synced commits, so the manager closed it and confirmed child promotion.
+- Board status: `done=5`, `running=1`, `blocked=0`, `ready=0`, `todo=14` after dispatch.
+- Current repo state: branch `master`; `HEAD` `a1dc5f8` (`docs: record M8 push status`); worktree clean; `master` matches `origin/master` with no ahead/behind.
+- Tests/result: no new repo tests run by the manager this tick; relied on the verified M8 handoff already recorded for `t_c6eb31b9` (`uv run pytest tests/test_import_detect.py tests/test_import_report.py tests/test_import_adopt.py tests/test_setup.py -q` → 51 passed, `uv run pytest -q` → 261 passed, `uv run ruff check .` → passed, `uv run python -m build` → passed, plus import/setup/adoption smoke checks).
+- Push status: no new repo commit this tick before the progress update; existing M8 implementation/progress commits are already synced to `origin/master`.
+- Blockers: none currently on the board.
+- Next step: let `odoo-security` complete or block `t_242010a5` (M8 safety/security review); only then should M9 environment branch model `t_660859dd` promote.
+
 ### 2026-05-30 17:37 UTC — M8 import/takeover + setup wizard implemented
 
 **Changed files:**

@@ -321,6 +321,30 @@ def test_audit_append_concurrent_preserves_chain_integrity(tmp_path):
     assert verify_chain(chain) is True
 
 
+def test_audit_tamper_detection_modifies_stored_prev_hash(tmp_path):
+    """Changing only the stored prev_hash field must be detected by verify_chain."""
+    from odooctl.operations.audit import AuditStore, verify_chain
+    from odooctl.operations.models import AuditEntry
+
+    audit = AuditStore(tmp_path)
+    for i in range(3):
+        entry = AuditEntry(
+            actor="cli", action=f"action_{i}", target="staging",
+            params_redacted={}, outcome="succeeded",
+            op_id=f"op{i}", timestamp="2026-01-01T00:00:00+00:00",
+        )
+        audit.append(entry)
+
+    lines = audit.path.read_text().splitlines()
+    second = json.loads(lines[1])
+    second["prev_hash"] = "0" * 64  # plausible but wrong hash
+    lines[1] = json.dumps(second)
+    audit.path.write_text("\n".join(lines) + "\n")
+
+    chain = audit.load_chain()
+    assert verify_chain(chain) is False
+
+
 # ---- EnvironmentLock ----
 
 def test_lock_acquire_and_release_creates_and_removes_file(tmp_path):
@@ -706,3 +730,55 @@ def test_deploy_command_creates_operation_record_on_failure(tmp_path, monkeypatc
     assert len(ops) == 1
     assert ops[0].kind.value == "deploy"
     assert ops[0].status.value == "failed"
+
+
+def test_engine_lock_acquisition_failure_leaves_audit_trail(tmp_path):
+    """When lock acquisition fails, run_operation must record FAILED status,
+    emit an error event, and append a failed audit entry."""
+    from odooctl.operations.audit import AuditStore
+    from odooctl.operations.engine import run_operation
+    from odooctl.operations.locks import LockAcquisitionError
+    from odooctl.operations.models import OperationKind, OperationStatus
+    from odooctl.operations.store import OperationStore
+
+    store = OperationStore(tmp_path)
+    audit = AuditStore(tmp_path)
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    def first_op():
+        with run_operation(
+            store, audit,
+            kind=OperationKind.BACKUP, project="demo", environment="staging",
+            actor="cli", params_redacted={}, state_dir=tmp_path,
+        ):
+            entered.set()
+            release.wait()
+
+    t = threading.Thread(target=first_op)
+    t.start()
+    entered.wait()
+
+    with pytest.raises(LockAcquisitionError):
+        with run_operation(
+            store, audit,
+            kind=OperationKind.BACKUP, project="demo", environment="staging",
+            actor="cli", params_redacted={}, state_dir=tmp_path,
+        ):
+            pass
+
+    release.set()
+    t.join()
+
+    ops = store.list_all()
+    failed_ops = [op for op in ops if op.status == OperationStatus.FAILED]
+    assert len(failed_ops) == 1
+    assert failed_ops[0].kind == OperationKind.BACKUP
+
+    events = store.load_events(failed_ops[0].id)
+    assert any(e.level == "error" or e.phase == "end" for e in events)
+
+    chain = audit.load_chain()
+    failed_audits = [e for e in chain if e.outcome == "failed"]
+    assert len(failed_audits) >= 1

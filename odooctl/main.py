@@ -14,6 +14,7 @@ from odooctl.commands import (
     github_actions as gha_cmd,
     init as init_cmd,
     logs as logs_cmd,
+    ops as ops_cmd,
     project as project_cmd,
     restore as restore_cmd,
     rollback as rollback_cmd,
@@ -30,6 +31,7 @@ app = typer.Typer(
 )
 app.add_typer(project_cmd.app, name="project")
 app.add_typer(env_cmd.app, name="env")
+app.add_typer(ops_cmd.app, name="ops")
 
 
 def _context_config(config: str) -> str:

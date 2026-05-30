@@ -23,6 +23,8 @@ class RuntimeConfig(BaseModel):
 
 class EnvironmentConfig(BaseModel):
     stack: str = "default"
+    tier: Literal["production", "staging", "development", "qa"] | None = None
+    protected: bool | None = None
     branch: str
     scheme: Literal["http", "https"] = "https"
     domain: str
@@ -34,6 +36,9 @@ class EnvironmentConfig(BaseModel):
     clone_from: str | None = None
     sanitize: bool = False
     update_modules: list[str] = Field(default_factory=list)
+    promotes_to: str | None = None
+    auto_deploy: bool = False
+    last_deployed_commit: str | None = None
 
 
 class PostgresConfig(BaseModel):
@@ -213,7 +218,21 @@ class OdooCtlConfig(BaseModel):
                     "branch-to-environment mapping must be unique for deploy and rollback to target the right instance"
                 )
             seen_branches[env.branch] = name
+
+            if env.promotes_to and env.promotes_to not in self.environments:
+                known = ", ".join(sorted(self.environments))
+                raise ValueError(
+                    f"Environment '{name}' promotes_to '{env.promotes_to}' is not defined. Known: {known}"
+                )
+            if env.promotes_to == name:
+                raise ValueError(f"Environment '{name}' cannot promotes_to itself")
         return self
+
+    def is_protected(self, name: str) -> bool:
+        env = self.env(name)
+        if env.protected is not None:
+            return env.protected
+        return name == "production" or env.tier == "production"
 
     def env(self, name: str) -> EnvironmentConfig:
         try:

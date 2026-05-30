@@ -12,6 +12,44 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M9 review findings fixed (blocking)
+
+**Changed files:**
+- `odooctl/services/promote.py` — (1) replaced `git pull --ff-only` with `git merge --ff-only <source_branch>` so source commits are integrated into target before deploy; (2) capture `pre_promote_commit` after checkout/before merge; on failure, added code rollback (`git checkout; git reset --hard pre_promote_commit; compose.up`) alongside data restore; honest error if rollback is incomplete ("Manual intervention required"); (3) added `confirm: bool = False` param — raises RuntimeError if target `is_protected()` and `confirm=False`; preview remains unrestricted; (4) added `_assert_clean_worktree` preflight using module-level `run` (mockable) before backup; raises if `git status --porcelain` shows dirty paths.
+- `odooctl/commands/promote.py` — added `yes: bool = False` parameter to `execute()`; passed as `confirm=yes` to `run_promote`.
+- `odooctl/main.py` — added `--yes / -y` option to `promote` CLI command.
+- `tests/test_promote.py` — rewrote/extended: added `confirm=True` to all existing tests that reach past env-var preflight; updated run mocks to accept `**kwargs`; updated ordering assertion in `test_run_promote_preflight_and_backup_before_git_operations` to include `git:status` before `backup`; renamed `test_run_promote_deploy_uses_target_branch` → `test_run_promote_merges_source_into_target_via_ff_only` with merge assertions; added 10 new tests covering: protected-target enforcement, `--yes` bypass, preview allowed without confirm, dirty-worktree abort, code rollback resets to pre_promote_commit, code rollback redeploys, honest incomplete-rollback error (data restore failure), honest incomplete-rollback error (code reset failure), CLI `--yes` enforcement, CLI `--yes` success flow.
+- `tests/test_env_cmd.py` — added 5 tests for `env open`: refuses reserved names (production, staging), refuses duplicate env, `--no-provision` writes config without clone, provision clones sanitized from source.
+
+**Tests:** `uv run pytest tests/test_branch_status.py tests/test_promote.py tests/test_env_cmd.py -q` → 51 passed; `uv run pytest -q` → 314 passed; `uv run ruff check .` → all checks passed; `uv run python -m build` → sdist and wheel built successfully.
+**Result:** All 5 blocking review findings resolved — source code is now integrated via ff-merge before deploy; rollback restores both data and code with honest error surfacing on partial failure; protected production requires explicit confirmation (preview remains free); dirty-worktree is caught before backup; `env open` has full CLI test coverage.
+**Implementation commit SHA:** placeholder — not yet committed
+**Push status:** placeholder — not yet pushed; awaiting Hermes controller inspection
+**Blockers:** none
+**Next step:** M9 review gate, then M10 onboarding catalog.
+
+### 2026-05-30 — M9 environment/branch model implemented
+
+**Changed files:**
+- `odooctl/config.py` — added `tier`, `protected`, `promotes_to`, `auto_deploy`, `last_deployed_commit` fields to `EnvironmentConfig`; added `promotes_to` validator in `validate_environment_graph`; added `is_protected(name)` method to `OdooCtlConfig`.
+- `odooctl/operations/models.py` — added `PROMOTE = "promote"` to `OperationKind`.
+- `odooctl/services/models.py` — added `BranchStatus` and `PromoteResult` dataclasses.
+- `odooctl/services/branch.py` — new: `get_branch_statuses()` service; git-based per-environment drift detection (`_git_rev`, `_git_count`, `_compute_drift`).
+- `odooctl/services/promote.py` — new: `promote_preview()` (no side effects) and `run_promote()` (source health → backup target → deploy → healthcheck → rollback on failure → record metadata).
+- `odooctl/commands/branch.py` — new: `odooctl branch status` CLI; table + JSON output.
+- `odooctl/commands/promote.py` — new: `odooctl promote <source> <target> [--preview]` CLI; wraps `run_promote` in `run_operation` for audit/lock.
+- `odooctl/commands/env.py` — added `env open <name> --from <branch>` command; creates ephemeral development environment (tier=development) cloned/sanitized from production (or `--from-env`).
+- `odooctl/main.py` — registered `branch` sub-app and top-level `promote` command.
+- `tests/test_branch_status.py` — new: 17 TDD tests covering BranchStatus dataclass, drift states (clean/ahead/behind/diverged/unknown), tier inference, `is_protected`, `promotes_to` validation, config field acceptance.
+- `tests/test_promote.py` — new: 14 TDD tests covering preview no-side-effects, `promotes_to` validation, source health checked before backup, backup before deploy, success/failure metadata recording, rollback on healthcheck failure, branch selection, env-var preflight.
+
+**Tests:** (superseded by review-fixes entry above)
+**Result:** M9 initial implementation.
+**Implementation commit SHA:** placeholder — not yet committed
+**Push status:** placeholder — not yet pushed; awaiting Hermes controller inspection
+**Blockers:** none (resolved in review-fixes entry above)
+**Next step:** M9 review gate, then M10 onboarding catalog.
+
 ### 2026-05-30 18:45 UTC — Hourly Kanban manager check
 
 - Active task(s): none running; board remains stalled on `t_242010a5` — **M8 safety/security review** assigned to `odoo-security`, status `blocked`.
@@ -298,13 +336,13 @@ Primary plan index: `docs/plans/README.md`
 - [x] Add tests enforcing import detection has no mutating command calls.
 - [x] Document the import safety contract in CLI help and docs.
 
-### M9 — Environment/branch model
+### M9 — Environment/branch model ✓ DONE
 
-- [ ] Add environment tiers and protected production semantics.
-- [ ] Add branch status/drift detection.
-- [ ] Add promote staging → production flow.
-- [ ] Add ephemeral branch/dev environment flow.
-- [ ] Add rollback-on-failed-promote tests.
+- [x] Add environment tiers and protected production semantics.
+- [x] Add branch status/drift detection.
+- [x] Add promote staging → production flow.
+- [x] Add ephemeral branch/dev environment flow.
+- [x] Add rollback-on-failed-promote tests.
 
 ### M10 — Onboarding catalog
 

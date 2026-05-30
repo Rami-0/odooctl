@@ -7,6 +7,7 @@ import click
 import typer
 from odooctl.commands import (
     backup as backup_cmd,
+    branch as branch_cmd,
     clone as clone_cmd,
     deploy as deploy_cmd,
     doctor as doctor_cmd,
@@ -17,6 +18,7 @@ from odooctl.commands import (
     logs as logs_cmd,
     ops as ops_cmd,
     project as project_cmd,
+    promote as promote_cmd,
     restore as restore_cmd,
     rollback as rollback_cmd,
     schedule as schedule_cmd,
@@ -34,6 +36,7 @@ app = typer.Typer(
 app.add_typer(project_cmd.app, name="project")
 app.add_typer(env_cmd.app, name="env")
 app.add_typer(ops_cmd.app, name="ops")
+app.add_typer(branch_cmd.app, name="branch")
 
 
 def _context_config(config: str) -> str:
@@ -102,6 +105,17 @@ def update_modules(environment: str, modules: str | None = None, config: str = "
 @app.command()
 def rollback(environment: str, mode: str = "code", backup: str | None = None, config: str = "odooctl.yml"):
     rollback_cmd.execute(environment, mode, backup, _context_config(config))
+
+
+@app.command()
+def promote(
+    source: str,
+    target: str,
+    preview: bool = typer.Option(False, "--preview", "--dry-run", help="Show promote plan without side effects."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Confirm promote to a protected target."),
+    config: str = "odooctl.yml",
+):
+    promote_cmd.execute(source, target, _context_config(config), preview=preview, yes=yes)
 
 @app.command()
 def logs(environment: str, service: str | None = None, config: str = "odooctl.yml", follow: bool = True, tail: int | None = None):

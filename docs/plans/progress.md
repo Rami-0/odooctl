@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 20:08 UTC — Hourly Kanban manager check
+
+- Active task(s): none running. Board is currently stalled on `t_660859dd` — **M9 environment branch model** assigned to `odoo-backend`; status `blocked` as a review-required handoff.
+- Done since last run: no new cards completed. The only board transition since the previous manager check is `t_660859dd` moving from `running` to `blocked` after the backend worker pushed its M9 implementation and requested review.
+- Board status: `done=6`, `blocked=1`, `running=0`, `ready=0`, `todo=13`; dispatcher pass promoted/spawned nothing, and child review gate `t_8a3df0ce` remains dependency-gated in `todo` behind the blocked parent.
+- Current repo state: branch `master`; `HEAD` `aa53bce` (`docs: update odooctl kanban progress`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree was clean before this progress update.
+- Tests/result: no new manager-run tests this tick. Current verified M9 handoff evidence on the blocked task is unchanged: `uv run pytest tests/test_branch_status.py tests/test_promote.py tests/test_env_cmd.py -q` → 51 passed, `uv run pytest -q` → 314 passed, `uv run ruff check .` → passed, `uv run python -m build` → succeeded.
+- Push status: no milestone code or manager commit existed before this progress update; repo was already synced to `origin/master` at `aa53bce`.
+- Exact blocker: `t_660859dd` is blocked with **"review-required: M9 branch/promote/env model implemented and pushed; 314 tests, ruff, build pass; needs review gate before M10."** Worker handoff cites implementation commit `b9280d7`, progress commit `82fe484`, and clean synced state after manager progress commit `aa53bce`. Until this review-required handoff is accepted/completed, child `t_8a3df0ce` (M9 review gate) cannot promote to `ready`.
+- Next step: inspect and accept/close the `t_660859dd` review-required handoff, then verify `t_8a3df0ce` promotes to `ready`/`running` for the M9 review gate before any M10 work begins.
+
 ### 2026-05-30 19:47 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_660859dd` — **M9 environment branch model** assigned to `odoo-backend`; status `running` with active worker run `#23`.

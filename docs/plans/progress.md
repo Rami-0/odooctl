@@ -12,6 +12,23 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 14:57 UTC — M6 review gate approved
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded M6 review gate result.
+
+**Review scope:** `d13a91a..76c555f` (M6 service-layer implementation plus progress commits)
+**Tests:** `uv run pytest -q` — 159 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully
+**Result:** M6 review approved — commands remain thin wrappers, service modules own business logic, CLI behavior/backward compatibility preserved, and new service tests cover success/error paths.
+**Reviewed commit SHA:** 76c555f
+**Push status:** failed from reviewer workspace: `git push origin HEAD` could not read HTTPS username and `gh auth status` reported no logged-in GitHub hosts.
+**Blockers:** none
+**Next step:** M7 operation engine (`t_32688f1c`) may proceed.
+
+**Non-blocking follow-ups for M7:**
+- Decide whether `ServiceResult[T]` becomes the operation/API envelope or should be removed to avoid a misleading unused API.
+- Wire or test `list_environments()`/`ProjectSummary`, or remove the unused seam before it rots.
+
 ### 2026-05-30 — M6 service layer complete
 
 **Changed files:**

@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 13:49 UTC — Kanban sprint initialized
+
+- Created Kanban board `odooctl` for M6–M15 control-plane work.
+- Queued 20 linked tasks, moving plan-by-plan from M6 through M15 with review/security gates.
+- Active task: `t_abe7f5bf` — M6 service layer assigned to `odoo-backend`.
+- Model routing verified:
+  - Opus: `odoo-planner`, `odoo-reviewer`, `odoo-security`.
+  - Sonnet: `odoo-backend`, `odoo-docker`, `odoo-docs`, `odoo-frontend`.
+- Created hourly cron manager `c361eaeae4e5` (`odooctl-kanban-hourly-manager`) to inspect board state, dispatch workers, update this progress file, commit management changes, attempt push, and report back to Rami every run.
+- Dispatch status: one running task, 19 dependency-gated todo tasks.
+- Next step: `odoo-backend` completes M6 service layer, then `odoo-reviewer` reviews M6.
+
 ### 2026-05-30 — V1 scope hardened
 
 - Locked v1 deployment mode: single-host Docker Compose only.

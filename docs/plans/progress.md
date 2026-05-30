@@ -12,6 +12,20 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 17:15 UTC — M7 review gate approved
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded the M7 review-gate approval, verification checks, push hygiene, and next milestone.
+
+**Review scope:** `76c555f..903766b` (M7 operation engine, post-review fixes, live fixture evidence, and verification docs)
+**Tests:** Claude Code read-only review — approved; `uv run pytest -q` — 210 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; local audit check against `experiments/odoo19-community-staging/.odooctl/audit.jsonl` — 5 entries, `verify_chain=True`; git hygiene check — `HEAD` matched `origin/master` before this progress entry.
+**Result:** M7 review gate approved — operation durability, event timelines, audit chain/tamper detection, lock behavior, mutating-command wrapping, tests, live fixture evidence, and push hygiene are sufficient for milestone closeout.
+**Reviewed commit SHA:** `903766b`
+**Push status:** pending for this progress-entry commit; M7 implementation/docs were already synced to `origin/master` at `903766b` before the review entry.
+**Blockers:** none
+**Next step:** start M8 import/takeover + setup wizard (`t_c6eb31b9`).
+**Non-blocking hardening notes for a later milestone:** consider atomic temp-file writes for `OperationStore.save()`, documenting audit-chain truncation limits, improving stale-lock PID-reuse handling, auditing `ops cancel`, and adding a regression test for rollback→restore reentrant lock nesting.
+
 ### 2026-05-30 17:07 UTC — M7 live fixture verification passed
 
 **Changed files:**

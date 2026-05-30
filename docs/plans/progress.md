@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 18:45 UTC — Hourly Kanban manager check
+
+- Active task(s): none running; board remains stalled on `t_242010a5` — **M8 safety/security review** assigned to `odoo-security`, status `blocked`.
+- Done since last run: no additional Kanban cards completed after the M8 security review handoff and hardening-test push at `27dac21`.
+- Board status: `done=5`, `blocked=1`, `running=0`, `ready=0`, `todo=14`; dispatcher pass promoted/spawned nothing.
+- Current repo state: branch `master`; `HEAD` `27dac21` (`docs: record M8 security review push status`); worktree clean before this progress update; `master` matches `origin/master` with no ahead/behind.
+- Tests/result: no new repo tests run by the manager this tick; relying on the completed M8 security handoff already recorded for `t_242010a5` (`uv run pytest tests/test_import_hardening.py -q` → 7 passed, milestone subset → 58 passed, `uv run pytest -q` → 268 passed, `uv run ruff check .` → passed, `uv run python -m build` → passed).
+- Push status: no milestone code changes this tick before the progress update; repo `HEAD` already matched `origin/master` at `27dac21`.
+- Exact blocker: `t_242010a5` is intentionally blocked as `review-required` after approval. Latest run summary: **"M8 safety/security review approved and hardening tests pushed at 27dac21; needs human eyes on the tests/progress update before promoting M9."** Until that review-required handoff is accepted/unblocked, child `t_660859dd` (M9 environment branch model) remains dependency-gated in `todo`.
+- Next step: inspect and accept the `t_242010a5` review-required handoff, then unblock/complete it so M9 `t_660859dd` can promote to `ready` for `odoo-backend`.
+
 ### 2026-05-30 17:52 UTC — M8 safety/security review approved + hardening tests
 
 **Changed files:**

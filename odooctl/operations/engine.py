@@ -70,11 +70,34 @@ def run_operation(
     lock = EnvironmentLock(environment, state_dir, op.id)
     try:
         lock.__enter__()
-    except LockAcquisitionError:
+    except LockAcquisitionError as exc:
         op.status = OperationStatus.FAILED
         op.error = f"Could not acquire lock for environment '{environment}'"
         op.updated_at = _utcnow()
         store.save(op)
+        store.append_event(
+            op.id,
+            Event(
+                op_id=op.id,
+                seq=0,
+                timestamp=_utcnow(),
+                level="error",
+                phase="end",
+                message=f"lock acquisition failed: {exc}",
+                data={},
+            ),
+        )
+        audit.append(
+            AuditEntry(
+                actor=actor,
+                action=kind.value,
+                target=environment,
+                params_redacted=params_redacted,
+                outcome="failed",
+                op_id=op.id,
+                timestamp=_utcnow(),
+            )
+        )
         raise
 
     op.status = OperationStatus.RUNNING

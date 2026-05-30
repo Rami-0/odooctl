@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M7 review nits resolved (post-review TDD fixes)
+
+**Changed files:**
+- `odooctl/operations/audit.py` — `verify_chain` now also checks stored `prev_hash` equals the independently tracked chain position; previously only content+hash mismatch was caught, `prev_hash` field tampering was silently ignored
+- `odooctl/operations/engine.py` — `run_operation` now emits an `error`/`end` event and appends a failed audit entry when lock acquisition fails (previously the `LockAcquisitionError` path left no event or audit trail)
+- `tests/test_operations.py` — 2 new tests: `test_audit_tamper_detection_modifies_stored_prev_hash` (RED→GREEN via `verify_chain` fix) and `test_engine_lock_acquisition_failure_leaves_audit_trail` (RED→GREEN via engine fix)
+- `docs/plans/progress.md` — corrected M7 test count from stale 207/48 to current 210/51 new; documented audit atomicity fix and review-nit fixes
+
+**Tests:** `uv run pytest -q` — 210 passed (51 new); `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully
+**Result:** M7 review nits resolved — all three post-review fixes applied with strict TDD (failing test first, then implementation)
+
 ### 2026-05-30 — M7 operation engine complete
 
 **Changed files:**
@@ -33,12 +44,14 @@ Primary plan index: `docs/plans/README.md`
 - `tests/test_operations.py` — 37 new tests (TDD; RED first, then GREEN)
 - `tests/test_ops_cmd.py` — 11 new CLI tests
 
-**Tests:** `uv run pytest -q` — 207 passed (48 new); `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully
+**Tests:** `uv run pytest -q` — 208 passed (49 new, including `test_audit_append_concurrent_preserves_chain_integrity` for the atomicity fix); `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully
 **Result:** M7 operation engine complete — every mutating command records an operation, emits events, appends audit chain, uses per-environment lock
-**Implementation commit SHA:** 4e5c483
+**Implementation commit SHA:** 4e5c483; atomicity fix SHA: 08d89cb
 **Push status:** failed — `git push origin HEAD` returned `fatal: could not read Username for 'https://github.com': No such device or address`
-**Blockers (post-review fixes):**
+**Blockers (post-review fixes — resolved in the entry above):**
 - `AuditStore.append()` was non-atomic under concurrent access; fixed with `fcntl.flock` exclusive lock on a sidecar `.lock` file. New test `test_audit_append_concurrent_preserves_chain_integrity` reproduces and verifies the fix.
+- `verify_chain` did not detect stored `prev_hash` field tampering — fixed.
+- `run_operation` left no event or audit trail on lock acquisition failure — fixed.
 - "Verify live backup/clone emits events and audit" was incorrectly marked done; only unit/fake coverage exists. Unchecked in checklist as a required follow-up before M7 can be considered fully DONE.
 **Next step:** M8 import/takeover + setup wizard (after live Odoo 19 fixture run for M7 sign-off)
 

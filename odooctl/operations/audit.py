@@ -63,6 +63,8 @@ def verify_chain(entries: list[AuditEntry]) -> bool:
     """Return True if the hash chain is intact, False if any entry was tampered."""
     prev_hash = ""
     for entry in entries:
+        if entry.prev_hash != prev_hash:
+            return False
         expected = _hash_entry(entry.to_dict(), prev_hash)
         if entry.current_hash != expected:
             return False

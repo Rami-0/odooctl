@@ -289,6 +289,38 @@ def test_audit_tamper_detection_modifies_outcome(tmp_path):
     assert verify_chain(chain) is False
 
 
+def test_audit_append_concurrent_preserves_chain_integrity(tmp_path):
+    """Concurrent threads appending to the same AuditStore must produce a valid linear chain."""
+    from odooctl.operations.audit import AuditStore, verify_chain
+    from odooctl.operations.models import AuditEntry
+
+    audit = AuditStore(tmp_path)
+    n_threads = 10
+    barrier = threading.Barrier(n_threads)
+
+    def append_entry(i):
+        barrier.wait()  # release all threads simultaneously to maximise race window
+        entry = AuditEntry(
+            actor="cli", action=f"action_{i}", target="staging",
+            params_redacted={}, outcome="succeeded",
+            op_id=f"op{i}", timestamp="2026-01-01T00:00:00+00:00",
+        )
+        audit.append(entry)
+
+    threads = [threading.Thread(target=append_entry, args=(i,)) for i in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    chain = audit.load_chain()
+    assert len(chain) == n_threads
+    # Every current_hash must be unique — forked chains produce duplicates
+    assert len({e.current_hash for e in chain}) == n_threads
+    # The chain must verify cleanly (no forked prev_hash values)
+    assert verify_chain(chain) is True
+
+
 # ---- EnvironmentLock ----
 
 def test_lock_acquire_and_release_creates_and_removes_file(tmp_path):

@@ -58,11 +58,13 @@ def test_env_create_writes_valid_config_and_provisions_with_clone(tmp_path: Path
     config = _write_config(repo)
     calls = []
 
-    def fake_clone(source, target, sanitize, config_path, *args, **kwargs):
-        calls.append((source, target, sanitize, Path(config_path)))
-        return "http://localhost:18069"
+    from odooctl.services.models import CloneResult
 
-    monkeypatch.setattr("odooctl.commands.env.clone_cmd.execute", fake_clone)
+    def fake_clone(ctx, source, target, sanitize=True, **kwargs):
+        calls.append((source, target, sanitize, ctx.project.config_path))
+        return CloneResult(url="http://localhost:18069")
+
+    monkeypatch.setattr("odooctl.services.clone.run_clone", fake_clone)
 
     result = runner.invoke(
         app,
@@ -106,7 +108,7 @@ def test_env_create_can_skip_provision(tmp_path: Path, monkeypatch):
     repo = tmp_path / "repo"
     repo.mkdir()
     config = _write_config(repo)
-    monkeypatch.setattr("odooctl.commands.env.clone_cmd.execute", lambda *a, **k: (_ for _ in ()).throw(AssertionError("unexpected clone")))
+    monkeypatch.setattr("odooctl.services.clone.run_clone", lambda *a, **k: (_ for _ in ()).throw(AssertionError("unexpected clone")))
 
     result = runner.invoke(
         app,

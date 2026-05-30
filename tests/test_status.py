@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from odooctl.commands import status as status_cmd
+from odooctl.services import project as project_svc
 
 
 class DummyConsole:
@@ -14,7 +15,7 @@ class DummyConsole:
 
 
 class DummyCompose:
-    def __init__(self, compose_file: str) -> None:
+    def __init__(self, compose_file, **kwargs) -> None:
         self.compose_file = compose_file
 
     def ps(self) -> str:
@@ -22,7 +23,7 @@ class DummyCompose:
 
 
 class DummyComposeStopped:
-    def __init__(self, compose_file: str) -> None:
+    def __init__(self, compose_file, **kwargs) -> None:
         self.compose_file = compose_file
 
     def ps(self) -> str:
@@ -30,6 +31,9 @@ class DummyComposeStopped:
 
 
 class DummyStore:
+    def __init__(self, *args, **kwargs):
+        pass
+
     def latest_deployment(self, environment: str):
         if environment == "production":
             return {
@@ -48,7 +52,6 @@ class DummyStore:
         return None
 
 
-
 def test_status_reports_metadata_and_services(monkeypatch, tmp_path: Path):
     config = tmp_path / "odooctl.yml"
     config.write_text(
@@ -56,9 +59,9 @@ def test_status_reports_metadata_and_services(monkeypatch, tmp_path: Path):
     )
     dummy_console = DummyConsole()
     monkeypatch.setattr(status_cmd, "Console", lambda: dummy_console)
-    monkeypatch.setattr(status_cmd, "DockerComposeAdapter", DummyCompose)
-    monkeypatch.setattr(status_cmd, "MetadataStore", lambda: DummyStore())
-    monkeypatch.setattr(status_cmd, "git_commit", lambda: "feedbeef")
+    monkeypatch.setattr(project_svc, "DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr(project_svc, "MetadataStore", DummyStore)
+    monkeypatch.setattr(project_svc, "git_commit", lambda cwd=None: "feedbeef")
 
     status_cmd.execute(str(config), "production")
 
@@ -86,9 +89,9 @@ def test_status_can_emit_json(monkeypatch, tmp_path: Path):
     )
     dummy_console = DummyConsole()
     monkeypatch.setattr(status_cmd, "Console", lambda: dummy_console)
-    monkeypatch.setattr(status_cmd, "DockerComposeAdapter", DummyCompose)
-    monkeypatch.setattr(status_cmd, "MetadataStore", lambda: DummyStore())
-    monkeypatch.setattr(status_cmd, "git_commit", lambda: "feedbeef")
+    monkeypatch.setattr(project_svc, "DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr(project_svc, "MetadataStore", DummyStore)
+    monkeypatch.setattr(project_svc, "git_commit", lambda cwd=None: "feedbeef")
 
     status_cmd.execute(str(config), "production", json_output=True)
 
@@ -107,9 +110,9 @@ def test_status_marks_service_as_stopped_when_compose_reports_exit(monkeypatch, 
     )
     dummy_console = DummyConsole()
     monkeypatch.setattr(status_cmd, "Console", lambda: dummy_console)
-    monkeypatch.setattr(status_cmd, "DockerComposeAdapter", DummyComposeStopped)
-    monkeypatch.setattr(status_cmd, "MetadataStore", lambda: DummyStore())
-    monkeypatch.setattr(status_cmd, "git_commit", lambda: "feedbeef")
+    monkeypatch.setattr(project_svc, "DockerComposeAdapter", DummyComposeStopped)
+    monkeypatch.setattr(project_svc, "MetadataStore", DummyStore)
+    monkeypatch.setattr(project_svc, "git_commit", lambda cwd=None: "feedbeef")
 
     status_cmd.execute(str(config), "production")
 

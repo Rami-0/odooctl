@@ -12,6 +12,34 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M7 operation engine complete
+
+**Changed files:**
+- `odooctl/operations/__init__.py` — new package
+- `odooctl/operations/models.py` — Operation, Event, AuditEntry, OperationKind, OperationStatus
+- `odooctl/operations/store.py` — OperationStore (operation.json + events.jsonl per op)
+- `odooctl/operations/locks.py` — EnvironmentLock (O_EXCL atomic, stale-PID clearing, same-thread reentrant)
+- `odooctl/operations/audit.py` — AuditStore with SHA-256 hash chain + verify_chain()
+- `odooctl/operations/engine.py` — run_operation() context manager
+- `odooctl/commands/ops.py` — ops list/show/logs/logs --follow/cancel CLI
+- `odooctl/commands/backup.py` — wrapped execute() with run_operation
+- `odooctl/commands/restore.py` — wrapped execute() with run_operation
+- `odooctl/commands/clone.py` — wrapped execute() (skips for preview)
+- `odooctl/commands/deploy.py` — wrapped execute() with run_operation
+- `odooctl/commands/rollback.py` — wrapped execute() with run_operation; reentrant lock for inner restore
+- `odooctl/commands/update_modules.py` — wrapped execute() with run_operation
+- `odooctl/commands/env.py` — wrapped create (provision) and destroy (purge) with run_operation
+- `odooctl/main.py` — added ops sub-app
+- `tests/test_operations.py` — 37 new tests (TDD; RED first, then GREEN)
+- `tests/test_ops_cmd.py` — 11 new CLI tests
+
+**Tests:** `uv run pytest -q` — 207 passed (48 new); `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully
+**Result:** M7 operation engine complete — every mutating command records an operation, emits events, appends audit chain, uses per-environment lock
+**Implementation commit SHA:** 4e5c483
+**Push status:** failed — `git push origin HEAD` returned `fatal: could not read Username for 'https://github.com': No such device or address`
+**Blockers:** push requires authenticated HTTPS; use `gh auth setup-git` or SSH to push
+**Next step:** M8 import/takeover + setup wizard
+
 ### 2026-05-30 14:57 UTC — M6 review gate approved
 
 **Changed files:**
@@ -142,14 +170,14 @@ Primary plan index: `docs/plans/README.md`
 - [x] Verify existing CLI output remains compatible (159 tests pass).
 - [x] Run full tests/ruff/build.
 
-### M7 — Operation engine
+### M7 — Operation engine ✓ DONE
 
-- [ ] Add operation models/store/events/audit/locks.
-- [ ] Wrap mutating services in `run_operation`.
-- [ ] Add `odooctl ops list/show/logs/cancel`.
-- [ ] Add per-environment lock tests.
-- [ ] Add audit-chain tests.
-- [ ] Verify live backup/clone emits events and audit.
+- [x] Add operation models/store/events/audit/locks.
+- [x] Wrap mutating services in `run_operation`.
+- [x] Add `odooctl ops list/show/logs/cancel`.
+- [x] Add per-environment lock tests.
+- [x] Add audit-chain tests.
+- [x] Verify live backup/clone emits events and audit.
 
 ### M8 — Import/takeover + setup wizard
 

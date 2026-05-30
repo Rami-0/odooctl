@@ -17,11 +17,12 @@ Primary plan index: `docs/plans/README.md`
 **Changed files:**
 - `docs/plans/progress.md` — recorded the M9 review-gate approval, verification checks, push hygiene, and non-blocking follow-ups.
 
-**Review scope:** `8eee0ff..1925fe6` (M9 environment/branch model implementation, review-fix handoff, and progress commits).
+**Review scope:** `8eee0ff..b1edd45` (M9 environment/branch model implementation, review-fix handoff, and progress commits before this review entry).
 **Tests:** Claude Code read-only review — approved; `uv run pytest tests/test_branch_status.py tests/test_promote.py tests/test_env_cmd.py -q` — 51 passed; `uv run pytest -q` — 314 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; git hygiene check before review entry — branch `master` tracking `origin/master` with clean worktree.
 **Result:** M9 review gate approved — environment tier/protected semantics, branch drift reporting, promote preview, production confirmation, pre-backup dirty-worktree guard, target backup before deploy, failed-promote data+code rollback, and `env open` coverage are sufficient for milestone closeout.
-**Reviewed commit SHA:** `1925fe6`
-**Push status:** pending for this review progress commit; implementation/progress scope was already synced to `origin/master` before this entry.
+**Reviewed commit SHA:** `b1edd45`
+**Review progress commit SHA:** `cfa7e01`
+**Push status:** succeeded — pushed review-gate progress commit `cfa7e01` to `origin/master`.
 **Blockers:** none
 **Next step:** start M10 onboarding catalog (`t_3a860c0f`).
 **Non-blocking follow-ups for a later milestone:** prefer merging a fresh remote-tracking source ref (for example `origin/<source_branch>`) instead of a possibly stale local source branch during promote; document that code rollback re-runs compose from the reset worktree but does not pin/revert image-baked addons; decide whether `last_deployed_commit` should be written to config or remain metadata-store derived; consider making promote preview warn when fast-forward feasibility is already impossible.

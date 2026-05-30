@@ -18,7 +18,8 @@ Primary plan index: `docs/plans/README.md`
 - Profile controller routing now uses the working `openai-codex` / `gpt-5.5` Hermes provider; each worker `SOUL.md` explicitly instructs substantive task work to be delegated to the installed `claude` CLI using the `claude-code` workflow.
 - Claude Code CLI verification: `claude --version` returned `2.1.158`; `claude auth status --text` reported Claude Max account auth; a repo-local `claude -p` smoke test returned `CLAUDE_CLI_OK`.
 - Worker verification: all seven profiles have the `claude-code` skill available and `hermes -p odoo-backend chat -q ...` returned `ODOO_BACKEND_PROFILE_OK`.
-- Next step: unblock `t_abe7f5bf` and let the board dispatch M6 using Claude Code CLI-backed workers.
+- Follow-up auth fix at 14:05 UTC: the worker subprocess uses a profile-scoped `$HOME`, so Claude Code initially saw `Not logged in`; each Odoo profile home now symlinks `.claude` and `.claude.json` to the authenticated `/home/dev` Claude Code account. Profile-home smoke test returned `PROFILE_HOME_CLAUDE_OK`.
+- Next step: unblock `t_abe7f5bf` again and let the board dispatch M6 using Claude Code CLI-backed workers.
 
 ### 2026-05-30 13:51 UTC — Hourly Kanban manager check
 

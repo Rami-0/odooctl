@@ -30,6 +30,8 @@ import time
 
 _ALG = "HS256"
 
+_RESERVED_CLAIMS = frozenset({"act", "env", "proj", "iat", "exp", "nonce", "sub"})
+
 
 class TokenError(Exception):
     """Base class for capability-token failures."""
@@ -74,6 +76,7 @@ def mint(
     subject: str | None = None,
     nonce: str | None = None,
     now: float | None = None,
+    **extra_claims: object,
 ) -> str:
     """Mint a signed capability token scoped to one action/environment/project.
 
@@ -83,9 +86,16 @@ def mint(
     replayable for the same scope until expiry unless the runner records and
     rejects consumed nonces. It exists to make that future single-use tracking
     possible.
+
+    *extra_claims* are merged into the payload after the required fields, so
+    callers can embed ``roles=["operator"]`` for API session tokens without
+    changing the verification contract.
     """
     if ttl_seconds <= 0:
         raise ValueError("ttl_seconds must be positive")
+    reserved_overlap = _RESERVED_CLAIMS & set(extra_claims)
+    if reserved_overlap:
+        raise ValueError(f"extra_claims must not override reserved fields: {sorted(reserved_overlap)}")
     issued = int(now if now is not None else time.time())
     payload = {
         "act": action,
@@ -97,6 +107,7 @@ def mint(
     }
     if subject is not None:
         payload["sub"] = subject
+    payload.update(extra_claims)
     header = {"alg": _ALG, "typ": "ocap"}
     h = _b64encode(json.dumps(header, sort_keys=True, separators=(",", ":")).encode())
     p = _b64encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())

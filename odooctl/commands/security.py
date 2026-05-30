@@ -214,9 +214,11 @@ def token_mint(
     ttl: int = typer.Option(300, "--ttl", help="Time-to-live in seconds."),
     subject: str | None = typer.Option(None, "--subject", help="Optional subject (principal identity)."),
     key_env: str = typer.Option(RUNNER_KEY_ENV, "--key-env", help="Env var holding the runner signing key."),
+    role: list[str] = typer.Option([], "--role", help="Role to embed in the token (repeatable, e.g. --role operator)."),
 ) -> None:
     """Mint a signed capability token for a single scoped runner action."""
     key = _runner_key(key_env)
+    extra: dict = {"roles": role} if role else {}
     token = tokens.mint(
         key,
         action=action,
@@ -224,6 +226,7 @@ def token_mint(
         project=project,
         ttl_seconds=ttl,
         subject=subject,
+        **extra,
     )
     typer.echo(token)
 

@@ -22,7 +22,7 @@ Primary plan index: `docs/plans/README.md`
 **Result:** M11 review gate approved — RBAC role/action matrix, protected-environment escalation, secret store encryption/file permissions/value egress rules, capability-token signature/scope/expiry behavior, central redaction helpers, and static API/web vs privileged-runner import contract are sufficient for milestone closeout.
 **Reviewed commit SHA:** `7a42d64`
 **Review progress commit SHA:** `5352585`
-**Push status:** pending push.
+**Push status:** succeeded — pushed review-gate progress commits (`5352585`, `4cfd619`) plus this push-status update to `origin/master`; ahead/behind `0/0` after push.
 **Blockers:** none. Non-blocking follow-ups for M12: wire central redaction at the operation/audit choke point before user-supplied API params are recorded; make runner token consumption/RBAC minting obligations explicit; consider expanding the static runner contract to catch privileged service imports with an allowlist for read-only services.
 **Next step:** start M12 API and runner (`t_3aa785d8`).
 

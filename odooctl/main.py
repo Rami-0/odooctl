@@ -22,8 +22,10 @@ from odooctl.commands import (
     promote as promote_cmd,
     restore as restore_cmd,
     rollback as rollback_cmd,
+    runner as runner_cmd,
     schedule as schedule_cmd,
     security as security_cmd,
+    serve as serve_cmd,
     setup as setup_cmd,
     status as status_cmd,
     update_modules as update_cmd,
@@ -241,6 +243,36 @@ def setup(
     Use --catalog to extend the bundled catalog with custom StackTemplate entries.
     """
     setup_cmd.run(yes=yes, stack=stack, name=name, output=output, force=force, catalog=catalog)
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host (default: localhost only)."),
+    port: int = typer.Option(8787, "--port", "-p", help="Bind port."),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="ODOOCTL_API_KEY", help="HMAC key for bearer tokens."),
+    static_dir: Path | None = typer.Option(None, "--static-dir", help="Directory of pre-built SPA assets to serve at /."),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev only)."),
+) -> None:
+    """Start the local API server (requires odooctl[api] extras).
+
+    Binds to 127.0.0.1 by default. Pass --api-key or set ODOOCTL_API_KEY.
+    Optionally serve a static SPA from --static-dir at /.
+    """
+    serve_cmd.run(host=host, port=port, api_key=api_key, static_dir=static_dir, reload=reload)
+
+
+@app.command()
+def runner(
+    once: bool = typer.Option(False, "--once", help="Process one operation and exit."),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="ODOOCTL_API_KEY", help="HMAC key for capability-token verification."),
+) -> None:
+    """Run the privileged operation runner.
+
+    Claims and executes queued operations from all registered projects.
+    Requires Docker, Postgres, and filestore access.
+    Use --once to process a single operation and exit (useful for testing).
+    """
+    runner_cmd.run(once=once, api_key=api_key)
 
 
 if __name__ == "__main__":

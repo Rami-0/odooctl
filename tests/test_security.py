@@ -458,6 +458,90 @@ def test_token_ttl_must_be_positive():
         tokens.mint(RKEY, action="backup", environment="production", project="acme", ttl_seconds=0)
 
 
+def test_token_mint_with_roles_extra_claim():
+    tok = tokens.mint(RKEY, action="api", environment="*", project="*", roles=["operator"])
+    payload = tokens.verify(RKEY, tok)
+    assert payload["roles"] == ["operator"]
+
+
+def test_token_mint_extra_claims_cannot_override_reserved():
+    """extra_claims must not silently override reserved token fields.
+
+    ``nonce`` is an explicit parameter; it is also listed as reserved in the
+    implementation for defensive clarity, but Python binds it before
+    ``extra_claims`` so this loop only exercises fields that can reach
+    ``extra_claims``.
+    """
+    reserved = ("act", "env", "proj", "iat", "exp", "sub")
+    for field in reserved:
+        with pytest.raises(ValueError, match="reserved"):
+            tokens.mint(RKEY, action="backup", environment="production", project="acme", **{field: "x"})
+
+
+def test_token_mint_with_multiple_roles():
+    tok = tokens.mint(RKEY, action="api", environment="*", project="*", roles=["operator", "viewer"])
+    payload = tokens.verify(RKEY, tok)
+    assert payload["roles"] == ["operator", "viewer"]
+
+
+def test_token_mint_without_roles_has_no_roles_key():
+    tok = tokens.mint(RKEY, action="backup", environment="production", project="acme")
+    payload = tokens.verify(RKEY, tok)
+    assert "roles" not in payload
+
+
+# --------------------------------------------------------------------------- #
+# CLI: token mint --role
+# --------------------------------------------------------------------------- #
+def test_token_mint_cli_single_role(monkeypatch):
+    from typer.testing import CliRunner
+    from odooctl.commands.security import token_app
+
+    monkeypatch.setenv("ODOOCTL_RUNNER_KEY", RKEY)
+    runner = CliRunner()
+    result = runner.invoke(
+        token_app,
+        ["mint", "--action", "api", "--env", "*", "--project", "*", "--role", "operator"],
+    )
+    assert result.exit_code == 0, result.output
+    tok = result.output.strip()
+    payload = tokens.verify(RKEY, tok)
+    assert payload["roles"] == ["operator"]
+
+
+def test_token_mint_cli_multiple_roles(monkeypatch):
+    from typer.testing import CliRunner
+    from odooctl.commands.security import token_app
+
+    monkeypatch.setenv("ODOOCTL_RUNNER_KEY", RKEY)
+    runner = CliRunner()
+    result = runner.invoke(
+        token_app,
+        ["mint", "--action", "api", "--env", "*", "--project", "*",
+         "--role", "operator", "--role", "viewer"],
+    )
+    assert result.exit_code == 0, result.output
+    tok = result.output.strip()
+    payload = tokens.verify(RKEY, tok)
+    assert payload["roles"] == ["operator", "viewer"]
+
+
+def test_token_mint_cli_no_role_backwards_compatible(monkeypatch):
+    from typer.testing import CliRunner
+    from odooctl.commands.security import token_app
+
+    monkeypatch.setenv("ODOOCTL_RUNNER_KEY", RKEY)
+    runner = CliRunner()
+    result = runner.invoke(
+        token_app,
+        ["mint", "--action", "backup", "--env", "production", "--project", "acme"],
+    )
+    assert result.exit_code == 0, result.output
+    tok = result.output.strip()
+    payload = tokens.verify(RKEY, tok)
+    assert "roles" not in payload
+
+
 # --------------------------------------------------------------------------- #
 # Runner contract
 # --------------------------------------------------------------------------- #

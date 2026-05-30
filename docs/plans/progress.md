@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 13:51 UTC — Hourly Kanban manager check
+
+- Active task: `t_abe7f5bf` — M6 service layer assigned to `odoo-backend`; status `running` (run #3 active).
+- Board status: `running=1`, `todo=19`, `ready=0`, `blocked=0`, `done=0`.
+- Worker diagnostics: the first two `odoo-backend` attempts crashed before tool work because Anthropic returned `HTTP 404: model: claude-sonnet-4`; dispatcher spawned run #3 after promotion/retry.
+- Tests/result: no repo milestone tests were run by this manager tick; no code changes verified yet.
+- Commit SHA: no milestone commit yet; repo HEAD remains `92e17e6` (`docs: initialize kanban sprint progress`).
+- Push status: branch `master` is tracking `origin/master` with no ahead/behind shown before this progress update.
+- Blocker: none currently marked blocked on the board; model-name 404 is a worker crash diagnostic to monitor.
+- Next step: let `odoo-backend` finish or block M6; then verify `t_26a59c73` M6 review gate promotes to ready for `odoo-reviewer`.
+
 ### 2026-05-30 13:49 UTC — Kanban sprint initialized
 
 - Created Kanban board `odooctl` for M6–M15 control-plane work.

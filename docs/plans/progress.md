@@ -42,7 +42,7 @@ Primary plan index: `docs/plans/README.md`
 **Tests:** `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 161 passed; `uv run pytest -q` — 535 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; `uv run odooctl security runner-check` — contract OK.
 **Result:** M12 acceptance criteria met — API lists projects/envs/status, enqueues backup/clone, runner executes queued operations, event streaming works (SSE), API is localhost-only by default and can serve static SPA, unauthenticated request returns 401, viewer token cannot enqueue mutating operation (403).
 **Implementation commit SHA:** `dafd009`
-**Push status:** pending — will push after this progress entry is committed.
+**Push status:** succeeded — pushed implementation commit `dafd009` and progress commit `1d63fd3` to `origin/master`.
 **Blockers:** none.
 **Next step:** M12 review gate, then M13 Web UI MVP.
 

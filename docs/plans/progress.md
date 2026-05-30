@@ -21,8 +21,8 @@ Primary plan index: `docs/plans/README.md`
 **Tests:** Claude Code read-only security review — approved with no blocking findings; `uv run pytest tests/test_security.py -q` — 113 passed; `uv run pytest -q` — 487 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; CLI/security smokes: `uv run odooctl security runner-check` — contract OK, token mint→verify roundtrip with scoped action/env/project — passed, secret put/list metadata plus disk plaintext grep — passed.
 **Result:** M11 review gate approved — RBAC role/action matrix, protected-environment escalation, secret store encryption/file permissions/value egress rules, capability-token signature/scope/expiry behavior, central redaction helpers, and static API/web vs privileged-runner import contract are sufficient for milestone closeout.
 **Reviewed commit SHA:** `7a42d64`
-**Review progress commit SHA:** pending commit.
-**Push status:** pending.
+**Review progress commit SHA:** `5352585`
+**Push status:** pending push.
 **Blockers:** none. Non-blocking follow-ups for M12: wire central redaction at the operation/audit choke point before user-supplied API params are recorded; make runner token consumption/RBAC minting obligations explicit; consider expanding the static runner contract to catch privileged service imports with an allowlist for read-only services.
 **Next step:** start M12 API and runner (`t_3aa785d8`).
 

@@ -12,6 +12,27 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M10 docs review approved
+
+**Changed files:**
+- `docs/catalog.md` — corrected `catalog list` command comment from "(bundled + session-loaded)" to "(bundled only)"; `catalog list` has no `--catalog` flag so user manifests never appear in its output — the prior comment was misleading.
+- `docs/plans/progress.md` — recorded M10 docs review result.
+
+**Review scope:** `docs/catalog.md`, `docs/plans/m10-onboarding-catalog.md`, `odooctl/catalog/` package, `odooctl/commands/catalog.py`, `odooctl/commands/setup.py`, `tests/test_catalog.py`, `tests/test_setup.py`, `tests/test_cli_smoke.py`.
+**Checks:**
+- Schema fields and validators match docs tables for `StackTemplate`, `AddonSource`, `AddonPack`, `CompanionService`.
+- Bundled manifest content (`odoo-18-community.yaml`, `odoo-19-community.yaml`, `oca-web.yaml`, `companions.yaml`) matches the docs tables for images, versions, ports, and IDs.
+- Setup integration examples (`--yes`, `--stack`, `--catalog`, `--name`) match `setup.py` CLI parameters.
+- User-manifest YAML examples in docs parse correctly per the schema.
+- Safety rules in docs accurately reflect schema validators (no `:latest`, env-var-name-only `auth_env`).
+- Manifest schema reference tables match Pydantic model fields.
+- `uv run pytest tests/test_catalog.py tests/test_setup.py tests/test_cli_smoke.py -q` — 80 passed.
+**Result:** M10 docs review approved — one inaccurate comment corrected; all examples, field tables, and safety rules are coherent with the implementation.
+**Commit SHA:** (recorded after commit)
+**Push status:** (recorded after push)
+**Blockers:** none
+**Next step:** M11 security architecture (`t_c76c65a1`).
+
 ### 2026-05-30 21:52 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_e86d60c8` — **M10 docs review** assigned to `odoo-docs`; status `running` after this manager pass verified and closed the M10 parent handoff, then dispatched the child task.

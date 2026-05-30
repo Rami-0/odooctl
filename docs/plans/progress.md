@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 23:55 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_c8f027f4` — **M12 security review** assigned to `odoo-security`; status `running` after this manager pass cleared the parent M12 review-required handoff and dispatched the child review gate.
+- Done since last run: `t_3aa785d8` — **M12 API and runner** is now manager-approved/closed. The blocker was manager-resolvable because it was only a procedural review-required gate: the worker had already pushed `origin/master` at `dad913a`, provided explicit passing verification evidence, and left no open user/product/policy questions.
+- Board status: `done=13`, `running=1`, `blocked=0`, `ready=0`, `todo=6` after dispatch. Milestone order remains intact: M12 security review is the only active card before M13 `t_bf02e8bf` can promote.
+- Current repo state: branch `master`; `HEAD` `dad913a` (`docs: record M12 push status`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: manager reran `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 161 passed, 1 StarletteDeprecationWarning. Verified worker evidence for the closed M12 parent handoff: `uv run pytest -q` — 535 passed; `uv run ruff check .` — passed; `uv run python -m build` — succeeded; `uv run odooctl security runner-check` — contract OK; read-only Claude Opus review — approved.
+- Push status: no new milestone-code push existed before this progress update; repo was already synced to `origin/master` at `dad913a`.
+- Blockers: none on the board. The M12 parent handoff did not require Rami input because it contained a complete pushed implementation, explicit test/build/review evidence, and no unresolved security/product decisions.
+- Auto-resolved this run: completed `t_3aa785d8` with a manager approval summary/metadata, then ran `hermes kanban --board odooctl dispatch` and verified child `t_c8f027f4` promoted and spawned.
+- Next step: let `odoo-security` finish `t_c8f027f4`; if it clears, verify M13 Web UI MVP `t_bf02e8bf` promotes/spawns next.
+
 ### 2026-05-30 — M12 API and runner implemented
 
 **Changed files:**

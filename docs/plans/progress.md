@@ -21,9 +21,10 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest -q` — 210 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; live fixture checks passed: `validate`, `doctor`, `status --json-output`, `backup production`, `restore production`, `clone production staging --sanitize`, `update-modules staging --modules base`, HTTP login probe, PostgreSQL module-count query, and local `verify_chain=True` against `.odooctl/audit.jsonl`
 **Result:** M7 live Odoo 19 fixture verification passed — real backup/restore/clone/update-modules runs emitted operation events, appended audit entries, and preserved a valid audit hash chain.
-**Push status:** pending in this entry until the verification docs commit is created and pushed.
+**Implementation commit SHA:** `b751c85`
+**Push status:** succeeded — pushed `b751c85` to `origin/master` via authenticated GitHub CLI HTTPS
 **Blockers:** none for M7 live-fixture evidence
-**Next step:** unblock `t_32688f1c`, let `t_cabeb728` (M7 review gate) promote, then continue to M8.
+**Next step:** complete `t_32688f1c`, let `t_cabeb728` (M7 review gate) promote, then continue to M8.
 
 ### 2026-05-30 17:00 UTC — Hourly Kanban manager check
 

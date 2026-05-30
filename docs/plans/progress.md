@@ -29,7 +29,7 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest tests/test_security.py -q` — 113 passed; `uv run pytest -q` — 487 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully (wheel includes `odooctl/security/*` and `odooctl/commands/security.py`); CLI smoke (in `/tmp` with `--state-dir`): rbac matrix shows `operator.deploy=True`/`operator.secrets=False`; secret put/list/get confirmed no value in metadata output and no plaintext on disk, `--reveal` prints value; token mint→verify roundtrip ok, wrong-scope verify exits 1 with `INVALID: token not valid for action 'restore'`; `runner-check` reports contract OK.
 **Result:** M11 security primitives implemented — RBAC policy helpers for future API/runner enforcement, encrypted/env-referenced secret store with rotation metadata and private file creation, signed scoped capability tokens with explicit replay-window caveat, central redaction, and a structural API-vs-runner import contract that catches absolute and relative privileged imports. No new runtime dependency (stdlib-only crypto). Existing CLI remains backward-compatible; no config-compatibility breakage.
-**Implementation commit SHA:** _pending — orchestrator to commit and fill in._
+**Implementation commit SHA:** `3119913`
 **Push status:** _pending — orchestrator to push and update._
 **Blockers:** none.
 **Next step:** M11 review gate, then M12 API and runner. Note for M12: when `odooctl/api` / `odooctl/web` land, `tests/test_security.py::test_find_violations_no_api_package_yet` plus `odooctl security runner-check` enforce the no-privileged-import contract.

@@ -12,6 +12,40 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M12 API and runner implemented
+
+**Changed files:**
+- `pyproject.toml` — added `api` optional extras: `fastapi>=0.111`, `uvicorn>=0.29`, `httpx>=0.27`.
+- `odooctl/security/tokens.py` — added `**extra_claims` to `mint()` so API session tokens can embed `roles=["viewer"]` or `roles=["operator"]` for RBAC; backward-compatible.
+- `odooctl/commands/security.py` — added repeatable `--role` to `security token mint` so operators can mint API session tokens with explicit RBAC roles.
+- `odooctl/api/__init__.py` — package init; documents the unprivileged API/runner split.
+- `odooctl/api/queue.py` — `QueueEntry` dataclass + `OperationQueue` class: file-backed durable queue in `{state_dir}/queue/`; atomic temp-file enqueue, atomic POSIX rename claim, cancel removal, and corrupt-entry quarantine.
+- `odooctl/api/auth.py` — FastAPI bearer-token dependency (`get_principal`), RBAC dependency factory (`require_action`); requires `act="api"` session tokens and extracts roles from token payload.
+- `odooctl/api/routes_projects.py` — read-only routes: `GET /projects`, `GET /projects/{p}`, `GET /projects/{p}/environments`, `GET /projects/{p}/status` (metadata-derived, no Docker), `GET /projects/{p}/backups`, `GET /projects/{p}/audit`; no privileged imports.
+- `odooctl/api/routes_operations.py` — `POST /projects/{p}/operations` (enqueue with redacted params + capability token), `GET /operations/{id}`, `GET /operations/{id}/events` (SSE, `?max_polls`), `POST /operations/{id}/cancel`; RBAC per operation kind.
+- `odooctl/api/app.py` — `create_app(api_key, registry_loader, allowed_hosts, static_dir)` factory; `TrustedHostMiddleware` defaults to localhost-only; optional static SPA mount.
+- `odooctl/runner/__init__.py` — package init; documents privileged status.
+- `odooctl/runner/worker.py` — `NonceStore` (consumed nonce tracking at `{state_dir}/consumed_nonces.json`), `RunnerWorker.claim_and_run()` (verifies token, checks nonce replay, skips cancelled claimed ops, acquires env lock, dispatches to service, transitions status QUEUED→RUNNING→SUCCEEDED/FAILED, appends audit entry), `RunnerWorker.run_loop(once)`.
+- `odooctl/commands/serve.py` — `odooctl serve --host --port --api-key --static-dir --reload`.
+- `odooctl/commands/runner.py` — `odooctl runner --once --api-key`.
+- `odooctl/main.py` — registered `serve` and `runner` commands.
+- `tests/test_security.py` — 7 extra-claim/CLI role tests covering API session token RBAC claims, reserved-claim rejection, and backwards-compatible minting without roles.
+- `tests/test_api.py` — 24 TDD tests: 401/403 auth/RBAC (unauthenticated, invalid, expired, non-API token, viewer vs operator), project/env/status/backup routes, enqueue backup/clone, operation record fetch, SSE stream headers, param redaction, queue file persistence/atomic write/cancel/corrupt quarantine, capability token in queue entry, runner contract check (`find_violations`).
+- `tests/test_runner.py` — 16 TDD tests: queue enqueue/claim/rename/complete/fail/roundtrip, runner backup execution, tampered-token rejection, nonce consumption, replayed-nonce rejection, cancelled claimed-op skip, empty-queue returns False, service-error marks FAILED, `--once` processes single item.
+- `docs/api.md` — API routes, RBAC table, auth format, SSE format, queue format, security model.
+
+**M11 follow-ups addressed:**
+- Central redaction wired: `routes_operations.py` calls `redact(body.params)` before writing to operation store or queue.
+- Runner token consumption explicit: `NonceStore` in `worker.py` marks nonces consumed; runner rejects replayed nonces with FAILED status + error message.
+- Runner contract static check: `test_api_does_not_import_privileged` in `test_api.py` calls `find_violations(("odooctl.api",))` and asserts zero violations.
+
+**Tests:** `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 161 passed; `uv run pytest -q` — 535 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; `uv run odooctl security runner-check` — contract OK.
+**Result:** M12 acceptance criteria met — API lists projects/envs/status, enqueues backup/clone, runner executes queued operations, event streaming works (SSE), API is localhost-only by default and can serve static SPA, unauthenticated request returns 401, viewer token cannot enqueue mutating operation (403).
+**Implementation commit SHA:** `dafd009`
+**Push status:** pending — will push after this progress entry is committed.
+**Blockers:** none.
+**Next step:** M12 review gate, then M13 Web UI MVP.
+
 ### 2026-05-30 22:59 UTC — M11 review gate approved
 
 **Changed files:**
@@ -507,15 +541,15 @@ Primary plan index: `docs/plans/README.md`
 - [x] Enforce web/API vs runner privilege split.
 - [x] Expand security docs.
 
-### M12 — API and runner
+### M12 — API and runner ✓ DONE
 
-- [ ] Add optional FastAPI service.
-- [ ] Serve static SPA assets from `odooctl serve`.
-- [ ] Add durable queue handoff.
-- [ ] Add privileged runner.
-- [ ] Add operation event streaming.
-- [ ] Add API auth/RBAC tests.
-- [ ] Verify API-driven backup/clone via runner.
+- [x] Add optional FastAPI service.
+- [x] Serve static SPA assets from `odooctl serve`.
+- [x] Add durable queue handoff.
+- [x] Add privileged runner.
+- [x] Add operation event streaming.
+- [x] Add API auth/RBAC tests.
+- [x] Verify API-driven backup/clone via runner.
 
 ### M13 — Web UI MVP
 

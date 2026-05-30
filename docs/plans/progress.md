@@ -39,12 +39,10 @@ Primary plan index: `docs/plans/README.md`
 - `tests/test_restore.py` — updated patches to restore service module
 - `tests/test_env_cmd.py` — updated provision mock to use run_clone service
 
-**Tests:** 159 passed (136 original + 23 new), 0 failed
-**Ruff:** 0 errors
-**Build:** no pyproject.toml changes
+**Tests:** `uv run pytest -q` — 159 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — built sdist and wheel successfully
 **Result:** M6 service layer complete — commands are thin wrappers, services hold all business logic
-**Commit SHA:** 919025b
-**Push status:** failed — no remote credentials in execution environment; push manually with `git push origin HEAD`
+**Implementation commit SHA:** 919025b
+**Push status:** failed in Claude Code run because the execution environment lacked remote credentials; retry pending from worker handoff
 **Blockers:** none
 **Next step:** M7 operation engine — add operation models/store/events/audit/locks, wrap mutating services in run_operation
 

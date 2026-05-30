@@ -24,8 +24,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest tests/test_import_detect.py tests/test_import_report.py tests/test_import_adopt.py tests/test_setup.py -q` — 51 passed; `uv run pytest -q` — 261 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; smoke checks: `uv run odooctl import experiments/odoo19-community-staging --preview` rendered a 49-line read-only preview, `uv run odooctl setup --yes --stack odoo-19-community --name smoke-odoo --output <tmp>/odooctl.yml` generated config, `uv run odooctl validate --config <tmp>/odooctl.yml` passed schema validation with the expected missing `ODOO_DB_PASSWORD` warning, and fixture adoption with `--skip-doctor --skip-backup` wrote config plus registry entry without touching Docker/DB.
 **Result:** M8 implementation is ready for review: import detection is preview-first and file-read-only, adoption is explicit and registers/validates/checks/backs up by default, generated config references secrets by env var name only, and setup scaffolds a greenfield project.
-**Implementation commit SHA:** pending
-**Push status:** pending
+**Implementation commit SHA:** `282d18a`
+**Push status:** pending final progress commit/push
 **Blockers:** none
 **Next step:** M8 review gate (`t_242010a5`).
 

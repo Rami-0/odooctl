@@ -12,6 +12,19 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 17:07 UTC — M7 live fixture verification passed
+
+**Changed files:**
+- `experiments/odoo19-community-staging/2026-05-30-m7-live-fixture-verification.md` — recorded the real Odoo 19 Docker verification for M7 on current `HEAD` `280fea7`, including successful backup/restore/clone/update-modules runs plus operation/event/audit evidence.
+- `experiments/odoo19-community-staging/README.md` — added the new M7 verification artifact to the fixture index.
+- `docs/plans/progress.md` — marked the live M7 verification blocker resolved and recorded the exact checks run.
+
+**Tests:** `uv run pytest -q` — 210 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; live fixture checks passed: `validate`, `doctor`, `status --json-output`, `backup production`, `restore production`, `clone production staging --sanitize`, `update-modules staging --modules base`, HTTP login probe, PostgreSQL module-count query, and local `verify_chain=True` against `.odooctl/audit.jsonl`
+**Result:** M7 live Odoo 19 fixture verification passed — real backup/restore/clone/update-modules runs emitted operation events, appended audit entries, and preserved a valid audit hash chain.
+**Push status:** pending in this entry until the verification docs commit is created and pushed.
+**Blockers:** none for M7 live-fixture evidence
+**Next step:** unblock `t_32688f1c`, let `t_cabeb728` (M7 review gate) promote, then continue to M8.
+
 ### 2026-05-30 17:00 UTC — Hourly Kanban manager check
 
 - Active task(s): none running; board is stalled on `t_32688f1c` — **M7 operation engine** assigned to `odoo-backend`, status `blocked`.
@@ -196,14 +209,14 @@ Primary plan index: `docs/plans/README.md`
 - [x] Verify existing CLI output remains compatible (159 tests pass).
 - [x] Run full tests/ruff/build.
 
-### M7 — Operation engine (unit/fake complete; live fixture pending)
+### M7 — Operation engine
 
 - [x] Add operation models/store/events/audit/locks.
 - [x] Wrap mutating services in `run_operation`.
 - [x] Add `odooctl ops list/show/logs/cancel`.
 - [x] Add per-environment lock tests.
 - [x] Add audit-chain tests (including concurrent-append atomicity fix).
-- [ ] Verify live backup/clone emits events and audit — **BLOCKER**: only unit/fake coverage exists; requires a real Odoo 19 fixture run to confirm end-to-end event emission and audit chain integrity. Follow-up before M7 is marked fully DONE.
+- [x] Verify live backup/clone emits events and audit — passed on the real Odoo 19 fixture; see `experiments/odoo19-community-staging/2026-05-30-m7-live-fixture-verification.md`.
 
 ### M8 — Import/takeover + setup wizard
 

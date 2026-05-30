@@ -12,6 +12,14 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 14:02 UTC — Workers rerouted through Claude Code CLI
+
+- Updated all specialist Hermes profiles (`odoo-backend`, `odoo-docker`, `odoo-docs`, `odoo-frontend`, `odoo-planner`, `odoo-reviewer`, `odoo-security`) so Hermes no longer uses the Anthropic API for worker control-plane execution.
+- Profile controller routing now uses the working `openai-codex` / `gpt-5.5` Hermes provider; each worker `SOUL.md` explicitly instructs substantive task work to be delegated to the installed `claude` CLI using the `claude-code` workflow.
+- Claude Code CLI verification: `claude --version` returned `2.1.158`; `claude auth status --text` reported Claude Max account auth; a repo-local `claude -p` smoke test returned `CLAUDE_CLI_OK`.
+- Worker verification: all seven profiles have the `claude-code` skill available and `hermes -p odoo-backend chat -q ...` returned `ODOO_BACKEND_PROFILE_OK`.
+- Next step: unblock `t_abe7f5bf` and let the board dispatch M6 using Claude Code CLI-backed workers.
+
 ### 2026-05-30 13:51 UTC — Hourly Kanban manager check
 
 - Active task: `t_abe7f5bf` — M6 service layer assigned to `odoo-backend`; status `running` (run #3 active).

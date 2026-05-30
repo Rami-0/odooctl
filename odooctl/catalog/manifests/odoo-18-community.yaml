@@ -1,0 +1,10 @@
+kind: StackTemplate
+id: odoo-18-community
+description: "Odoo 18 Community Edition on PostgreSQL 15"
+odoo_version: "18.0"
+odoo_image: "odoo:18.0"
+postgres_image: "postgres:15-alpine"
+http_port: 8069
+volumes:
+  - odoo-data:/var/lib/odoo
+  - pg-data:/var/lib/postgresql/data

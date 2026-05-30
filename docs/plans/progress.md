@@ -12,6 +12,24 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 20:41 UTC — M10 onboarding catalog implemented
+
+**Changed files:**
+- `odooctl/catalog/__init__.py`, `schema.py`, `registry.py`, `render.py` — added typed catalog entry models, manifest loading/lookup, validation for pinned images/env-var auth references, and stack-template config rendering.
+- `odooctl/catalog/manifests/odoo-19-community.yaml`, `odoo-18-community.yaml`, `oca-web.yaml`, `companions.yaml` — added bundled Odoo stack templates, OCA addon sources/packs, and companion service templates.
+- `odooctl/commands/catalog.py`, `odooctl/main.py` — added `odooctl catalog list/show/add` and registered the catalog subcommand.
+- `odooctl/commands/setup.py` — wired setup scaffolding to bundled catalog templates and per-invocation user manifest extension via `--catalog PATH`, while preserving legacy stack IDs.
+- `tests/test_catalog.py` — added schema, registry, render, CLI, setup integration, validation, user-manifest, and root CLI registration coverage.
+- `docs/catalog.md` — documented catalog commands, manifest schema, bundled entries, setup integration, user extension, and safety rules.
+- `docs/plans/progress.md` — recorded M10 implementation status.
+
+**Tests:** `uv run pytest tests/test_catalog.py tests/test_setup.py -q` — 54 passed; `uv run pytest tests/test_catalog.py tests/test_setup.py tests/test_cli_smoke.py -q` — 80 passed; `uv run ruff check odooctl/catalog odooctl/commands/catalog.py odooctl/commands/setup.py odooctl/main.py tests/test_catalog.py` — all checks passed; smoke `uv run odooctl setup --yes --stack odoo-18-community --name catalog-smoke --output <tmp>/odooctl.yml && uv run odooctl validate --config <tmp>/odooctl.yml` — config valid with expected missing `ODOO_DB_PASSWORD` warning; `uv run pytest -q` — 374 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully.
+**Result:** M10 catalog implementation is ready for review: bundled and user manifests validate, setup consumes catalog stack templates, catalog CLI lists/shows/validates manifests, custom stack manifests extend setup for a single invocation, and generated config validates.
+**Implementation commit SHA:** `8bf55ec`
+**Push status:** pending
+**Blockers:** none
+**Next step:** M10 review gate, then M11 security architecture.
+
 ### 2026-05-30 20:25 UTC — M9 review gate approved
 
 **Changed files:**
@@ -394,11 +412,11 @@ Primary plan index: `docs/plans/README.md`
 
 ### M10 — Onboarding catalog
 
-- [ ] Add catalog manifest schema.
-- [ ] Add bundled Odoo stack templates.
-- [ ] Add OCA/private/Enterprise addon source model.
-- [ ] Add companion service templates.
-- [ ] Wire catalog into setup wizard.
+- [x] Add catalog manifest schema.
+- [x] Add bundled Odoo stack templates.
+- [x] Add OCA/private/Enterprise addon source model.
+- [x] Add companion service templates.
+- [x] Wire catalog into setup wizard.
 
 ### M11 — Security architecture
 

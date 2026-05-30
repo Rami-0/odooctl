@@ -25,7 +25,7 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest tests/test_catalog.py tests/test_setup.py -q` — 54 passed; `uv run pytest tests/test_catalog.py tests/test_setup.py tests/test_cli_smoke.py -q` — 80 passed; `uv run ruff check odooctl/catalog odooctl/commands/catalog.py odooctl/commands/setup.py odooctl/main.py tests/test_catalog.py` — all checks passed; smoke `uv run odooctl setup --yes --stack odoo-18-community --name catalog-smoke --output <tmp>/odooctl.yml && uv run odooctl validate --config <tmp>/odooctl.yml` — config valid with expected missing `ODOO_DB_PASSWORD` warning; `uv run pytest -q` — 374 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully.
 **Result:** M10 catalog implementation is ready for review: bundled and user manifests validate, setup consumes catalog stack templates, catalog CLI lists/shows/validates manifests, custom stack manifests extend setup for a single invocation, and generated config validates.
-**Implementation commit SHA:** `8bf55ec`
+**Implementation commit SHA:** `3ee8fdf`
 **Push status:** pending
 **Blockers:** none
 **Next step:** M10 review gate, then M11 security architecture.

@@ -1,0 +1,49 @@
+- kind: CompanionService
+  id: pgadmin
+  description: "pgAdmin 4 — web-based PostgreSQL admin UI"
+  service_name: pgadmin
+  image: "dpage/pgadmin4:8.6"
+  ports:
+    - "5050:80"
+  environment:
+    PGADMIN_DEFAULT_EMAIL: "${PGADMIN_EMAIL:-admin@example.com}"
+    PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_PASSWORD}"
+  volumes:
+    - pgadmin-data:/var/lib/pgadmin
+
+- kind: CompanionService
+  id: mailhog
+  description: "MailHog — SMTP mail catcher for development and staging"
+  service_name: mailhog
+  image: "mailhog/mailhog:v1.0.1"
+  ports:
+    - "1025:1025"
+    - "8025:8025"
+  environment: {}
+  volumes: []
+
+- kind: CompanionService
+  id: minio
+  description: "MinIO — S3-compatible object storage (filestore offload, backup target)"
+  service_name: minio
+  image: "minio/minio:RELEASE.2024-05-01T01-11-10Z"
+  ports:
+    - "9000:9000"
+    - "9001:9001"
+  environment:
+    MINIO_ROOT_USER: "${MINIO_ROOT_USER:-admin}"
+    MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+  volumes:
+    - minio-data:/data
+
+- kind: CompanionService
+  id: n8n
+  description: "n8n — workflow automation (integrations, Odoo webhooks, etc.)"
+  service_name: n8n
+  image: "n8nio/n8n:1.40.0"
+  ports:
+    - "5678:5678"
+  environment:
+    N8N_BASIC_AUTH_PASSWORD: "${N8N_PASSWORD}"
+  volumes:
+    - n8n-data:/home/node/.n8n

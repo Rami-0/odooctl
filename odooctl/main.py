@@ -8,6 +8,7 @@ import typer
 from odooctl.commands import (
     backup as backup_cmd,
     branch as branch_cmd,
+    catalog as catalog_cmd,
     clone as clone_cmd,
     deploy as deploy_cmd,
     doctor as doctor_cmd,
@@ -37,6 +38,7 @@ app.add_typer(project_cmd.app, name="project")
 app.add_typer(env_cmd.app, name="env")
 app.add_typer(ops_cmd.app, name="ops")
 app.add_typer(branch_cmd.app, name="branch")
+app.add_typer(catalog_cmd.app, name="catalog")
 
 
 def _context_config(config: str) -> str:
@@ -224,13 +226,19 @@ def setup(
     name: str | None = typer.Option(None, "--name", "-n", help="Project name."),
     output: Path = typer.Option(Path("odooctl.yml"), "--output", "-o", help="Output path."),
     force: bool = typer.Option(False, "--force", help="Overwrite existing odooctl.yml."),
+    catalog: Path | None = typer.Option(
+        None,
+        "--catalog",
+        help="Path to a YAML catalog manifest to extend bundled entries for this invocation.",
+    ),
 ) -> None:
     """Scaffold a greenfield Odoo project (new deployment, no existing stack).
 
     For taking over an existing running deployment, use 'odooctl import' instead.
     Secrets are referenced by env-var name only — never inlined in the generated config.
+    Use --catalog to extend the bundled catalog with custom StackTemplate entries.
     """
-    setup_cmd.run(yes=yes, stack=stack, name=name, output=output, force=force)
+    setup_cmd.run(yes=yes, stack=stack, name=name, output=output, force=force, catalog=catalog)
 
 
 if __name__ == "__main__":

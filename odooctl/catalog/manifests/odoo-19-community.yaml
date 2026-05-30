@@ -1,0 +1,10 @@
+kind: StackTemplate
+id: odoo-19-community
+description: "Odoo 19 Community Edition on PostgreSQL 16"
+odoo_version: "19.0"
+odoo_image: "odoo:19.0"
+postgres_image: "postgres:16-alpine"
+http_port: 8069
+volumes:
+  - odoo-data:/var/lib/odoo
+  - pg-data:/var/lib/postgresql/data

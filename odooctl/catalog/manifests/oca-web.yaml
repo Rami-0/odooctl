@@ -1,0 +1,22 @@
+- kind: AddonSource
+  id: oca-web
+  description: "OCA web addons (web_responsive, web_dialog_size, web_environment_ribbon, etc.)"
+  repo_url: "https://github.com/OCA/web"
+  ref: "18.0"
+  subpath: null
+  auth_env: null
+
+- kind: AddonSource
+  id: oca-server-tools
+  description: "OCA server-tools (base_setup_partner, base_technical_user, etc.)"
+  repo_url: "https://github.com/OCA/server-tools"
+  ref: "18.0"
+  subpath: null
+  auth_env: null
+
+- kind: AddonPack
+  id: oca-web-essentials
+  description: "Bundled OCA web + server-tools addons for a standard deployment"
+  sources:
+    - oca-web
+    - oca-server-tools

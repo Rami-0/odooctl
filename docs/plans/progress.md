@@ -21,6 +21,8 @@ Primary plan index: `docs/plans/README.md`
 **Review scope:** `a1dc5f8` plus the new hardening tests in this entry.
 **Tests:** Claude Code read-only security review — approved; `uv run pytest tests/test_import_hardening.py -q` — 7 passed; `uv run pytest tests/test_import_detect.py tests/test_import_report.py tests/test_import_adopt.py tests/test_import_hardening.py tests/test_setup.py -q` — 58 passed; `uv run pytest -q` — 268 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully.
 **Result:** M8 safety contract approved — detection/preview remain file-read-only with no subprocess/Docker/DB/volume mutation path, preview is default, adoption writes config/registry only after explicit `--yes`, secrets are referenced by env-var name only, overwrite requires `--force`, and validate/doctor/backup run after adoption unless explicitly skipped.
+**Hardening/review commit SHA:** `f0ca498`
+**Push status:** succeeded — pushed `f0ca498` to `origin/master` after configuring the repo credential helper to use the authenticated `/home/dev` GitHub CLI account.
 **Blockers:** none found in the M8 safety contract. Informational follow-ups for later: consider documenting that non-secret DB host/user values are rendered as detected, and decide whether “verified backup” should mean an additional verify command beyond manifest/checksum creation.
 **Next step:** M8 review-required handoff for the added hardening tests, then proceed to M9 environment/branch model after approval.
 

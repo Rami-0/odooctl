@@ -23,8 +23,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest tests/test_branch_status.py tests/test_promote.py tests/test_env_cmd.py -q` → 51 passed; `uv run pytest -q` → 314 passed; `uv run ruff check .` → all checks passed; `uv run python -m build` → sdist and wheel built successfully.
 **Result:** All 5 blocking review findings resolved — source code is now integrated via ff-merge before deploy; rollback restores both data and code with honest error surfacing on partial failure; protected production requires explicit confirmation (preview remains free); dirty-worktree is caught before backup; `env open` has full CLI test coverage.
-**Implementation commit SHA:** placeholder — not yet committed
-**Push status:** placeholder — not yet pushed; awaiting Hermes controller inspection
+**Implementation commit SHA:** `b9280d7`
+**Push status:** succeeded — pushed `b9280d7` to `origin/master`.
 **Blockers:** none
 **Next step:** M9 review gate, then M10 onboarding catalog.
 
@@ -45,8 +45,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** (superseded by review-fixes entry above)
 **Result:** M9 initial implementation.
-**Implementation commit SHA:** placeholder — not yet committed
-**Push status:** placeholder — not yet pushed; awaiting Hermes controller inspection
+**Implementation commit SHA:** `b9280d7`
+**Push status:** succeeded — pushed `b9280d7` to `origin/master`.
 **Blockers:** none (resolved in review-fixes entry above)
 **Next step:** M9 review gate, then M10 onboarding catalog.
 

@@ -42,9 +42,20 @@ Primary plan index: `docs/plans/README.md`
 **Tests:** `uv run pytest -q` — 159 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — built sdist and wheel successfully
 **Result:** M6 service layer complete — commands are thin wrappers, services hold all business logic
 **Implementation commit SHA:** 919025b
-**Push status:** failed in Claude Code run because the execution environment lacked remote credentials; retry pending from worker handoff
+**Push status:** succeeded on manager retry via authenticated `gh`/HTTPS; pushed `a2438ff` to `origin/master`
 **Blockers:** none
-**Next step:** M7 operation engine — add operation models/store/events/audit/locks, wrap mutating services in run_operation
+**Next step:** M6 review gate (`t_26a59c73`) before M7 operation engine
+
+### 2026-05-30 14:53 UTC — Hourly Kanban manager check
+
+- Active task: `t_26a59c73` — M6 review gate assigned to `odoo-reviewer`; status `running` after dispatcher spawned the reviewer.
+- Done since last run: `t_abe7f5bf` — M6 service layer marked `done` after manager verified the implementation handoff, resolved the push blocker, and pushed `a2438ff` to `origin/master`.
+- Board status: `done=1`, `running=1`, `todo=18`, `ready=0`, `blocked=0`.
+- Tests/result: M6 worker verification already recorded `uv run pytest -q` → 159 passed, `uv run ruff check .` → all checks passed, `uv run python -m build` → sdist/wheel built successfully; manager did not rerun full tests this tick because only board/progress state changed.
+- Commit SHA: `a2438ff` (`docs: update M6 verification handoff`) is now synced to `origin/master` before this progress update.
+- Push status: succeeded via `gh auth status`, `gh auth setup-git`, and `git push origin HEAD`.
+- Blocker: none currently marked blocked on the board.
+- Next step: let `odoo-reviewer` complete or block the M6 review gate; only then should M7 operation engine (`t_32688f1c`) promote.
 
 ### 2026-05-30 14:02 UTC — Workers rerouted through Claude Code CLI
 

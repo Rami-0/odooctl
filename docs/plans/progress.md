@@ -12,6 +12,28 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 — M11 security architecture implemented
+
+**Changed files:**
+- `odooctl/security/__init__.py` — new package; re-exports principals/RBAC surface and documents the enforced security rules.
+- `odooctl/security/principals.py` — `Org`/`User`/`Role`/`Principal`/`PrincipalKind` identity models; role privilege ordering (`viewer<operator<admin<owner`), `has_at_least`, `identity` string for audit, transport-agnostic for future API use.
+- `odooctl/security/rbac.py` — `Action` enum (read/status/logs/backups/operations/audit + backup/deploy/clone/restore/promote/env/secrets); `ROLE_ACTIONS` matrix; `is_allowed`/`require`/`allowed_actions`/`role_matrix`; protected/production destructive escalation (admin+ required); `AccessDenied` exception (names principal+action, no secrets).
+- `odooctl/security/secrets.py` — stdlib-only secret store: `SecretValue` (repr/str masked, `.reveal()` only), encrypt-then-MAC HMAC-SHA256 keystream `encrypt`/`decrypt`, `derive_key` (PBKDF2), `SecretRecord` rotation metadata, `SecretStore` (put/put_reference/get/rotate/delete/list/metadata, env-ref + encrypted sources, 0600 atomic writes), `resolve_key`/`open_store`/`default_store_path`.
+- `odooctl/security/tokens.py` — capability tokens (`base64url(header).payload.HMAC-SHA256`); `mint`/`verify`/`decode_unverified`; scope (action/env/project), expiry, optional subject, random nonce; `TokenInvalid`/`TokenExpired`/`TokenScopeError`.
+- `odooctl/security/redaction.py` — `strip_env_defaults` (collapses `${VAR:-default}`→`${VAR}`), `redact_text`, recursive `redact` for str/dict/list; masks known secret values and secret-looking keys.
+- `odooctl/security/runner_contract.py` — AST-based `scan_source_for_violations`/`find_violations`/`assert_api_does_not_import_privileged`; privileged prefixes `odooctl.adapters`/`odooctl.odoo`; API packages `odooctl.api`/`odooctl.web` (tolerates missing packages today, catches future direct imports); documents API vs runner capability lists.
+- `odooctl/commands/security.py` — `odooctl security rbac` (matrix display), `security secret put/get/rotate/list` (values via `--value-env`/`--stdin`/`--reference` only — never argv; `get` reveals only with `--reveal`), `security token mint/verify` (key from `--key-env`), `security runner-check`.
+- `odooctl/main.py` — registered `security` sub-app.
+- `tests/test_security.py` — 113 tests: full role×action matrix, protected escalation, secret crypto roundtrip/tamper/wrong-key/private file modes, store no-leak (repr/disk/metadata)/rotation/env-ref, redaction (incl. `${VAR:-default}` and non-string secret-key values), token mint/verify/tamper/expiry/scope/CLI stdin + empty-key guard, runner-contract absolute+relative import scan + assert-on-violation, plus redacted params safe in operation/audit surfaces and audit tamper-detection still fires.
+- `docs/rbac.md`, `docs/runner-architecture.md` — security model, RBAC matrix, secret handling, capability tokens, token replay-window caveat, local key threat model, and web/API-vs-runner split.
+
+**Tests:** `uv run pytest tests/test_security.py -q` — 113 passed; `uv run pytest -q` — 487 passed; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully (wheel includes `odooctl/security/*` and `odooctl/commands/security.py`); CLI smoke (in `/tmp` with `--state-dir`): rbac matrix shows `operator.deploy=True`/`operator.secrets=False`; secret put/list/get confirmed no value in metadata output and no plaintext on disk, `--reveal` prints value; token mint→verify roundtrip ok, wrong-scope verify exits 1 with `INVALID: token not valid for action 'restore'`; `runner-check` reports contract OK.
+**Result:** M11 security primitives implemented — RBAC policy helpers for future API/runner enforcement, encrypted/env-referenced secret store with rotation metadata and private file creation, signed scoped capability tokens with explicit replay-window caveat, central redaction, and a structural API-vs-runner import contract that catches absolute and relative privileged imports. No new runtime dependency (stdlib-only crypto). Existing CLI remains backward-compatible; no config-compatibility breakage.
+**Implementation commit SHA:** _pending — orchestrator to commit and fill in._
+**Push status:** _pending — orchestrator to push and update._
+**Blockers:** none.
+**Next step:** M11 review gate, then M12 API and runner. Note for M12: when `odooctl/api` / `odooctl/web` land, `tests/test_security.py::test_find_violations_no_api_package_yet` plus `odooctl security runner-check` enforce the no-privileged-import contract.
+
 ### 2026-05-30 — M10 docs review approved
 
 **Changed files:**
@@ -452,12 +474,12 @@ Primary plan index: `docs/plans/README.md`
 
 ### M11 — Security architecture
 
-- [ ] Add org/user/role/principal models.
-- [ ] Add RBAC action matrix.
-- [ ] Add secret store and rotation commands.
-- [ ] Add capability tokens.
-- [ ] Enforce web/API vs runner privilege split.
-- [ ] Expand security docs.
+- [x] Add org/user/role/principal models.
+- [x] Add RBAC action matrix.
+- [x] Add secret store and rotation commands.
+- [x] Add capability tokens.
+- [x] Enforce web/API vs runner privilege split.
+- [x] Expand security docs.
 
 ### M12 — API and runner
 

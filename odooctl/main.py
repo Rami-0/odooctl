@@ -12,6 +12,7 @@ from odooctl.commands import (
     doctor as doctor_cmd,
     env as env_cmd,
     github_actions as gha_cmd,
+    import_cmd,
     init as init_cmd,
     logs as logs_cmd,
     ops as ops_cmd,
@@ -19,6 +20,7 @@ from odooctl.commands import (
     restore as restore_cmd,
     rollback as rollback_cmd,
     schedule as schedule_cmd,
+    setup as setup_cmd,
     status as status_cmd,
     update_modules as update_cmd,
     validate as validate_cmd,
@@ -164,6 +166,57 @@ def github_actions(config: str = "odooctl.yml", output: str = ".github/workflows
     content = gha_cmd.run(_context_config(config), output, dry_run, force)
     if dry_run:
         typer.echo(content)
+
+
+@app.command(name="import")
+def import_project(
+    path: Path | None = typer.Argument(None, help="Path to docker-compose.yml or its directory."),
+    preview: bool = typer.Option(False, "--preview", help="Show preview only (default behaviour)."),
+    name: str | None = typer.Option(None, "--name", "-n", help="Project name for the generated config."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Write odooctl.yml after preview (adoption)."),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing odooctl.yml."),
+    output: Path = typer.Option(Path("odooctl.yml"), "--output", "-o", help="Output path for generated config."),
+    skip_doctor: bool = typer.Option(False, "--skip-doctor", help="Skip preflight doctor checks after adoption."),
+    skip_backup: bool = typer.Option(False, "--skip-backup", help="Skip safety backup after adoption."),
+) -> None:
+    """Import an existing Docker Compose Odoo deployment (read-only detection, then optional adoption).
+
+    Detection is strictly read-only: no containers are touched, no DBs mutated,
+    no volumes written, and no secret values are printed or stored.
+
+    Run without --yes to preview. Add --yes to write the generated odooctl.yml.
+    Use --force to overwrite an existing file.
+
+    After adoption, the project is registered, config is validated, doctor
+    preflight checks run, and a safety backup is created. Use --skip-doctor
+    or --skip-backup to suppress those post-adoption steps.
+    """
+    import_cmd.run(
+        path,
+        preview=preview,
+        name=name,
+        yes=yes,
+        force=force,
+        output=output,
+        skip_doctor=skip_doctor,
+        skip_backup=skip_backup,
+    )
+
+
+@app.command()
+def setup(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive prompts and use defaults."),
+    stack: str | None = typer.Option(None, "--stack", help="Stack name (e.g. odoo-19-community)."),
+    name: str | None = typer.Option(None, "--name", "-n", help="Project name."),
+    output: Path = typer.Option(Path("odooctl.yml"), "--output", "-o", help="Output path."),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing odooctl.yml."),
+) -> None:
+    """Scaffold a greenfield Odoo project (new deployment, no existing stack).
+
+    For taking over an existing running deployment, use 'odooctl import' instead.
+    Secrets are referenced by env-var name only — never inlined in the generated config.
+    """
+    setup_cmd.run(yes=yes, stack=stack, name=name, output=output, force=force)
 
 
 if __name__ == "__main__":

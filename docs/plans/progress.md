@@ -28,8 +28,8 @@ Primary plan index: `docs/plans/README.md`
 - Manifest schema reference tables match Pydantic model fields.
 - `uv run pytest tests/test_catalog.py tests/test_setup.py tests/test_cli_smoke.py -q` — 80 passed.
 **Result:** M10 docs review approved — one inaccurate comment corrected; all examples, field tables, and safety rules are coherent with the implementation.
-**Commit SHA:** (recorded after commit)
-**Push status:** (recorded after push)
+**Commit SHA:** `5f87365`
+**Push status:** succeeded — pushed `5f87365` to `origin/master`.
 **Blockers:** none
 **Next step:** M11 security architecture (`t_c76c65a1`).
 

@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-30 20:13 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_8a3df0ce` — **M9 review gate** assigned to `odoo-reviewer`; status `running` with active worker run `#25` started at 20:12 UTC after the manager-cleared M9 parent handoff promoted it.
+- Done since last run: `t_660859dd` — **M9 environment branch model** is now closed/resolved, which promoted and spawned the child review gate `t_8a3df0ce`; no M10 work has started yet, so milestone order remains M6 → M7 → M8 → M9.
+- Board status: `done=7`, `running=1`, `blocked=0`, `ready=0`, `todo=12`; no stalled ready cards, and next dependency-gated child remains `t_3a860c0f` (M10 onboarding catalog) behind the M9 review gate.
+- Current repo state: branch `master`; `HEAD` `1925fe6` (`docs: update odooctl kanban progress`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: no new manager-run repo tests this tick. Current verified evidence for M9 remains the backend handoff already recorded in this file: milestone subset `uv run pytest tests/test_branch_status.py tests/test_promote.py tests/test_env_cmd.py -q` → 51 passed, `uv run pytest -q` → 314 passed, `uv run ruff check .` → passed, `uv run python -m build` → succeeded.
+- Push status: no milestone-code push attempt by the manager this tick before this progress update; repo was already synced to `origin/master` at `1925fe6`.
+- Blockers: none currently on the board. The prior review-required blocker was manager-resolvable because the parent task already carried explicit passing tests, commit/push metadata, and a clean synced repo state, so the manager safely advanced it and verified the child review gate actually promoted/spawned.
+- Next step: let `odoo-reviewer` finish `t_8a3df0ce`, then verify its completion or any genuine blocker before promoting M10 `t_3a860c0f`.
+
 ### 2026-05-30 20:08 UTC — Hourly Kanban manager check
 
 - Active task(s): none running. Board is currently stalled on `t_660859dd` — **M9 environment branch model** assigned to `odoo-backend`; status `blocked` as a review-required handoff.

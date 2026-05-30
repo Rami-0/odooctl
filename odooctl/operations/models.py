@@ -17,6 +17,7 @@ class OperationKind(str, Enum):
     ENV_DESTROY = "env_destroy"
     UPDATE_MODULES = "update_modules"
     ROLLBACK = "rollback"
+    PROMOTE = "promote"
 
 
 class OperationStatus(str, Enum):

@@ -185,3 +185,102 @@ def test_env_destroy_purge_drops_db_and_filestore_before_removing_config(tmp_pat
     assert result.exit_code == 0, result.output
     assert calls == [("drop-db", "acme_qa"), ("delete-filestore", "/var/lib/odoo/filestore/acme_qa")]
     assert "qa" not in yaml.safe_load(config.read_text())["environments"]
+
+
+# ─── env open ─────────────────────────────────────────────────────────────────
+
+def test_env_open_refuses_reserved_name_production(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo)
+
+    result = runner.invoke(
+        app, ["--project-dir", str(repo), "env", "open", "production", "--from", "main"]
+    )
+    assert result.exit_code != 0
+    assert "reserved" in result.output.lower()
+
+
+def test_env_open_refuses_reserved_name_staging(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo)
+
+    result = runner.invoke(
+        app, ["--project-dir", str(repo), "env", "open", "staging", "--from", "staging"]
+    )
+    assert result.exit_code != 0
+    assert "reserved" in result.output.lower()
+
+
+def test_env_open_refuses_duplicate_environment(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    config = _write_config(repo)
+    data = yaml.safe_load(config.read_text())
+    data["environments"]["existing"] = {
+        "branch": "existing",
+        "domain": "existing.example.com",
+        "db_name": "acme_existing",
+        "filestore_path": "/var/lib/odoo/filestore/acme_existing",
+    }
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+
+    result = runner.invoke(
+        app, ["--project-dir", str(repo), "env", "open", "existing", "--from", "feature/existing"]
+    )
+    assert result.exit_code != 0
+    assert "already exists" in result.output.lower()
+
+
+def test_env_open_no_provision_writes_config_without_clone(tmp_path: Path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    config = _write_config(repo)
+    monkeypatch.setattr(
+        "odooctl.services.clone.run_clone",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("clone should not run")),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--project-dir", str(repo),
+            "env", "open", "feature-x",
+            "--from", "feature/x",
+            "--no-provision",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    data = yaml.safe_load(config.read_text())
+    assert "feature-x" in data["environments"]
+    env = data["environments"]["feature-x"]
+    assert env["branch"] == "feature/x"
+    assert env["tier"] == "development"
+    assert env["clone_from"] == "production"
+
+
+def test_env_open_with_provision_clones_sanitized_from_source(tmp_path: Path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo)
+    clone_calls: list = []
+
+    from odooctl.services.models import CloneResult
+
+    def fake_clone(ctx, source, target, sanitize=True, **kwargs):
+        clone_calls.append((source, target, sanitize))
+        return CloneResult(url="http://localhost")
+
+    monkeypatch.setattr("odooctl.services.clone.run_clone", fake_clone)
+
+    result = runner.invoke(
+        app,
+        [
+            "--project-dir", str(repo),
+            "env", "open", "dev1",
+            "--from", "feature/dev1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert clone_calls == [("production", "dev1", True)]

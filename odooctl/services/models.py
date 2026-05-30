@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 T = TypeVar("T")
 
@@ -85,3 +85,25 @@ class ProjectSummary:
     config_path: str
     odoo_version: str
     git_commit: str | None
+
+
+@dataclass
+class BranchStatus:
+    environment: str
+    tier: str | None
+    branch: str
+    current_commit: str | None
+    last_deployed_commit: str | None
+    ahead: int | None
+    behind: int | None
+    drift: Literal["clean", "ahead", "behind", "diverged", "unknown"]
+
+
+@dataclass
+class PromoteResult:
+    source: str
+    target: str
+    status: str  # "success" | "failed" | "preview"
+    backup_id: str | None = None
+    rolled_back: bool = False
+    message: str | None = None

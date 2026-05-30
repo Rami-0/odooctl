@@ -191,6 +191,91 @@ def create_env(
         typer.echo(f"Provisioned {name} from {clone_from}")
 
 
+@app.command("open")
+def open_env(
+    name: str,
+    from_branch: str = typer.Option(..., "--from", help="Feature branch to bind this environment to."),
+    from_env: str = typer.Option("production", "--from-env", help="Source environment to clone/sanitize from."),
+    domain: str | None = typer.Option(None, "--domain", help="Public domain; defaults to <name>.<source domain>."),
+    port: int | None = typer.Option(None, "--port", help="Optional URL port."),
+    db_name: str | None = typer.Option(None, "--db-name", help="Database name; defaults to <project>_<name>."),
+    provision: bool = typer.Option(True, "--provision/--no-provision", help="Clone and sanitize from source after config write."),
+    config: str = "odooctl.yml",
+):
+    """Create an ephemeral development environment bound to a feature branch.
+
+    Clones and sanitizes data from the source environment (default: production),
+    then binds the new environment to the specified branch.
+
+    Example: odooctl env open feature-x --from feature/x
+    """
+    if name in {"production", "staging"}:
+        raise click.ClickException(f"Refusing to open a reserved environment name: {name}")
+
+    path = _config_path(config)
+    data = _load_raw(path)
+    if name in data["environments"]:
+        raise click.ClickException(f"Environment already exists: {name}")
+
+    current = load_config(path)
+    source = current.env(from_env)
+    project_name = current.project.name.replace("-", "_")
+    new_db = db_name or f"{project_name}_{name}"
+    source_filestore = str(source.filestore_path)
+    if source.db_name in source_filestore:
+        filestore_path = source_filestore.replace(source.db_name, new_db)
+    else:
+        filestore_path = f"/var/lib/odoo/filestore/{new_db}"
+
+    env_data: dict = {
+        "tier": "development",
+        "stack": source.stack,
+        "branch": from_branch,
+        "scheme": source.scheme,
+        "domain": domain or f"{name}.{source.domain}",
+        "db_name": new_db,
+        "filestore_path": filestore_path,
+        "clone_from": from_env,
+        "sanitize": True,
+        "db_selector": source.db_selector,
+    }
+    if port is not None:
+        env_data["port"] = port
+    if source.filestore_volume:
+        env_data["filestore_volume"] = source.filestore_volume
+    if source.update_modules:
+        env_data["update_modules"] = list(source.update_modules)
+
+    updated = deepcopy(data)
+    updated["environments"][name] = env_data
+    from odooctl.config import OdooCtlConfig
+
+    OdooCtlConfig.model_validate(updated)
+    _write_raw(path, updated)
+    typer.echo(f"Created development environment {name} (branch: {from_branch}) in {path}")
+
+    if provision:
+        from odooctl.services.clone import run_clone
+        from odooctl.services.context import ServiceContext
+        svc_ctx = ServiceContext.from_config_path(str(path))
+        op_store = OperationStore(svc_ctx.project.state_dir)
+        audit = AuditStore(svc_ctx.project.state_dir)
+        with run_operation(
+            op_store,
+            audit,
+            kind=OperationKind.ENV_CREATE,
+            project=svc_ctx.project.config.project.name,
+            environment=name,
+            actor="cli",
+            params_redacted={"name": name, "from_env": from_env, "branch": from_branch},
+            state_dir=svc_ctx.project.state_dir,
+        ) as op_ctx:
+            op_ctx.emit(f"opening dev environment {name} from {from_env}", phase="env_open")
+            run_clone(svc_ctx, from_env, name, sanitize=True)
+            op_ctx.emit(f"environment {name} ready (branch: {from_branch})", phase="env_open")
+        typer.echo(f"Provisioned {name} from {from_env} (sanitized)")
+
+
 @app.command("destroy")
 def destroy_env(
     name: str,

@@ -11,6 +11,10 @@ from odooctl.adapters.reverse_proxy import public_url
 from odooctl.metadata.models import DeploymentMetadata
 from odooctl.metadata.store import MetadataStore
 from odooctl.odoo.healthcheck import check_url, with_db_selector
+from odooctl.operations.audit import AuditStore
+from odooctl.operations.engine import run_operation
+from odooctl.operations.models import OperationKind
+from odooctl.operations.store import OperationStore
 from odooctl.utils.logging import warn
 from odooctl.utils.shell import run
 
@@ -35,6 +39,7 @@ def _git_commit(root: Path) -> str | None:
     except TypeError:
         return git_commit()
 
+
 def _clean_worktree(operation: str, root: Path) -> None:
     try:
         _assert_clean_worktree(operation, cwd=root)
@@ -45,7 +50,10 @@ def _clean_worktree(operation: str, root: Path) -> None:
 def _verify_health(cfg, environment: str) -> None:
     env = cfg.env(environment)
     scheme = cfg.healthcheck.scheme or env.scheme
-    url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
+    url = with_db_selector(
+        public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path,
+        env.db_name if env.db_selector else None,
+    )
     print("[rollback] verify")
     check_url(
         url,
@@ -54,8 +62,11 @@ def _verify_health(cfg, environment: str) -> None:
         interval=cfg.healthcheck.interval_seconds,
     )
 
+
 def execute(environment: str, mode: str = "code", backup: str | None = None, config_path: str = "odooctl.yml") -> None:
     context = ProjectContext.from_config_path(config_path)
+    op_store = OperationStore(context.state_dir)
+    audit = AuditStore(context.state_dir)
     cfg = context.config
     if mode not in {"code", "full"}:
         raise typer.BadParameter("--mode must be code or full")
@@ -70,18 +81,37 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
     if not compose_path.exists():
         raise FileNotFoundError(f"Compose file not found: {compose_path}")
 
+    with run_operation(
+        op_store,
+        audit,
+        kind=OperationKind.ROLLBACK,
+        project=cfg.project.name,
+        environment=environment,
+        actor="cli",
+        params_redacted={"environment": environment, "mode": mode},
+        state_dir=context.state_dir,
+    ) as op_ctx:
+        op_ctx.emit(f"rollback {mode} on {environment}", phase="rollback")
+        _run_rollback(context, environment, mode, backup, config_path, op_ctx)
+
+
+def _run_rollback(context, environment, mode, backup, config_path, op_ctx=None):
+    cfg = context.config
     env = cfg.env(environment)
     scheme = cfg.healthcheck.scheme or env.scheme
-    url = with_db_selector(public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path, env.db_name if env.db_selector else None)
+    url = with_db_selector(
+        public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path,
+        env.db_name if env.db_selector else None,
+    )
     compose = _compose_adapter(cfg.runtime.compose_file, context.root)
-    store = _store(context.state_dir)
+    meta_store = _store(context.state_dir)
     status = "failed"
     message = None
     commit: str | None = _git_commit(context.root)
     image: str | None = cfg.odoo.image
 
     if mode == "code":
-        previous = store.previous_successful_deployment(environment)
+        previous = meta_store.previous_successful_deployment(environment)
         if not previous or not previous.get("commit"):
             raise RuntimeError(f"No previous successful deployment commit recorded for environment '{environment}'")
         recorded_branch = previous.get("branch")
@@ -117,7 +147,7 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         message = str(exc)
         raise
     finally:
-        store.save_deployment(
+        meta_store.save_deployment(
             DeploymentMetadata(
                 project=cfg.project.name,
                 environment=environment,

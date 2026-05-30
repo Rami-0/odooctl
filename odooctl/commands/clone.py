@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from odooctl.services.clone import run_clone
 from odooctl.services.context import ServiceContext
+from odooctl.operations.audit import AuditStore
+from odooctl.operations.engine import run_operation
+from odooctl.operations.models import OperationKind
+from odooctl.operations.store import OperationStore
 
 
 def execute(
@@ -14,5 +18,29 @@ def execute(
     preview: bool = False,
 ) -> str:
     ctx = ServiceContext.from_config_path(config_path)
-    result = run_clone(ctx, source, target, sanitize=sanitize, sanitization_profile=sanitization_profile, preview=preview)
-    return result.url
+    if preview:
+        result = run_clone(
+            ctx, source, target,
+            sanitize=sanitize, sanitization_profile=sanitization_profile, preview=True,
+        )
+        return result.url
+    store = OperationStore(ctx.project.state_dir)
+    audit = AuditStore(ctx.project.state_dir)
+    result = None
+    with run_operation(
+        store,
+        audit,
+        kind=OperationKind.CLONE,
+        project=ctx.project.config.project.name,
+        environment=target,
+        actor="cli",
+        params_redacted={"source": source, "target": target, "profile": sanitization_profile},
+        state_dir=ctx.project.state_dir,
+    ) as op_ctx:
+        op_ctx.emit(f"cloning {source} → {target}", phase="clone")
+        result = run_clone(
+            ctx, source, target,
+            sanitize=sanitize, sanitization_profile=sanitization_profile, preview=False,
+        )
+        op_ctx.emit(f"clone complete: {result.url}", phase="clone")
+    return result.url  # type: ignore[union-attr]

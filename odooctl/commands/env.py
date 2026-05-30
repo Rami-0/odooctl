@@ -14,6 +14,10 @@ from odooctl.adapters.filestore import make_filestore_adapter
 from odooctl.config import load_config
 from odooctl.context import ProjectContext
 from odooctl.registry import resolve_project_context
+from odooctl.operations.audit import AuditStore
+from odooctl.operations.engine import run_operation
+from odooctl.operations.models import OperationKind
+from odooctl.operations.store import OperationStore
 
 app = typer.Typer(help="Manage named Odoo environments in this project.", add_completion=False)
 console = Console()
@@ -168,7 +172,22 @@ def create_env(
     if provision:
         from odooctl.services.clone import run_clone
         from odooctl.services.context import ServiceContext
-        run_clone(ServiceContext.from_config_path(str(path)), clone_from, name, sanitize=sanitize)
+        svc_ctx = ServiceContext.from_config_path(str(path))
+        op_store = OperationStore(svc_ctx.project.state_dir)
+        audit = AuditStore(svc_ctx.project.state_dir)
+        with run_operation(
+            op_store,
+            audit,
+            kind=OperationKind.ENV_CREATE,
+            project=svc_ctx.project.config.project.name,
+            environment=name,
+            actor="cli",
+            params_redacted={"name": name, "clone_from": clone_from},
+            state_dir=svc_ctx.project.state_dir,
+        ) as op_ctx:
+            op_ctx.emit(f"provisioning {name} from {clone_from}", phase="env_create")
+            run_clone(svc_ctx, clone_from, name, sanitize=sanitize)
+            op_ctx.emit(f"environment {name} provisioned", phase="env_create")
         typer.echo(f"Provisioned {name} from {clone_from}")
 
 
@@ -191,10 +210,24 @@ def destroy_env(
     env = cfg.env(name)
     if purge:
         ctx = ProjectContext(path.parent, path, cfg)
-        db = make_db_adapter(ctx)
-        fs = make_filestore_adapter(ctx, env)
-        db.drop(env.db_name)
-        fs.delete(str(env.filestore_path))
+        op_store = OperationStore(ctx.state_dir)
+        audit = AuditStore(ctx.state_dir)
+        with run_operation(
+            op_store,
+            audit,
+            kind=OperationKind.ENV_DESTROY,
+            project=cfg.project.name,
+            environment=name,
+            actor="cli",
+            params_redacted={"name": name, "purge": purge},
+            state_dir=ctx.state_dir,
+        ) as op_ctx:
+            op_ctx.emit(f"purging environment {name}", phase="env_destroy")
+            db = make_db_adapter(ctx)
+            fs = make_filestore_adapter(ctx, env)
+            db.drop(env.db_name)
+            fs.delete(str(env.filestore_path))
+            op_ctx.emit(f"environment {name} purged", phase="env_destroy")
     updated = deepcopy(data)
     del updated["environments"][name]
     from odooctl.config import OdooCtlConfig

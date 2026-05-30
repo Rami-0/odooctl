@@ -23,6 +23,7 @@ from odooctl.commands import (
     restore as restore_cmd,
     rollback as rollback_cmd,
     schedule as schedule_cmd,
+    security as security_cmd,
     setup as setup_cmd,
     status as status_cmd,
     update_modules as update_cmd,
@@ -39,6 +40,7 @@ app.add_typer(env_cmd.app, name="env")
 app.add_typer(ops_cmd.app, name="ops")
 app.add_typer(branch_cmd.app, name="branch")
 app.add_typer(catalog_cmd.app, name="catalog")
+app.add_typer(security_cmd.app, name="security")
 
 
 def _context_config(config: str) -> str:

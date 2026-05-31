@@ -21,7 +21,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest tests/test_migration.py -q` — 62 passed; `uv run ruff check odooctl/commands/migrate.py odooctl/runner/worker.py tests/test_migration.py` — all checks passed.
 **Result:** Both CLI and runner now reject unsupported version pairs from the matrix before starting any DB work, eliminating the `any([])==False` silent-path bug.
-**Push status:** pending — not committed or pushed.
+**Implementation commit SHA:** `dec65f3`
+**Push status:** succeeded — pushed `dec65f3` to `origin/master`.
 **Blockers:** none.
 **Next step:** M15 review gate.
 
@@ -36,7 +37,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** `uv run pytest tests/test_migration.py -q` — 62 passed; `uv run pytest -q` — 723 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/migration/ odooctl/commands/migrate.py odooctl/runner/worker.py tests/test_migration.py` — all checks passed; `node --check odooctl/web/dist/app.js` — passed; `uv run python -m build` — succeeded.
 **Result:** Both priority correctness caveats from the independent review are fixed: (1) healthcheck targets the throwaway DB via a real DB ping, never the source env public URL; (2) every cross-major rehearsal path that requires OpenUpgrade fails clearly without `--openupgrade` rather than silently claiming success. Final wiring review also fixed/pinned runner propagation of the UI/API `keep` flag and rejects target paths absent from the matrix so unsupported typos/jumps cannot be reported as successful plain updates.
-**Push status:** pending — not committed or pushed.
+**Implementation commit SHA:** `dec65f3`
+**Push status:** succeeded — pushed `dec65f3` to `origin/master`.
 **Blockers:** none.
 **Next step:** M15 review gate.
 

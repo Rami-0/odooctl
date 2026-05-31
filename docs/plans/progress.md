@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 00:00 UTC — M12 security review blocked
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded the M12 security-review blocker and verification evidence.
+
+**Review scope:** `dad913a` (M12 API/runner implementation and progress commits).
+**Tests:** Claude Code Opus read-only security review — not approved; `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 161 passed, 1 StarletteDeprecationWarning; direct RBAC probe confirmed `operator` is denied `clone` on protected env when `protected=True` but the enqueue-style `rbac.require(principal, Action.CLONE)` allows it; `uv run ruff check odooctl/api odooctl/runner odooctl/security tests/test_api.py tests/test_runner.py tests/test_security.py` — all checks passed.
+**Result:** Blocked — `POST /projects/{project}/operations` performs the base role/action check without passing the target environment's `protected` flag, so an operator API token can enqueue destructive operations such as `clone` against a protected environment despite the M11 admin+ protected-environment floor. Runner token verification checks signature/scope/nonce but does not re-assert RBAC, so it cannot recover the missing access-control check.
+**Blocking finding:** `odooctl/api/routes_operations.py:98-101` should load the project context first, resolve `ctx.config.environments[body.environment].protected`, and call `rbac.require(principal, action, protected=...)`; the privileged runner should also defensively re-check protected RBAC before dispatching a claimed queue entry.
+**Blockers:** Protected-environment RBAC floor is not enforced in the API/runner mutation path.
+**Next step:** backend/security remediation for the protected-environment enqueue/runner re-check, with regression tests proving operator tokens receive 403 for destructive operations on protected envs while admin tokens still enqueue successfully.
+
 ### 2026-05-30 23:55 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_c8f027f4` — **M12 security review** assigned to `odoo-security`; status `running` after this manager pass cleared the parent M12 review-required handoff and dispatched the child review gate.

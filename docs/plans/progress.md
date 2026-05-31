@@ -20,10 +20,10 @@ Primary plan index: `docs/plans/README.md`
 - `docs/disaster-recovery.md` — documented the mandatory sanitization requirement for protected-source cross-env restores; updated Safety invariants section to list all four new guarantees.
 - `docs/plans/progress.md` — this entry.
 
-**Tests:** TDD — 4 tests RED before implementation, all 5 GREEN after; full suite: `uv run pytest -q` — 661 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/services/restore.py tests/test_backup_verify.py` — all checks passed.
+**Tests:** TDD — 4 tests RED before implementation, all 5 GREEN after; `uv run pytest tests/test_backup_verify.py -q` — 19 passed; full suite: `uv run pytest -q` — 661 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/services/restore.py tests/test_backup_verify.py` — all checks passed; `uv run python -m build` — succeeded.
 **Result:** B1 remediated. `restore_to_env` now refuses production-source cross-env restores when target has `sanitize: false` (before any DB work); when allowed, the temp DB is sanitized using target env settings and project SQL files before the atomic swap — PII/credentials/live integrations are scrubbed before data is promoted into the target DB name.
-**Implementation commit SHA:** placeholder
-**Push status:** pending
+**Implementation commit SHA:** `6e367e9`
+**Push status:** pending — not pushed yet
 **Blockers:** none.
 **Next step:** return to M14 security re-review gate.
 

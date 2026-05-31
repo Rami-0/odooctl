@@ -24,8 +24,8 @@ Primary plan index: `docs/plans/README.md`
 **Result:** M15 and the M6-M15 release chain are approved. The migration assistant remains rehearsal/evidence/reporting only, never a blind production upgrade: unsupported matrix paths fail before DB work, OpenUpgrade-required paths fail clearly without `--openupgrade`, healthchecks target the throwaway DB, reports are saved on failure, cleanup status is explicit, and production-source rehearsal enqueue is protected by restore-class RBAC.
 
 **Reviewed commit SHA:** `74ad75b`
-**Review progress commit SHA:** pending — this entry is being committed after verification.
-**Push status:** pending — this review progress update will be pushed after commit.
+**Review progress commit SHA:** `a5beb93`
+**Push status:** succeeded — pushed review progress commit `a5beb93` to `origin/master`.
 **Blockers:** none.
 **Non-blocking follow-ups for later:** consider a friendlier CLI hint/default for OpenUpgrade-required paths; consider hiding or disabling the SPA Migrate action for operator users on protected source environments before the server-side admin check returns 403; document that most non-backup/clone/DR/migration operation kinds remain CLI-only and intentionally unsupported by the runner.
 **Next step:** close the M15 final review card and treat the M6-M15 control-plane chain as release-ready.

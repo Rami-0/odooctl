@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 09:17 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_4e32db27` — **M15 final release review** is now **running** on `odoo-reviewer` as run `#50` after this manager pass approved and closed the parent M15 implementation handoff. No other cards are running.
+- Done since last run: `t_8b7a971e` — **M15 migration assistant** is now manager-approved/closed. The blocker was manager-resolvable because the worker had already committed and pushed the milestone (`dec65f3` implementation, `b145b1d` progress/push-status), left the repo clean and synced, and the remaining gate was purely procedural review-required handoff with no unresolved product/policy/user questions.
+- Board status after dispatch: `done=21`, `running=1`, `blocked=0`, `ready=0`, `todo=0`. Milestone order remains intact: M15 implementation is complete and the dependency-linked final release review is now the only active card.
+- Current repo state: branch `master`; `HEAD` `b145b1d` (`docs: record migration assistant push status`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: manager independently reran `uv run pytest tests/test_migration.py -q` — 62 passed; `uv run ruff check odooctl/migration/ odooctl/commands/migrate.py odooctl/runner/worker.py tests/test_migration.py` — passed; `node --check odooctl/web/dist/app.js` — passed; `uv run python -m build` — succeeded.
+- Blockers: none currently on the board. Rami input is not required because the closed M15 blocker was a procedural review gate backed by passing verification, a clean synced repo, explicit commit/push metadata, and a concrete child review task.
+- Auto-resolved this run: completed `t_8b7a971e` with a manager approval summary/metadata, ran `hermes kanban --board odooctl dispatch`, and verified child `t_4e32db27` promoted/spawned as run `#50`. This was safe because the only remaining step is the explicitly requested M15 final release review.
+- Push status: no new milestone-code push was needed this tick; repo was already synced to `origin/master` at `b145b1d`. Manager progress update commit/push pending below.
+- Next step: let `odoo-reviewer` finish `t_4e32db27`; if it approves the release chain, verify final governance/release state and close out M15.
+
 ### 2026-05-31 — M15 correctness fix: reject unsupported migration paths
 
 **Changed files:**

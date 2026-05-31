@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 00:57 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_c68f5587` — **M12 protected-env RBAC remediation** assigned to `odoo-backend`; status `running` after this manager pass spawned the backend fix task. `t_c8f027f4` remains **blocked** as the security review gate pending the remediation result.
+- Done since last run: no additional cards completed. The new board movement is the manager-created remediation lane required to clear the M12 blocker without waiting for user input.
+- Board status: `done=13`, `running=1`, `blocked=1`, `ready=0`, `todo=6` after dispatch. Milestone order remains intact: M12 remediation/review is the only active work before M13 `t_bf02e8bf` can promote.
+- Current repo state: branch `master`; `HEAD` `61ce614` (`docs: record M12 security review blocker`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: no new manager-run repo tests this tick. Verified blocker evidence from `t_c8f027f4`: `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 161 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/api odooctl/runner odooctl/security tests/test_api.py tests/test_runner.py tests/test_security.py` — passed; direct RBAC probe reproduced the protected-env authorization gap.
+- Blockers: `t_c8f027f4` remains a real implementation blocker, not a user-decision blocker. Rami input is not needed yet because the required next step is concrete backend remediation already defined by the security review.
+- Auto-resolved this run: created `t_c68f5587` (**M12 protected-env RBAC remediation**) assigned to `odoo-backend`, linked it as a parent of `t_c8f027f4`, commented the review task with the recovery plan, ran `hermes kanban --board odooctl dispatch`, and verified the backend worker spawned. This was safe because the blocker was actionable engineering work within M12, with a clear fix/test shape and no product/policy ambiguity.
+- Next step: let `odoo-backend` finish `t_c68f5587`, then re-run/unblock `t_c8f027f4` so `odoo-security` can verify the fix and either approve M12 or report any remaining issue.
+
 ### 2026-05-31 00:00 UTC — M12 security review blocked
 
 **Changed files:**

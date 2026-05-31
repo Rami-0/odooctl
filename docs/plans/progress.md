@@ -26,8 +26,8 @@ Primary plan index: `docs/plans/README.md`
 **Result:** M14 security review approved. The prior B1 blocker is remediated, DR drill remains throwaway/cleanup-safe, remote backup encryption manifests record only non-secret metadata/env references, API/runner dispatch protects `dr_drill` as restore-class work, and domain operations remain CLI-only through the reverse-proxy abstraction.
 
 **Reviewed commit SHA:** `02b681e`
-**Review progress commit SHA:** pending
-**Push status:** pending.
+**Review progress commit SHA:** `276e13d`
+**Push status:** succeeded — pushed review progress commit `276e13d` to `origin/master`.
 **Blockers:** none.
 **Non-blocking follow-ups for later:** validate/reject unsafe domain values before writing Traefik `Host(...)` rules; align `clone.py` production-source sanitization guard with `cfg.is_protected(source)` instead of literal `source == "production"`; add an upfront `temp_db != target_db` guard in `restore_to_env` before any restore; make `DomainService.attach` more robust for envs materialized via defaults.
 **Next step:** M15 migration assistant (`t_8b7a971e`) may proceed after this review-progress entry is committed and pushed.

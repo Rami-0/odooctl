@@ -20,8 +20,8 @@ Primary plan index: `docs/plans/README.md`
 - Remote/auth status: `gh auth status` healthy for `Rami-0`; `gh pr status` shows no PR associated with `master` and no open PRs.
 - Blockers: none. No user input, credential action, or policy decision is currently required.
 - Auto-resolved this run: none. I ran `hermes kanban --board odooctl dispatch` to verify there were no stale/promotable tasks; nothing changed and no workers were spawned.
-- Progress-file commit SHA: pending local manager update.
-- Push status: pending local manager update.
+- Progress-file commit SHA: `facc6e4`
+- Push status: succeeded — pushed manager progress update `facc6e4` to `origin/master`.
 - Next step: no further Kanban action is required for the current M6-M15 sprint; treat the control-plane chain as release-ready unless/until a new post-M15 milestone or follow-up card set is intentionally opened.
 
 ### 2026-05-31 09:21 UTC — M15 final release review approved

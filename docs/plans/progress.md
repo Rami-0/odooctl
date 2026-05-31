@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 02:01 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_c8f027f4` — **M12 security review** assigned to `odoo-security`; status `running` after this manager pass closed the remediation handoff and re-dispatched the review worker.
+- Done since last run: `t_c68f5587` — **M12 protected-env RBAC remediation** is now manager-approved/closed. The blocker was manager-resolvable because the backend worker had already pushed the fix, included exact regression coverage, and left no unresolved product/policy questions.
+- Board status: `done=14`, `running=1`, `blocked=0`, `ready=0`, `todo=6` after dispatch. Milestone order remains intact: M12 security review is the only active card before M13 `t_bf02e8bf` can promote.
+- Current repo state: branch `master`; `HEAD` `811b4bf` (`docs: record M12 RBAC remediation push`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: manager reran `uv run pytest tests/test_api.py::test_operator_cannot_enqueue_destructive_op_on_protected_env tests/test_api.py::test_admin_can_enqueue_destructive_op_on_protected_env tests/test_runner.py::test_runner_rejects_protected_destructive_op_with_operator_role -q` — 3 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 164 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/api/routes_operations.py odooctl/runner/worker.py tests/test_api.py tests/test_runner.py` — passed.
+- Push status: no new milestone-code push existed before this manager progress update; repo was already synced to `origin/master` at `811b4bf`. GitHub auth remains healthy (`gh auth status` OK; `gh auth setup-git` succeeded).
+- Blockers: none currently on the board. The prior remediation handoff did not require Rami input because the required action was a procedural approval/re-dispatch step backed by passing local verification and a synced remote state.
+- Auto-resolved this run: completed `t_c68f5587` with a manager approval summary/metadata, unblocked `t_c8f027f4`, ran `hermes kanban --board odooctl dispatch`, and verified the security review respawned as run `#37`. This was safe because the child task explicitly required an independent re-review rather than a user decision.
+- Next step: let `odoo-security` finish `t_c8f027f4`; if it approves M12, verify M13 Web UI MVP `t_bf02e8bf` promotes/spawns next.
+
 ### 2026-05-31 01:13 UTC — M12 protected-env RBAC remediation
 
 **Changed files:**

@@ -12,6 +12,20 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 02:07 UTC — M12 security re-review approved
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded the M12 security re-review approval, verification evidence, non-blocking notes, and next milestone.
+
+**Review scope:** `811b4bf` (M12 API/runner implementation plus protected-env RBAC remediation).
+**Tests:** Claude Code Opus read-only security re-review — approved with no blocking findings; focused protected-env RBAC regressions `uv run pytest tests/test_api.py::test_operator_cannot_enqueue_destructive_op_on_protected_env tests/test_api.py::test_admin_can_enqueue_destructive_op_on_protected_env tests/test_runner.py::test_runner_rejects_protected_destructive_op_with_operator_role -q` — 3 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 164 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/api odooctl/runner odooctl/security tests/test_api.py tests/test_runner.py tests/test_security.py` — all checks passed.
+**Result:** Approved — the prior protected-environment RBAC blocker is remediated. API enqueue resolves target environment protection before authorization, passes `protected=...` to RBAC, and signs principal roles into scoped capability tokens; the privileged runner verifies token scope/signature, reconstructs a token-derived principal, independently recomputes protected status, and re-checks RBAC before nonce consumption, lock acquisition, or dispatch.
+**Reviewed commit SHA:** `811b4bf`
+**Push status:** pending for this progress-only review entry.
+**Blockers:** none.
+**Non-blocking follow-ups for later:** gate `POST /operations/{id}/cancel` behind a write/operator-level policy rather than read-family `Action.OPERATIONS`; add project/org scoping for operation reads before any shared/multi-tenant deployment; consider shorter runner capability TTL, nonce-store pruning, and documenting the dual API+runner protected-env enforcement invariant.
+**Next step:** M13 Web UI MVP (`t_bf02e8bf`) may proceed after this review progress entry is committed and pushed.
+
 ### 2026-05-31 02:01 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_c8f027f4` — **M12 security review** assigned to `odoo-security`; status `running` after this manager pass closed the remediation handoff and re-dispatched the review worker.

@@ -12,6 +12,28 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 — M13 Web UI MVP implemented
+
+**Changed files:**
+- `pyproject.toml` — force-includes `odooctl/web/dist/` in both wheel and sdist builds so packaged installs serve the SPA assets.
+- `odooctl/api/app.py` — serves static SPA assets with a catch-all route registered after API routes, falls back to `index.html` for client-side routes, and uses `Path.relative_to()` to prevent static path traversal/sibling-directory leakage.
+- `odooctl/commands/serve.py` — auto-detects bundled `odooctl/web/dist/` when `--static-dir` is omitted while preserving explicit `--static-dir` overrides.
+- `odooctl/web/__init__.py` — package marker for runner-contract scanning with no privileged imports.
+- `odooctl/web/README.md` — developer notes for the no-build static SPA, API-only architecture, routes, RBAC display gating, confirmations, SSE streaming, and runner contract.
+- `odooctl/web/dist/index.html` — packaged SPA shell served by `odooctl serve`.
+- `odooctl/web/dist/app.js` — vanilla JS dashboard: token handling, projects page, project/environment detail, Overview/Doctor/Operations/Backups/Clone/Promote tabs, RBAC hide/disable logic, typed confirmations, operation enqueue, and SSE log streaming through `/operations/{id}/events`.
+- `odooctl/web/dist/style.css` — dashboard styling for cards, tabs, forms, badges, logs, and responsive layouts.
+- `docs/web-ui.md` — M13 UI documentation covering serving model, file layout, run commands, hash routes, RBAC display gating, destructive-action confirmation keywords, SSE streaming, and runner-contract checks.
+- `tests/test_web.py` — 38 tests covering packaged asset presence/content, pyproject build inclusion, API-only/privilege-split constraints, Doctor/Clone/Promote/backup/SSE affordances, FastAPI static serving and API priority, traversal guard behavior, serve-command auto-detection, and docs presence.
+- `docs/plans/progress.md` — recorded M13 implementation and verification evidence.
+
+**Tests:** `uv run pytest tests/test_web.py tests/test_api.py::test_api_does_not_import_privileged -q` — 38 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_web.py tests/test_api.py tests/test_security.py -q` — 180 passed, 1 StarletteDeprecationWarning; `uv run pytest -q` — 575 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; wheel/sdist manifest smoke verified `odooctl/web/dist/index.html`, `app.js`, `style.css`, and `odooctl/web/README.md` are packaged.
+**Result:** M13 Web UI MVP implemented: `odooctl serve` now serves the packaged static SPA by default; UI reads/enqueues/streams only via API endpoints; projects, environment detail, status/doctor/backups/operations, clone/promote, typed confirmations, RBAC display gating, and streaming logs are covered by docs and tests.
+**Implementation commit SHA:** pending.
+**Push status:** pending.
+**Blockers:** none.
+**Next step:** commit and push M13, then proceed to M13 review gate (`t_cddc7524`).
+
 ### 2026-05-31 02:07 UTC — M12 security re-review approved
 
 **Changed files:**
@@ -631,13 +653,13 @@ Primary plan index: `docs/plans/README.md`
 
 ### M13 — Web UI MVP
 
-- [ ] Add web asset/app structure.
-- [ ] Projects page.
-- [ ] Environment detail page.
-- [ ] Doctor/status/backups/operations views.
-- [ ] Clone/promote operation buttons.
-- [ ] Streaming operation logs.
-- [ ] Verify UI only talks to API.
+- [x] Add web asset/app structure.
+- [x] Projects page.
+- [x] Environment detail page.
+- [x] Doctor/status/backups/operations views.
+- [x] Clone/promote operation buttons.
+- [x] Streaming operation logs.
+- [x] Verify UI only talks to API.
 
 ### M14 — Domain/SSL and backup UX
 

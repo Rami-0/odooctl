@@ -25,8 +25,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Follow-up created:** `t_a11a2123` — M14 security remediation: sanitize production-to-staging restores, assigned to `odoo-backend` and dependent on this review card.
 
-**Commit SHA:** pending.
-**Push status:** pending.
+**Review progress commit SHA:** `99c8e0b`
+**Push status:** succeeded — pushed review progress commit `99c8e0b` to `origin/master`.
 **Blockers:** M14 security approval blocked on B1 remediation and re-review.
 **Next step:** `odoo-backend` should remediate B1, add regression coverage/docs, rerun gates, commit/push, then return to security review.
 

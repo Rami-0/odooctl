@@ -12,6 +12,24 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 09:21 UTC — M15 final release review approved
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded final M6-M15 release review approval and checked off M15 milestone items.
+
+**Review scope:** Final release review of the M6-M15 control-plane chain at `HEAD` `74ad75b` (`origin/master` matched local `HEAD` before this progress update), with emphasis on M15 migration assistant CLI/API/runner/SPA/docs/tests wiring, migration safety invariants, OpenUpgrade gating, RBAC, release blockers, and commit/push hygiene.
+
+**Tests/checks:** Claude Code Opus read-only release review — approved with no blocking findings; `uv run pytest tests/test_migration.py -q` — 62 passed; `uv run pytest -q` — 723 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — all checks passed; `node --check odooctl/web/dist/app.js` — passed; `uv run python -m build` — succeeded.
+
+**Result:** M15 and the M6-M15 release chain are approved. The migration assistant remains rehearsal/evidence/reporting only, never a blind production upgrade: unsupported matrix paths fail before DB work, OpenUpgrade-required paths fail clearly without `--openupgrade`, healthchecks target the throwaway DB, reports are saved on failure, cleanup status is explicit, and production-source rehearsal enqueue is protected by restore-class RBAC.
+
+**Reviewed commit SHA:** `74ad75b`
+**Review progress commit SHA:** pending — this entry is being committed after verification.
+**Push status:** pending — this review progress update will be pushed after commit.
+**Blockers:** none.
+**Non-blocking follow-ups for later:** consider a friendlier CLI hint/default for OpenUpgrade-required paths; consider hiding or disabling the SPA Migrate action for operator users on protected source environments before the server-side admin check returns 403; document that most non-backup/clone/DR/migration operation kinds remain CLI-only and intentionally unsupported by the runner.
+**Next step:** close the M15 final review card and treat the M6-M15 control-plane chain as release-ready.
+
 ### 2026-05-31 09:17 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_4e32db27` — **M15 final release review** is now **running** on `odoo-reviewer` as run `#50` after this manager pass approved and closed the parent M15 implementation handoff. No other cards are running.
@@ -934,10 +952,10 @@ Primary plan index: `docs/plans/README.md`
 - [x] Add DR drill operation.
 - [x] Add encrypted off-site backup option (manifest metadata records algorithm + key env ref; no key material stored).
 
-### M15 — Migration assistant
+### M15 — Migration assistant ✓ DONE
 
-- [ ] Add migration matrix.
-- [ ] Add module readiness scan.
-- [ ] Add upgrade rehearsal operation.
-- [ ] Add OpenUpgrade hook support.
-- [ ] Add migration report output/API/UI.
+- [x] Add migration matrix.
+- [x] Add module readiness scan.
+- [x] Add upgrade rehearsal operation.
+- [x] Add OpenUpgrade hook support.
+- [x] Add migration report output/API/UI.

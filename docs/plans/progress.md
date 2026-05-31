@@ -30,9 +30,9 @@ Primary plan index: `docs/plans/README.md`
 **Tests:** `uv run pytest tests/test_web.py tests/test_api.py::test_api_does_not_import_privileged -q` — 38 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_web.py tests/test_api.py tests/test_security.py -q` — 180 passed, 1 StarletteDeprecationWarning; `uv run pytest -q` — 575 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; wheel/sdist manifest smoke verified `odooctl/web/dist/index.html`, `app.js`, `style.css`, and `odooctl/web/README.md` are packaged.
 **Result:** M13 Web UI MVP implemented: `odooctl serve` now serves the packaged static SPA by default; UI reads/enqueues/streams only via API endpoints; projects, environment detail, status/doctor/backups/operations, clone/promote, typed confirmations, RBAC display gating, and streaming logs are covered by docs and tests.
 **Implementation commit SHA:** `c370d0c`
-**Push status:** pending for final progress metadata commit.
+**Push status:** succeeded — pushed implementation commit `c370d0c` and progress commit `df776e7` to `origin/master`.
 **Blockers:** none.
-**Next step:** commit and push M13, then proceed to M13 review gate (`t_cddc7524`).
+**Next step:** M13 review gate (`t_cddc7524`).
 
 ### 2026-05-31 02:07 UTC — M12 security re-review approved
 

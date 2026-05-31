@@ -25,8 +25,8 @@ Primary plan index: `docs/plans/README.md`
 
 **Tests:** focused new regressions: `uv run pytest tests/test_api.py::test_admin_can_enqueue_dr_drill_on_protected_env tests/test_api.py::test_operator_cannot_enqueue_dr_drill_on_protected_env tests/test_runner.py::test_runner_claims_and_executes_dr_drill tests/test_operations.py::test_operation_kind_values -q` — 4 passed, 1 StarletteDeprecationWarning; focused milestone/API/runner suite: `uv run pytest tests/test_api.py tests/test_runner.py tests/test_operations.py tests/test_dr.py tests/test_m14_web.py -q` — 106 passed, 1 StarletteDeprecationWarning; touched-file ruff: `uv run ruff check odooctl/api/routes_operations.py odooctl/runner/worker.py odooctl/operations/models.py tests/test_api.py tests/test_runner.py tests/test_operations.py` — passed; full repo: `uv run pytest -q` — 656 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — passed; `uv run python -m build` — succeeded.
 **Result:** M14 implementation is now end-to-end complete: the SPA `dr_drill` operation kind is accepted by the API, protected by restore-class RBAC, executable by the privileged runner via the DR drill service, and covered by regression tests. The earlier manager-verified implementation blocker is resolved.
-**Implementation commit SHA:** pending
-**Push status:** pending
+**Implementation commit SHA:** `13774f3`
+**Push status:** succeeded — pushed implementation commit `13774f3` to `origin/master`.
 **Blockers:** none.
 **Next step:** commit/push M14, then hand off to M14 security review (`t_5c9d0fea`).
 

@@ -381,3 +381,204 @@ def test_restore_to_env_source_can_be_production(tmp_path):
             ctx=ctx,
         )
     assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# B1 security remediation: production-source restore must sanitize
+# ---------------------------------------------------------------------------
+
+CONFIG_STAGING_NO_SANITIZE = """\
+project:
+  name: bv-test
+  odoo_version: "19.0"
+runtime:
+  compose_file: docker-compose.yml
+postgres:
+  password_env: ODOO_DB_PASSWORD
+odoo:
+  image: odoo:19.0
+environments:
+  production:
+    branch: main
+    domain: odoo.example.com
+    db_name: odoo_prod
+    filestore_path: ./filestore/prod
+  staging:
+    branch: staging
+    domain: staging.example.com
+    db_name: odoo_staging
+    filestore_path: ./filestore/staging
+    sanitize: false
+"""
+
+CONFIG_THREE_ENVS = """\
+project:
+  name: bv-test
+  odoo_version: "19.0"
+runtime:
+  compose_file: docker-compose.yml
+postgres:
+  password_env: ODOO_DB_PASSWORD
+odoo:
+  image: odoo:19.0
+environments:
+  production:
+    branch: main
+    domain: odoo.example.com
+    db_name: odoo_prod
+    filestore_path: ./filestore/prod
+  staging:
+    branch: staging
+    domain: staging.example.com
+    db_name: odoo_staging
+    filestore_path: ./filestore/staging
+    sanitize: true
+  qa:
+    branch: qa
+    domain: qa.example.com
+    db_name: odoo_qa
+    filestore_path: ./filestore/qa
+    sanitize: true
+"""
+
+
+def test_restore_to_env_sanitizes_temp_db_for_production_source(tmp_path):
+    """production→staging restore must call sanitize_database on the temp DB."""
+    from odooctl.services.restore import restore_to_env
+    from odooctl.services.context import ServiceContext
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(MINIMAL_CONFIG)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    backups_root = tmp_path / "backups"
+    backups_root.mkdir()
+    _make_valid_backup(backups_root, "production")
+
+    sanitize_calls = []
+
+    with patch("odooctl.services.restore.sanitize_database",
+               side_effect=lambda pg, db, env, cfg, **kw: sanitize_calls.append(db)), \
+         patch("odooctl.services.restore.PostgresAdapter", return_value=MagicMock()), \
+         patch("odooctl.services.restore.FilestoreAdapter", return_value=MagicMock()), \
+         patch("odooctl.services.restore.check_url"):
+        restore_to_env(
+            source_environment="production",
+            target_environment="staging",
+            backup="latest",
+            ctx=ctx,
+        )
+
+    assert sanitize_calls, "sanitize_database must be called for production→staging restore"
+    assert sanitize_calls[0] == "odoo_staging_incoming"
+
+
+def test_restore_to_env_sanitizes_before_swap(tmp_path):
+    """sanitize_database must run on the temp DB BEFORE swap_temp_database."""
+    from odooctl.services.restore import restore_to_env
+    from odooctl.services.context import ServiceContext
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(MINIMAL_CONFIG)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    backups_root = tmp_path / "backups"
+    backups_root.mkdir()
+    _make_valid_backup(backups_root, "production")
+
+    call_order = []
+
+    mock_pg = MagicMock()
+    mock_pg.psql.side_effect = lambda *a, **kw: call_order.append("psql")
+
+    with patch("odooctl.services.restore.sanitize_database",
+               side_effect=lambda *a, **kw: call_order.append("sanitize")), \
+         patch("odooctl.services.restore.PostgresAdapter", return_value=mock_pg), \
+         patch("odooctl.services.restore.FilestoreAdapter", return_value=MagicMock()), \
+         patch("odooctl.services.restore.check_url",
+               side_effect=lambda *a, **kw: call_order.append("healthcheck")):
+        restore_to_env(
+            source_environment="production",
+            target_environment="staging",
+            backup="latest",
+            ctx=ctx,
+        )
+
+    assert "sanitize" in call_order
+    assert "psql" in call_order, "swap_temp_database must call psql"
+    assert "healthcheck" in call_order
+    sani = call_order.index("sanitize")
+    swap = call_order.index("psql")
+    hc = call_order.index("healthcheck")
+    assert sani < swap < hc, f"Expected sanitize < swap < healthcheck, got {call_order}"
+
+
+def test_restore_to_env_refuses_production_source_when_target_sanitize_disabled(tmp_path):
+    """production→staging restore must refuse if staging.sanitize is false."""
+    from odooctl.services.restore import restore_to_env
+    from odooctl.services.context import ServiceContext
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(CONFIG_STAGING_NO_SANITIZE)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    with pytest.raises(RuntimeError, match="sanitiz"):
+        restore_to_env(
+            source_environment="production",
+            target_environment="staging",
+            backup="latest",
+            ctx=ctx,
+        )
+
+
+def test_restore_to_env_refuses_before_any_restore_for_unsanitized_production(tmp_path):
+    """Sanitize refusal must happen before any DB restore attempt."""
+    from odooctl.services.restore import restore_to_env
+    from odooctl.services.context import ServiceContext
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(CONFIG_STAGING_NO_SANITIZE)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    called = []
+    with patch("odooctl.services.restore.PostgresAdapter",
+               side_effect=lambda *a, **kw: called.append("postgres")):
+        with pytest.raises(RuntimeError):
+            restore_to_env(
+                source_environment="production",
+                target_environment="staging",
+                backup="latest",
+                ctx=ctx,
+            )
+
+    assert called == [], "PostgresAdapter must not be instantiated before the sanitization refusal"
+
+
+def test_restore_to_env_does_not_sanitize_for_non_protected_source(tmp_path):
+    """staging→qa restore (non-protected source) must NOT call sanitize_database."""
+    from odooctl.services.restore import restore_to_env
+    from odooctl.services.context import ServiceContext
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(CONFIG_THREE_ENVS)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    backups_root = tmp_path / "backups"
+    backups_root.mkdir()
+    _make_valid_backup(backups_root, "staging")
+
+    sanitize_calls = []
+
+    with patch("odooctl.services.restore.sanitize_database",
+               side_effect=lambda *a, **kw: sanitize_calls.append(True)), \
+         patch("odooctl.services.restore.PostgresAdapter", return_value=MagicMock()), \
+         patch("odooctl.services.restore.FilestoreAdapter", return_value=MagicMock()), \
+         patch("odooctl.services.restore.check_url"):
+        restore_to_env(
+            source_environment="staging",
+            target_environment="qa",
+            backup="latest",
+            ctx=ctx,
+        )
+
+    assert not sanitize_calls, "sanitize_database must NOT be called for non-protected source"

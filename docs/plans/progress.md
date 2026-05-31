@@ -12,6 +12,21 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 — M14 B1 security remediation: production-source restore sanitization
+
+**Changed files:**
+- `odooctl/services/restore.py` — added `sanitize_database` module-level import; in `restore_to_env`: moved `env = cfg.env(target_environment)` before backup resolution; added `source_is_protected = cfg.is_protected(source_environment)` guard that refuses production-source cross-env restore when `env.sanitize` is `False`; added `sanitize_database(pg, temp_db, env, cfg, sql_files=ctx.project.sanitization_sql_files())` call after filestore restore and before `swap_temp_database` when source is protected — mirroring the clone safety contract.
+- `tests/test_backup_verify.py` — added 5 regression tests: `test_restore_to_env_sanitizes_temp_db_for_production_source` (sanitize called, temp DB name correct), `test_restore_to_env_sanitizes_before_swap` (ordering: sanitize < swap < healthcheck), `test_restore_to_env_refuses_production_source_when_target_sanitize_disabled` (RuntimeError matches "sanitiz"), `test_restore_to_env_refuses_before_any_restore_for_unsanitized_production` (PostgresAdapter not instantiated before refusal), `test_restore_to_env_does_not_sanitize_for_non_protected_source` (staging→qa: no sanitize call).
+- `docs/disaster-recovery.md` — documented the mandatory sanitization requirement for protected-source cross-env restores; updated Safety invariants section to list all four new guarantees.
+- `docs/plans/progress.md` — this entry.
+
+**Tests:** TDD — 4 tests RED before implementation, all 5 GREEN after; full suite: `uv run pytest -q` — 661 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/services/restore.py tests/test_backup_verify.py` — all checks passed.
+**Result:** B1 remediated. `restore_to_env` now refuses production-source cross-env restores when target has `sanitize: false` (before any DB work); when allowed, the temp DB is sanitized using target env settings and project SQL files before the atomic swap — PII/credentials/live integrations are scrubbed before data is promoted into the target DB name.
+**Implementation commit SHA:** placeholder
+**Push status:** pending
+**Blockers:** none.
+**Next step:** return to M14 security re-review gate.
+
 ### 2026-05-31 07:15 UTC — M14 security review blocked
 
 **Changed files:**

@@ -62,6 +62,19 @@ Safety rules:
 - The source backup is validated (checksums) but the environment mismatch check is intentionally skipped so cross-environment restores work.
 - The DB dump is restored into a temporary `{target_db}{temp_db_suffix}` database first, then swapped into the target DB name before healthcheck. The target filestore is restored as part of the staging flow.
 - A healthcheck is run against the target after restore.
+- **Sanitization is mandatory when the source environment is protected (production).** The target environment must have `sanitize: true`; if it does not, the restore is refused before any DB work begins. Sanitization runs on the temp DB before the atomic swap — production PII, credentials, and live integrations are scrubbed before the data is promoted into the target.
+
+To enable cross-env restore from production, set `sanitize: true` on the target environment in `odooctl.yml`:
+
+```yaml
+environments:
+  staging:
+    branch: staging
+    domain: staging.example.com
+    db_name: odoo_staging
+    filestore_path: /var/lib/odoo/filestore/odoo_staging
+    sanitize: true   # required for production→staging restore
+```
 
 ## DR drills
 
@@ -130,7 +143,9 @@ For real S3 uploads, the adapter passes the matching `ServerSideEncryption` and 
 ## Safety invariants
 
 - Production is never used as a restore *target* (enforced in `restore_to_env`).
-- Restore-to-staging restores the DB into a temporary incoming DB and swaps before target healthcheck.
+- Cross-env restore from a protected source (production) is refused if the target environment has `sanitize: false` — the refusal happens before any DB or filesystem work.
+- When source is protected, the temp DB is sanitized (mail servers, crons, payment providers, API keys, webhooks) before the atomic swap promotes it into the target DB name.
+- Restore-to-staging restores the DB into a temporary incoming DB, sanitizes it, and swaps before target healthcheck.
 - DR drill throwaway DB is always dropped in a `finally` block.
 - Backup checksums are verified before any restore or drill.
 - Remote S3 encryption metadata is recorded in the backup manifest and real boto3 uploads request S3 server-side encryption; no key material is stored.

@@ -11,6 +11,7 @@ from odooctl.adapters.filestore import FilestoreAdapter, make_filestore_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.odoo.healthcheck import check_url, with_db_selector
+from odooctl.odoo.sanitize import sanitize_database
 from odooctl.services.models import RestoreResult
 
 if TYPE_CHECKING:
@@ -93,11 +94,19 @@ def restore_to_env(
             "Use a non-production target (e.g. staging)."
         )
 
+    env = cfg.env(target_environment)
+    source_is_protected = cfg.is_protected(source_environment)
+    if source_is_protected and not env.sanitize:
+        raise RuntimeError(
+            f"Refusing to restore protected-environment backup ({source_environment!r}) "
+            f"into {target_environment!r} without sanitization. "
+            "Set sanitize: true on the target environment."
+        )
+
     backup_dir = resolve_backup_dir(source_environment, backup, ctx.project.backups_dir)
     # Validate checksums but skip environment-mismatch check (cross-env restore)
     validate_backup_dir(backup_dir, expected_project=cfg.project.name)
 
-    env = cfg.env(target_environment)
     temp_db = env.db_name + cfg.sanitization.temp_db_suffix
 
     pg = make_context_db_adapter(ctx.project) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
@@ -107,6 +116,10 @@ def restore_to_env(
     target_filestore = env.filestore_path if env.filestore_volume else str(ctx.project.resolve_path(env.filestore_path))
     fs = make_filestore_adapter(ctx.project, env) if env.filestore_volume else FilestoreAdapter()
     fs.restore_archive(backup_dir / "filestore.tar", target_filestore)
+
+    # Mirror clone safety contract: sanitize temp DB before swap when source is protected
+    if source_is_protected:
+        sanitize_database(pg, temp_db, env, cfg, sql_files=ctx.project.sanitization_sql_files())
 
     # Atomically promote temp DB into the target DB name
     swap_temp_database(pg, temp_db=temp_db, target_db=env.db_name, target_env_name=target_environment)

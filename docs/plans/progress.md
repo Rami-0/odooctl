@@ -22,7 +22,8 @@ Primary plan index: `docs/plans/README.md`
 **Result:** Approved — `odooctl serve` serves the packaged static SPA after API routes; the UI talks only to API endpoints, uses typed confirmations for destructive flows, applies RBAC only as display gating while server RBAC remains authoritative, streams operation logs with authenticated fetch/SSE, and ships with focused tests, docs, build packaging, and a clean synced repo.
 **Reviewed commit SHA:** `d937c9d`
 **Review progress commit SHA:** `c8a04b5`
-**Push status:** pending — will push review progress commit `c8a04b5` and this push-status follow-up after commit.
+**Review push-status commit SHA:** `a1141e7`
+**Push status:** succeeded — pushed review progress commit `c8a04b5` and push-status follow-up `a1141e7` to `origin/master`; final push-status update is recorded in the Kanban handoff.
 **Blockers:** none.
 **Non-blocking follow-ups for later:** clamp `max_polls` on `GET /operations/{id}/events`; cache `index.html` instead of synchronous `read_text()` per fallback request; add project/org scoping before any multi-tenant operation reads/cancels; decide later whether typoed API-like paths should 404 instead of returning SPA HTML.
 **Next step:** M14 domain/SSL and backup UX (`t_e777c704`) may proceed after this review progress entry is committed and pushed.

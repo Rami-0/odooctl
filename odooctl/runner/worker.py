@@ -30,7 +30,8 @@ from odooctl.operations.models import (
     _utcnow,
 )
 from odooctl.operations.store import OperationStore
-from odooctl.security import tokens
+from odooctl.security import rbac, tokens
+from odooctl.security.principals import Principal, PrincipalKind, Role
 from odooctl.security.tokens import TokenError
 from odooctl.services.backup import run_backup
 from odooctl.services.clone import run_clone
@@ -38,6 +39,19 @@ from odooctl.services.context import ServiceContext
 
 if TYPE_CHECKING:
     from odooctl.registry import Registry
+
+
+_KIND_ACTION: dict[str, rbac.Action] = {
+    "backup": rbac.Action.BACKUP,
+    "restore": rbac.Action.RESTORE,
+    "clone": rbac.Action.CLONE,
+    "deploy": rbac.Action.DEPLOY,
+    "promote": rbac.Action.PROMOTE,
+    "env_create": rbac.Action.ENV,
+    "env_destroy": rbac.Action.ENV,
+    "update_modules": rbac.Action.DEPLOY,
+    "rollback": rbac.Action.RESTORE,
+}
 
 
 class NonceStore:
@@ -123,6 +137,18 @@ class RunnerWorker:
             )
         except TokenError as exc:
             store.update_status(entry.op_id, OperationStatus.FAILED, error=f"token error: {exc}")
+            queue.fail(entry.op_id)
+            return
+
+        # Defensive RBAC floor: do not trust queue shape alone. Reconstruct the
+        # token-derived principal and enforce the same protected-env floor that
+        # the API applied before enqueueing.
+        try:
+            action = _KIND_ACTION[entry.kind]
+            protected = ctx.config.is_protected(entry.environment)
+            rbac.require(_principal_from_payload(payload), action, protected=protected)
+        except (KeyError, ValueError, rbac.AccessDenied) as exc:
+            store.update_status(entry.op_id, OperationStatus.FAILED, error=f"rbac error: {exc}")
             queue.fail(entry.op_id)
             return
 
@@ -217,3 +243,23 @@ def _dispatch(entry: QueueEntry, svc_ctx: ServiceContext, op_ctx: OperationConte
 
     else:
         raise ValueError(f"Unsupported operation kind in runner: {kind!r}")
+
+
+def _principal_from_payload(payload: dict) -> Principal:
+    roles_raw = payload.get("roles", [])
+    roles: list[Role] = []
+    if isinstance(roles_raw, list):
+        for role in roles_raw:
+            try:
+                roles.append(Role(role))
+            except ValueError:
+                continue
+
+    subject = str(payload.get("sub", "api-client"))
+    return Principal(
+        id=subject,
+        org_id=str(payload.get("org", "default")),
+        kind=PrincipalKind.TOKEN,
+        roles=frozenset(roles),
+        display=subject,
+    )

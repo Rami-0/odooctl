@@ -66,6 +66,18 @@ def _mint_operator(now=None):
     )
 
 
+def _mint_admin(now=None):
+    return tokens.mint(
+        TEST_KEY,
+        action="api",
+        environment="*",
+        project="*",
+        ttl_seconds=300,
+        now=now,
+        roles=["admin"],
+    )
+
+
 @pytest.fixture
 def project_dir(tmp_path):
     (tmp_path / "odooctl.yml").write_text(MINIMAL_CONFIG)
@@ -326,6 +338,28 @@ def test_non_api_token_rejected_by_auth(client):
     )
     resp = client.get("/projects", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401
+
+
+def test_operator_cannot_enqueue_destructive_op_on_protected_env(client):
+    """Operator must get 403 for destructive ops targeting a protected environment."""
+    token = _mint_operator()
+    resp = client.post(
+        "/projects/test-project/operations",
+        json={"kind": "clone", "environment": "production", "params": {"source": "staging"}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_can_enqueue_destructive_op_on_protected_env(client):
+    """Admin must succeed for destructive ops on protected environments."""
+    token = _mint_admin()
+    resp = client.post(
+        "/projects/test-project/operations",
+        json={"kind": "clone", "environment": "production", "params": {"source": "staging"}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 202
 
 
 def test_cancel_operation_removes_queue_file(client, project_dir):

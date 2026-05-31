@@ -91,16 +91,24 @@ def enqueue_operation(
     from odooctl.security import rbac, tokens
     from odooctl.security.redaction import redact
 
+    ctx = _load_ctx(request, project)
+
+    # Resolve the target environment before authorization so protected-env
+    # policy is applied to the actual enqueue target.
+    try:
+        protected = ctx.config.is_protected(body.environment)
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # RBAC check for the specific operation kind
     action = _KIND_ACTION.get(body.kind)
     if action is None:
         raise HTTPException(status_code=400, detail=f"Unknown operation kind: {body.kind!r}")
     try:
-        rbac.require(principal, action)
+        rbac.require(principal, action, protected=protected)
     except rbac.AccessDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    ctx = _load_ctx(request, project)
     api_key: str = request.app.state.api_key
 
     # Redact user-supplied params before recording
@@ -130,6 +138,7 @@ def enqueue_operation(
         project=project,
         ttl_seconds=3600,
         subject=principal.id,
+        roles=[role.value for role in principal.roles],
     )
 
     # Write queue entry

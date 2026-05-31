@@ -12,6 +12,26 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 08:16 UTC — M14 security re-review approved
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded M14 security re-review approval, B1 verification, validation checks, non-blocking follow-ups, and push hygiene.
+
+**Review scope:** re-reviewed M14 Traefik/ACME/domain attach/verify/detach, backup verification/encryption metadata, restore-to-staging, DR drill, API enqueue/runner dispatch paths, and the B1 remediation at current `HEAD` `02b681e` (B1 code remediation commit `6e367e9`, push-status commit `46213c8`).
+
+**B1 verification:** approved. `odooctl/services/restore.py::restore_to_env` now refuses protected-source cross-env restores when the target has `sanitize: false` before backup resolution or DB adapter creation; when allowed, it restores into the temp DB, restores filestore data, sanitizes the temp DB with target-env settings/project SQL files, then swaps the temp DB into the target DB name. This keeps protected-source PII/secrets/live integrations out of the promoted staging database and mirrors the clone safety contract.
+
+**Tests/checks:** Claude Code Opus read-only security re-review — approved with no blocking findings; `uv run pytest tests/test_backup_verify.py tests/test_dr.py tests/test_domain.py tests/test_restore_points.py tests/test_runner.py tests/test_api.py -q` — 120 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/services/restore.py odooctl/domains/ odooctl/services/domain.py` — passed; `uv run pytest -q` — 661 passed, 1 StarletteDeprecationWarning.
+
+**Result:** M14 security review approved. The prior B1 blocker is remediated, DR drill remains throwaway/cleanup-safe, remote backup encryption manifests record only non-secret metadata/env references, API/runner dispatch protects `dr_drill` as restore-class work, and domain operations remain CLI-only through the reverse-proxy abstraction.
+
+**Reviewed commit SHA:** `02b681e`
+**Review progress commit SHA:** pending
+**Push status:** pending.
+**Blockers:** none.
+**Non-blocking follow-ups for later:** validate/reject unsafe domain values before writing Traefik `Host(...)` rules; align `clone.py` production-source sanitization guard with `cfg.is_protected(source)` instead of literal `source == "production"`; add an upfront `temp_db != target_db` guard in `restore_to_env` before any restore; make `DomainService.attach` more robust for envs materialized via defaults.
+**Next step:** M15 migration assistant (`t_8b7a971e`) may proceed after this review-progress entry is committed and pushed.
+
 ### 2026-05-31 08:13 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_5c9d0fea` — **M14 security review** is back to **running** on `odoo-security` as run `#47` after this manager pass approved the remediation handoff and re-dispatched the review gate. No other cards are running.

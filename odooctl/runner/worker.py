@@ -35,6 +35,7 @@ from odooctl.security.principals import Principal, PrincipalKind, Role
 from odooctl.security.tokens import TokenError
 from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.filestore import FilestoreAdapter
+from odooctl.migration.rehearse import rehearse_upgrade, UpgradeResult
 from odooctl.services.backup import run_backup
 from odooctl.services.clone import run_clone
 from odooctl.services.context import ServiceContext
@@ -55,6 +56,7 @@ _KIND_ACTION: dict[str, rbac.Action] = {
     "update_modules": rbac.Action.DEPLOY,
     "rollback": rbac.Action.RESTORE,
     "dr_drill": rbac.Action.RESTORE,
+    "migrate_rehearsal": rbac.Action.RESTORE,
 }
 
 
@@ -270,6 +272,86 @@ def _dispatch(entry: QueueEntry, svc_ctx: ServiceContext, op_ctx: OperationConte
         if result.status != "success":
             raise RuntimeError(result.message or "DR drill failed")
         op_ctx.emit(f"DR drill complete: {result.backup_id}", phase="dr_drill")
+
+    elif kind == OperationKind.MIGRATE_REHEARSAL.value:
+        from odooctl.migration.matrix import supported_paths
+
+        cfg = svc_ctx.project.config
+        env_cfg = cfg.env(env)
+        db_adapter = make_context_db_adapter(svc_ctx.project)
+        target_version = params.get("to", "")
+        if not target_version:
+            raise ValueError("migrate_rehearsal requires 'to' version in params")
+        use_openupgrade = bool(params.get("openupgrade", False))
+        keep_throwaway = bool(params.get("keep", False))
+        from_version = cfg.project.odoo_version
+
+        matrix_paths = supported_paths(from_version=from_version, to_version=target_version)
+        if not matrix_paths:
+            raise ValueError(
+                f"No supported migration path from {from_version!r} to {target_version!r}; "
+                "check the migration matrix for supported paths."
+            )
+        path_requires_ou = any(p.requires_openupgrade for p in matrix_paths)
+
+        def _upgrade_fn(throwaway_db: str, tgt_ver: str) -> UpgradeResult:
+            from odooctl.adapters.docker_compose import DockerComposeAdapter
+
+            compose = DockerComposeAdapter(
+                cfg.runtime.compose_file, project_dir=str(svc_ctx.project.root)
+            )
+            if use_openupgrade:
+                from odooctl.migration.openupgrade import openupgrade_db_command
+
+                cmd = openupgrade_db_command(throwaway_db, tgt_ver)
+                if cmd is None:
+                    raise ValueError(
+                        f"OpenUpgrade does not support target version {tgt_ver!r}; "
+                        "check PINNED_BRANCHES or remove --openupgrade"
+                    )
+            else:
+                cmd = [
+                    "odoo",
+                    "--database", throwaway_db,
+                    "--update", "all",
+                    "--stop-after-init",
+                ]
+            try:
+                compose.exec(cfg.odoo.service, cmd, stream=True)
+                return UpgradeResult(ok=True)
+            except Exception as exc:
+                return UpgradeResult(ok=False, warnings=[str(exc)])
+
+        def _healthcheck_fn(db_name: str) -> bool:
+            # Ping the throwaway DB — after --stop-after-init Odoo is not running,
+            # so an HTTP check against the source env URL would test the wrong target.
+            try:
+                db_adapter.ping(db_name)
+                return True
+            except Exception:
+                return False
+
+        report_dir = svc_ctx.project.state_dir / "migration_reports"
+
+        result = rehearse_upgrade(
+            source_env=env,
+            source_version=from_version,
+            target_version=target_version,
+            source_db=env_cfg.db_name,
+            db_adapter=db_adapter,
+            healthcheck_fn=_healthcheck_fn,
+            upgrade_fn=_upgrade_fn,
+            report_dir=report_dir,
+            keep=keep_throwaway,
+            requires_openupgrade=path_requires_ou,
+            use_openupgrade=use_openupgrade,
+        )
+        if result.status != "success":
+            raise RuntimeError(result.message or "Migration rehearsal failed")
+        op_ctx.emit(
+            f"migrate rehearsal complete: {env} {result.source_version} → {target_version}",
+            phase="migrate_rehearsal",
+        )
 
     else:
         raise ValueError(f"Unsupported operation kind in runner: {kind!r}")

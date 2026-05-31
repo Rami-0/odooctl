@@ -12,6 +12,72 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 — M15 correctness fix: reject unsupported migration paths
+
+**Changed files:**
+- `odooctl/commands/migrate.py` — added guard after `supported_paths(from_version, to_version)`: raises `typer.BadParameter` immediately when `matrix_paths` is empty, before any DB work or `rehearse_upgrade()` call. Fixes the silent bug where an unsupported path (e.g. 12.0→19.0) would compute `path_requires_ou=False` via `any([])` and proceed with plain `--update all`.
+- `odooctl/runner/worker.py` — same guard in `MIGRATE_REHEARSAL` dispatch: raises `ValueError` when `matrix_paths` is empty, before `rehearse_upgrade()`. The runner transitions the operation to FAILED with a clear message.
+- `tests/test_migration.py` — added 4 regression tests: `test_cli_rehearse_rejects_unsupported_path` (guard present, BadParameter raised); `test_runner_dispatch_rejects_unsupported_path` (guard present, ValueError raised); `test_cli_rehearse_guard_precedes_rehearse_upgrade_call` (guard fires before rehearsal starts); `test_runner_dispatch_guard_precedes_rehearse_upgrade_call` (same for runner).
+
+**Tests:** `uv run pytest tests/test_migration.py -q` — 62 passed; `uv run ruff check odooctl/commands/migrate.py odooctl/runner/worker.py tests/test_migration.py` — all checks passed.
+**Result:** Both CLI and runner now reject unsupported version pairs from the matrix before starting any DB work, eliminating the `any([])==False` silent-path bug.
+**Push status:** pending — not committed or pushed.
+**Blockers:** none.
+**Next step:** M15 review gate.
+
+### 2026-05-31 — M15 correctness fixes: healthcheck targets throwaway DB; requires_openupgrade enforcement
+
+**Changed files:**
+- `odooctl/migration/rehearse.py` — (1) removed `healthcheck_url` parameter; `rehearse_upgrade` now calls `healthcheck_fn(throwaway_db)` instead of `healthcheck_fn(healthcheck_url)`, targeting the throwaway DB directly (the source env public URL is wrong after `--stop-after-init`); added explanatory comment. (2) added `requires_openupgrade: bool` and `use_openupgrade: bool` parameters; added early-exit guard that returns a failed `RehearsalReport` with a clear message and corrective `next_actions` when `requires_openupgrade and not use_openupgrade`, preventing a misleading success from a `--update all` run that cannot perform a cross-major upgrade. (3) extracted `_save_report_to_dir` helper used by both early-exit and normal paths. Updated module docstring and per-param docstrings.
+- `odooctl/commands/migrate.py` — fixed `_healthcheck_fn` to call `db_adapter.ping(db_name)` (DB-level ping on throwaway DB) instead of `check_url` against the source env public URL; removed `hc_url` construction; added `supported_paths` matrix lookup to derive `path_requires_ou`; now rejects paths absent from the migration matrix before rehearsal work starts; passed `requires_openupgrade=path_requires_ou` and `use_openupgrade=openupgrade` to `rehearse_upgrade`.
+- `odooctl/runner/worker.py` — same fixes in `MIGRATE_REHEARSAL` dispatch: `_healthcheck_fn` now calls `db_adapter.ping(db_name)`; removed `hc_url` / `env_cfg.domain` URL construction; rejects paths absent from the migration matrix before rehearsal work starts; added matrix `requires_openupgrade` lookup; passed `keep`, `requires_openupgrade`, and `use_openupgrade` through to `rehearse_upgrade`.
+- `docs/migration.md` — updated rehearsal flow (added pre-flight check step; DB ping healthcheck explanation); updated OpenUpgrade section to note all listed paths require `--openupgrade` and the rehearsal fails clearly without it; added two new safety invariants.
+- `tests/test_migration.py` — added 14 new tests: `test_rehearsal_healthcheck_fn_receives_throwaway_db` (pins that fn receives throwaway DB name, not a URL); `test_rehearsal_healthcheck_fn_not_called_when_upgrade_fails`; `test_rehearsal_fails_when_requires_openupgrade_without_flag` (no DB ops, clear message); `test_rehearsal_fails_openupgrade_required_has_next_action`; `test_rehearsal_fails_openupgrade_required_saved_to_report_dir`; `test_rehearsal_proceeds_when_requires_openupgrade_and_flag_set`; `test_rehearsal_proceeds_when_not_requires_openupgrade_and_no_flag`; `test_runner_healthcheck_fn_targets_throwaway_db_not_source_url` (source-inspection); `test_cli_healthcheck_fn_targets_throwaway_db_not_source_url` (source-inspection); `test_runner_passes_keep_param_to_rehearsal`; plus CLI/runner unsupported-path guard tests that ensure matrix misses fail before `rehearse_upgrade` dispatch.
+
+**Tests:** `uv run pytest tests/test_migration.py -q` — 62 passed; `uv run pytest -q` — 723 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/migration/ odooctl/commands/migrate.py odooctl/runner/worker.py tests/test_migration.py` — all checks passed; `node --check odooctl/web/dist/app.js` — passed; `uv run python -m build` — succeeded.
+**Result:** Both priority correctness caveats from the independent review are fixed: (1) healthcheck targets the throwaway DB via a real DB ping, never the source env public URL; (2) every cross-major rehearsal path that requires OpenUpgrade fails clearly without `--openupgrade` rather than silently claiming success. Final wiring review also fixed/pinned runner propagation of the UI/API `keep` flag and rejects target paths absent from the matrix so unsupported typos/jumps cannot be reported as successful plain updates.
+**Push status:** pending — not committed or pushed.
+**Blockers:** none.
+**Next step:** M15 review gate.
+
+### 2026-05-31 — M15 gap fixes: SPA migrate tab, OpenUpgrade safety, tests
+
+**Changed files:**
+- `odooctl/web/dist/app.js` — added Migrate tab (visible to operators) on environment detail page: target version text input (`migrate-to`), OpenUpgrade checkbox (`migrate-openupgrade`), keep-throwaway checkbox (`migrate-keep`), Run Rehearsal button with typed confirmation `"rehearse"`, enqueues `migrate_rehearsal` operation kind with `{to, openupgrade, keep}` params; `buildMigrateTab` + `attachMigrateTab` functions follow the Clone/Promote pattern.
+- `odooctl/runner/worker.py` — fixed `openupgrade_db_command(...) or []` silent empty-command bug in `_dispatch`'s `_upgrade_fn` closure: replaced with explicit `if cmd is None: raise ValueError(...)` so unsupported OpenUpgrade target version fails with a clear error rather than running an empty docker exec command.
+- `odooctl/commands/migrate.py` — same fix in CLI's inner `_upgrade_fn` closure (belt-and-suspenders; upfront check already exists in `rehearse()`, but inner fn now also raises explicitly rather than using `or []`).
+- `tests/test_migration.py` — added 9 tests: 6 SPA content assertions (`migrate_rehearsal` operation kind, `migrate-to` input, openupgrade control, `migrate-keep` control, `rehearse` confirmation keyword, migrate tab presence); 3 OpenUpgrade safety assertions (rehearsal-fails-with-message when upgrade_fn raises for unsupported version; source-inspection checks that runner and CLI do not use the `or []` substitution pattern).
+
+**Tests:** `uv run pytest tests/test_migration.py -q` — 48 passed; `uv run pytest tests/test_migration.py tests/test_m14_web.py tests/test_api.py::test_admin_can_enqueue_dr_drill_on_protected_env tests/test_runner.py::test_runner_claims_and_executes_dr_drill -q` — 59 passed, 1 StarletteDeprecationWarning; `uv run pytest -q` — 709 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/migration odooctl/commands/migrate.py odooctl/main.py odooctl/operations/models.py odooctl/api/routes_operations.py odooctl/runner/worker.py tests/test_migration.py` — all checks passed; `node --check odooctl/web/dist/app.js` — passed; `uv run python -m build` — succeeded.
+**Result:** Gap fixes applied — SPA Migrate tab is visible to operators with all three controls (target version, openupgrade, keep) and enqueues `migrate_rehearsal`; OpenUpgrade unsupported-version path now raises ValueError in both runner and CLI inner upgrade functions; 9 new tests pin these contracts.
+**Push status:** pending — not committed or pushed; Hermes to finalize.
+**Blockers:** none.
+**Next step:** M15 review gate (encompasses both the original implementation and these gap fixes).
+
+### 2026-05-31 — M15 Migration and Upgrade Assistant implemented
+
+**Changed files:**
+- `odooctl/migration/__init__.py` — new package init.
+- `odooctl/migration/data/paths.yaml` — migration matrix data: 5 supported adjacent-version upgrade paths (14.0–19.0), all require OpenUpgrade or the Odoo Enterprise upgrade service.
+- `odooctl/migration/matrix.py` — `MigrationPath` dataclass, `load_matrix(data_path)`, `supported_paths(from_version, to_version)`, `format_matrix(paths)` for human-readable table output.
+- `odooctl/migration/scan.py` — `ScanResult` dataclass, `scan_modules(from_version, to_version, module_list_fn, review_recommended)`: identifies installed modules, multi-version-jump blockers, custom-module warnings, and known-sensitive-module warnings; fully injectable for tests.
+- `odooctl/migration/openupgrade.py` — `OpenUpgradeMeta` dataclass, `PINNED_BRANCHES` dict (14.0–19.0), `get_openupgrade_meta(to_version)` (returns None for unsupported), `openupgrade_db_command(db_name, to_version)`.
+- `odooctl/migration/rehearse.py` — `UpgradeResult` dataclass, `RehearsalReport` dataclass (all 12 report fields + `to_dict()`), `rehearse_upgrade(...)` with fully injectable `db_adapter`/`upgrade_fn`/`healthcheck_fn`; safety: throwaway_db != source_db enforced, dump read-only on source, cleanup always in `finally`, report saved even on failure.
+- `odooctl/commands/migrate.py` — `odooctl migrate matrix`, `odooctl migrate scan --env --to`, `odooctl migrate rehearse --env --to --keep --openupgrade`; CLI wires real DB adapter / compose upgrade_fn / healthcheck_fn; OpenUpgrade availability checked up-front.
+- `odooctl/main.py` — imported and registered `migrate_cmd.app` as `migrate` sub-app.
+- `odooctl/operations/models.py` — added `OperationKind.MIGRATE_REHEARSAL = "migrate_rehearsal"`.
+- `odooctl/api/routes_operations.py` — mapped `"migrate_rehearsal"` to `Action.RESTORE` in `_KIND_ACTION`.
+- `odooctl/runner/worker.py` — imported `rehearse_upgrade`/`UpgradeResult`; added `"migrate_rehearsal"` to `_KIND_ACTION`; added dispatch branch in `_dispatch` that wires db_adapter, compose upgrade_fn, healthcheck_fn, and report_dir, raises on failure.
+- `docs/migration.md` — new docs: commands, rehearsal flow, report field table, OpenUpgrade pinning, safety invariants, API/runner integration, v1 scope.
+- `tests/test_migration.py` — 39 TDD tests covering: matrix load/filter/format; scan blockers/warnings/custom/known modules; OpenUpgrade meta/pinned-branches/db-command; rehearsal safety contract (throwaway naming, dump target, restore target, upgrade_fn target, cleanup-on-success/failure/healthcheck/exception/keep, source DB never dropped); report fields/saved-on-failure/saved-on-success/all-required-fields/next-actions/cleanup_failed; OperationKind value/API map/runner map.
+
+**Tests:** `uv run pytest tests/test_migration.py -q` — 39 passed; `uv run pytest -q` — 700 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/migration/ odooctl/commands/migrate.py odooctl/main.py odooctl/operations/models.py odooctl/api/routes_operations.py odooctl/runner/worker.py tests/test_migration.py` — all checks passed.
+**Result:** M15 acceptance criteria met — migration matrix prints supported paths; scan identifies installed modules and likely blockers; rehearsal never writes to production DB/filestore (proven by mock assertions on dump/restore/drop call targets); failed rehearsal leaves report with cleanup status; OpenUpgrade is optional and pinned to branch-per-version.
+**Implementation commit SHA:** pending
+**Push status:** pending — not committed or pushed; Hermes to finalize.
+**Blockers:** none.
+**Next step:** M15 review gate.
+
 ### 2026-05-31 08:16 UTC — M14 security re-review approved
 
 **Changed files:**

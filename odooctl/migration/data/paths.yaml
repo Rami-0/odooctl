@@ -1,0 +1,26 @@
+# Supported Odoo upgrade paths.
+# Only adjacent-version (N → N+1) upgrades are listed; multi-version jumps
+# require sequential hops through each intermediate version.
+# All community/SaaS upgrades require OpenUpgrade or the Odoo Enterprise
+# upgrade service — direct in-place upgrades are not supported.
+paths:
+  - from: "14.0"
+    to: "15.0"
+    requires_openupgrade: true
+    notes: "Use OpenUpgrade OCA branch 15.0 or the Odoo Enterprise upgrade service"
+  - from: "15.0"
+    to: "16.0"
+    requires_openupgrade: true
+    notes: "Use OpenUpgrade OCA branch 16.0 or the Odoo Enterprise upgrade service"
+  - from: "16.0"
+    to: "17.0"
+    requires_openupgrade: true
+    notes: "Use OpenUpgrade OCA branch 17.0 or the Odoo Enterprise upgrade service"
+  - from: "17.0"
+    to: "18.0"
+    requires_openupgrade: true
+    notes: "Use OpenUpgrade OCA branch 18.0 or the Odoo Enterprise upgrade service"
+  - from: "18.0"
+    to: "19.0"
+    requires_openupgrade: true
+    notes: "Use OpenUpgrade OCA branch 19.0 or the Odoo Enterprise upgrade service"

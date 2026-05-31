@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 07:10 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_5c9d0fea` — **M14 security review** assigned to `odoo-security`; status `running` after this manager pass closed the parent M14 implementation handoff and dispatched the child security review gate. No other cards are running.
+- Done since last run: `t_e777c704` — **M14 domain/SSL and backup UX** is now manager-approved/closed. The blocker was manager-resolvable because the worker had already committed and pushed the milestone (`13774f3` implementation, `3c28518` progress/push-status), provided explicit verification evidence, and left no unresolved product/policy questions.
+- Board status after dispatch: `done=18`, `running=1`, `blocked=0`, `ready=0`, `todo=2`. Milestone order remains intact: M14 security review is now the only active card before `t_8b7a971e` (M15 migration assistant) can promote.
+- Current repo state: branch `master`; `HEAD` `3c28518` (`docs: record M14 push status`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update. `gh auth status` is healthy.
+- Tests/result: manager independently reran `uv run pytest tests/test_api.py::test_admin_can_enqueue_dr_drill_on_protected_env tests/test_api.py::test_operator_cannot_enqueue_dr_drill_on_protected_env tests/test_runner.py::test_runner_claims_and_executes_dr_drill tests/test_operations.py::test_operation_kind_values -q` — 4 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_api.py tests/test_runner.py tests/test_operations.py tests/test_dr.py tests/test_m14_web.py -q` — 106 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — passed; `uv run python -m build` — succeeded.
+- Blockers: none currently on the board. Rami input is not required because the parent block was a procedural review-required handoff with durable repo evidence and synced remote state.
+- Auto-resolved this run: completed `t_e777c704` with a manager approval summary/metadata, ran `hermes kanban --board odooctl dispatch`, and verified child `t_5c9d0fea` promoted/spawned. This was safe because the prior DR drill integration blocker is resolved end-to-end and the remaining step is the explicitly requested M14 security review.
+- Push status: no new milestone-code push was needed this tick; repo was already synced to `origin/master` at `3c28518`. Manager progress update commit/push pending below.
+- Next step: let `odoo-security` finish `t_5c9d0fea`; if it approves M14, verify `t_8b7a971e` (M15 migration assistant) promotes/spawns next.
+
 ### 2026-05-31 06:18 UTC — M14 DR drill integration completed
 
 **Changed files:**

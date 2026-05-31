@@ -23,7 +23,7 @@ Primary plan index: `docs/plans/README.md`
 
 **Result:** not security-approved as-is. Blocking finding B1: `odooctl/services/restore.py::restore_to_env` restores production backup data into staging/non-protected targets without the sanitization guard used by `odooctl/services/clone.py::run_clone`, risking production PII/secrets/integrations and real side effects in staging. Non-blocking hardening: validate Traefik domain rule input, revalidate config on domain attach, point DR drill healthcheck at the throwaway DB, and reconcile API-enqueued `restore` with runner dispatch support.
 
-**Follow-up created:** `t_a11a2123` — M14 security remediation: sanitize production-to-staging restores, assigned to `odoo-backend` and dependent on this review card.
+**Follow-up created:** `t_1c479b1d` — dispatchable M14 security remediation: sanitize production-to-staging restores, assigned to `odoo-backend`. Note: `t_a11a2123` was also created as a dependency-linked child of this review card, but that shape is dependency-gated by this blocked review; use `t_1c479b1d` for remediation dispatch.
 
 **Review progress commit SHA:** `99c8e0b`
 **Push status:** succeeded — pushed review progress commit `99c8e0b` to `origin/master`.

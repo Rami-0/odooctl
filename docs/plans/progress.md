@@ -21,8 +21,8 @@ Primary plan index: `docs/plans/README.md`
 **Tests:** Claude Code Opus read-only review — approved with no blocking findings; `uv run pytest tests/test_web.py tests/test_api.py::test_api_does_not_import_privileged -q` — 38 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_web.py tests/test_api.py tests/test_security.py -q` — 180 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; wheel/sdist manifest smoke verified `odooctl/web/dist/index.html`, `app.js`, `style.css`, and `odooctl/web/README.md` are packaged; `uv run pytest -q` — 575 passed, 1 StarletteDeprecationWarning.
 **Result:** Approved — `odooctl serve` serves the packaged static SPA after API routes; the UI talks only to API endpoints, uses typed confirmations for destructive flows, applies RBAC only as display gating while server RBAC remains authoritative, streams operation logs with authenticated fetch/SSE, and ships with focused tests, docs, build packaging, and a clean synced repo.
 **Reviewed commit SHA:** `d937c9d`
-**Review progress commit SHA:** pending — this entry will be committed after review verification.
-**Push status:** pending — will push the review progress update after commit.
+**Review progress commit SHA:** `c8a04b5`
+**Push status:** pending — will push review progress commit `c8a04b5` and this push-status follow-up after commit.
 **Blockers:** none.
 **Non-blocking follow-ups for later:** clamp `max_polls` on `GET /operations/{id}/events`; cache `index.html` instead of synchronous `read_text()` per fallback request; add project/org scoping before any multi-tenant operation reads/cancels; decide later whether typoed API-like paths should 404 instead of returning SPA HTML.
 **Next step:** M14 domain/SSL and backup UX (`t_e777c704`) may proceed after this review progress entry is committed and pushed.

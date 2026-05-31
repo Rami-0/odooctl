@@ -30,6 +30,33 @@ environments:
     filestore_path: ./filestore/production
 """
 
+MINIMAL_CONFIG_PROTECTED_STAGING = """\
+project:
+  name: test-project
+  odoo_version: "19.0"
+runtime:
+  compose_file: docker-compose.yml
+postgres:
+  password_env: ODOO_DB_PASSWORD
+odoo:
+  image: odoo:19.0
+environments:
+  production:
+    branch: main
+    domain: prod.test.local
+    port: 8069
+    db_name: test_prod
+    filestore_path: ./filestore/production
+  secure_staging:
+    branch: secure-staging
+    domain: secure-staging.test.local
+    port: 8070
+    db_name: test_secure_staging
+    filestore_path: ./filestore/secure_staging
+    clone_from: production
+    protected: true
+"""
+
 
 def _make_entry(
     op_id: str = "abc123",
@@ -37,7 +64,9 @@ def _make_entry(
     project: str = "test-project",
     env: str = "production",
     nonce: str | None = None,
+    roles: list[str] | None = None,
 ) -> QueueEntry:
+    extra: dict = {"roles": roles if roles is not None else ["operator"]}
     token = tokens.mint(
         TEST_KEY,
         action=kind,
@@ -45,6 +74,7 @@ def _make_entry(
         project=project,
         ttl_seconds=300,
         nonce=nonce,
+        **extra,
     )
     return QueueEntry.create(
         op_id=op_id,
@@ -349,6 +379,45 @@ def test_runner_skips_cancelled_operation_after_claim(project_dir, fake_registry
     assert did_work is True
     assert not call_count
     assert store.load(op_id).status == OperationStatus.CANCELLED
+
+
+def test_runner_rejects_protected_destructive_op_with_operator_role(tmp_path):
+    """Runner must reject a destructive op on a protected env when token has operator-level roles.
+
+    Simulates a malformed/forged queue entry where operator roles are embedded
+    in the capability token but the target is an explicitly protected environment.
+    Clone to secure_staging (protected=true) with operator roles must fail with
+    an RBAC error, not reach dispatch.
+    """
+    from odooctl.operations.models import Operation, OperationKind, OperationStatus
+    from odooctl.operations.store import OperationStore
+    from odooctl.registry import RegisteredProject, Registry
+    from odooctl.runner.worker import RunnerWorker
+
+    (tmp_path / "odooctl.yml").write_text(MINIMAL_CONFIG_PROTECTED_STAGING)
+    registry = Registry(
+        path=tmp_path / "registry.toml",
+        active="test-project",
+        projects={"test-project": RegisteredProject("test-project", tmp_path, "odooctl.yml")},
+    )
+
+    store = OperationStore(tmp_path / ".odooctl")
+    op_id = "rbac_prot_001"
+    op = Operation.create(OperationKind.CLONE, "test-project", "secure_staging", "op-user", {})
+    op.id = op_id
+    store.save(op)
+
+    # Capability token carries operator roles — not sufficient for a protected env clone
+    entry = _make_entry(op_id=op_id, kind="clone", env="secure_staging", roles=["operator"])
+    OperationQueue(tmp_path / ".odooctl").enqueue(entry)
+
+    worker = RunnerWorker(registry=registry, api_key=TEST_KEY)
+    did_work = worker.claim_and_run()
+
+    assert did_work is True
+    op = store.load(op_id)
+    assert op.status == OperationStatus.FAILED
+    assert "protected" in (op.error or "").lower()
 
 
 def test_runner_once_processes_one_item(project_dir, fake_registry):

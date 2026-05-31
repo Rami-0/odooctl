@@ -12,6 +12,17 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 06:08 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_e777c704` — **M14 domain/SSL and backup UX** is back to **running** on `odoo-docker` as run `#42` after this manager recovery pass. No other cards are running.
+- Done since last run: no new milestone cards completed, but the blocked M14 implementation card was recovered without needing user input. The board is now `done=17`, `running=1`, `blocked=0`, `ready=0`, `todo=3`.
+- Current repo state at inspection time: branch `master`; `HEAD` `86fb47a` (`docs: update odooctl kanban progress`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree remains dirty with the same uncommitted M14 code/docs/tests changes.
+- Verified evidence: the current M14 worktree still has passing repo gates from the prior run — `uv run pytest tests/test_domain.py tests/test_dr.py tests/test_restore_points.py tests/test_backup_verify.py tests/test_m14_web.py tests/test_backup.py -q` — 84 passed, 1 StarletteDeprecationWarning; `uv run pytest -q` — 653 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — passed; `uv run python -m build` — succeeded.
+- Blockers: no real user-needed blocker at the moment. The only open issue is manager-verified implementation follow-through: the SPA enqueues `dr_drill`, but the operation model/API/runner path does not yet support that kind end-to-end.
+- Auto-resolved this run: I inspected the blocked card evidence, confirmed the blocker was engineering follow-up rather than a Rami decision, added a recovery comment with the exact missing integration (`OperationKind`, API RBAC mapping, runner dispatch, regression coverage), unblocked `t_e777c704`, ran `hermes kanban --board odooctl dispatch`, and verified it respawned as run `#42`. This was safe because no product/policy decision was pending and the required next step was concrete.
+- Push status: no new manager commit yet this run; progress update pending local commit/push.
+- Next step: let `odoo-docker` finish the `dr_drill` integration, rerun repo gates, commit/push the full M14 milestone, and hand off to `t_5c9d0fea` (M14 security review).
+
 ### 2026-05-31 05:05 UTC — Hourly Kanban manager check
 
 - Active task(s): none running. `t_e777c704` — **M14 domain/SSL and backup UX** remains **blocked** for `odoo-docker` after run #41 exhausted its iteration budget.

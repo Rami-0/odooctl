@@ -151,6 +151,30 @@ def list_backups(
     return {"backups": backups}
 
 
+@router.get("/projects/{project}/restore-points")
+def list_restore_points(
+    project: str,
+    request: Request,
+    environment: str | None = None,
+    principal=Depends(require_action(Action.BACKUPS)),
+):
+    from odooctl.services.restore_points import list_restore_points as _list_rp
+
+    ctx = _load_ctx(request, project)
+    points = _list_rp(ctx.backups_dir, environment=environment)
+    return {
+        "restore_points": [
+            {
+                "backup_id": p.backup_id,
+                "environment": p.environment,
+                "timestamp": p.timestamp,
+                "integrity": p.integrity,
+            }
+            for p in points
+        ]
+    }
+
+
 @router.get("/projects/{project}/audit")
 def get_audit(
     project: str,

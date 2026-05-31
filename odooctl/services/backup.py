@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -94,6 +95,17 @@ def redact_config_snapshot(text: str) -> str:
     return "\n".join(redacted_lines) + ("\n" if text.endswith("\n") else "")
 
 
+def remote_encryption_metadata(ctx: ServiceContext) -> dict[str, str] | None:
+    """Return non-secret remote-backup encryption metadata for manifests."""
+    remote = ctx.project.config.backups.remote
+    if remote is None or not remote.encryption_algorithm:
+        return None
+    metadata = {"algorithm": remote.encryption_algorithm}
+    if remote.encryption_key_env:
+        metadata["key_ref"] = f"env:{remote.encryption_key_env}"
+    return metadata
+
+
 def run_backup(ctx: ServiceContext, environment: str) -> BackupResult:
     cfg = ctx.project.config
     env = cfg.env(environment)
@@ -126,6 +138,7 @@ def run_backup(ctx: ServiceContext, environment: str) -> BackupResult:
             "db_dump": _sha256_file(backup_dir / "db.dump"),
             "filestore": _sha256_file(backup_dir / "filestore.tar"),
         },
+        encryption=remote_encryption_metadata(ctx),
     )
     (backup_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2))
     MetadataStore(ctx.project.state_dir).save_backup_manifest(backup_id, manifest)
@@ -135,3 +148,42 @@ def run_backup(ctx: ServiceContext, environment: str) -> BackupResult:
     keep_count = max(cfg.backups.retention.daily, cfg.backups.retention.weekly, cfg.backups.retention.monthly)
     prune_backups(ctx.project.backups_dir, keep=max(keep_count, 1), environment=environment)
     return BackupResult(backup_id=backup_id)
+
+
+@dataclass
+class BackupVerifyResult:
+    ok: bool
+    backup_id: str
+    error: str | None = None
+
+
+def verify_backup(
+    backups_root: Path,
+    backup_id: str,
+    *,
+    environment: str | None = None,
+) -> BackupVerifyResult:
+    """Verify backup integrity by re-checking manifest checksums.
+
+    Pass *backup_id* = "latest" with *environment* to resolve the most recent
+    backup for that environment first.
+    """
+    from odooctl.services.restore import resolve_backup_dir, validate_backup_dir
+
+    if backup_id == "latest":
+        if environment is None:
+            return BackupVerifyResult(ok=False, backup_id="latest", error="'latest' requires environment= to be specified")
+        try:
+            backup_dir = resolve_backup_dir(environment, "latest", backups_root)
+        except RuntimeError as exc:
+            return BackupVerifyResult(ok=False, backup_id="latest", error=str(exc))
+        resolved_id = backup_dir.name
+    else:
+        backup_dir = backups_root / backup_id
+        resolved_id = backup_id
+
+    try:
+        validate_backup_dir(backup_dir)
+        return BackupVerifyResult(ok=True, backup_id=resolved_id)
+    except Exception as exc:
+        return BackupVerifyResult(ok=False, backup_id=resolved_id, error=str(exc))

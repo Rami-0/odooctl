@@ -96,6 +96,8 @@ class RemoteBackupConfig(BaseModel):
     access_key_env: str | None = None
     secret_key_env: str | None = None
     region_env: str | None = None
+    encryption_algorithm: str | None = None
+    encryption_key_env: str | None = None
 
 
 class RetentionConfig(BaseModel):
@@ -249,7 +251,13 @@ class OdooCtlConfig(BaseModel):
             refs.add(self.odoo.db_password_env)
         if self.backups.remote:
             remote = self.backups.remote
-            for value in (remote.endpoint_env, remote.access_key_env, remote.secret_key_env, remote.region_env):
+            for value in (
+                remote.endpoint_env,
+                remote.access_key_env,
+                remote.secret_key_env,
+                remote.region_env,
+                remote.encryption_key_env,
+            ):
                 if value:
                     refs.add(value)
         return sorted(refs)

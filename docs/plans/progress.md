@@ -12,6 +12,24 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 06:18 UTC — M14 DR drill integration completed
+
+**Changed files:**
+- `odooctl/operations/models.py` — added `OperationKind.DR_DRILL = "dr_drill"` so queued/API operation records round-trip the SPA DR Drill kind.
+- `odooctl/api/routes_operations.py` — mapped `dr_drill` to restore-class RBAC (`Action.RESTORE`) so protected-environment admin+ enforcement applies before enqueue.
+- `odooctl/runner/worker.py` — mapped runner RBAC for `dr_drill` and dispatches it to `run_dr_drill(...)` with project DB/filestore adapters, healthcheck wiring, cleanup-preserving service semantics, and completion event emission.
+- `tests/test_api.py` — added protected-environment enqueue regressions for admin success and operator denial on `dr_drill`.
+- `tests/test_runner.py` — added patched/faked runner execution regression proving `dr_drill` succeeds end-to-end through queue claim, dispatch, status update, and event emission without real DB work.
+- `tests/test_operations.py` — pinned the new operation-kind enum value.
+- Prior uncommitted M14 files remain part of this milestone: domain/Traefik adapter, restore-point browser, backup verify/encryption metadata, restore-to-staging, DR drill service/CLI, docs, and SPA Restore Points/DR Drill UX.
+
+**Tests:** focused new regressions: `uv run pytest tests/test_api.py::test_admin_can_enqueue_dr_drill_on_protected_env tests/test_api.py::test_operator_cannot_enqueue_dr_drill_on_protected_env tests/test_runner.py::test_runner_claims_and_executes_dr_drill tests/test_operations.py::test_operation_kind_values -q` — 4 passed, 1 StarletteDeprecationWarning; focused milestone/API/runner suite: `uv run pytest tests/test_api.py tests/test_runner.py tests/test_operations.py tests/test_dr.py tests/test_m14_web.py -q` — 106 passed, 1 StarletteDeprecationWarning; touched-file ruff: `uv run ruff check odooctl/api/routes_operations.py odooctl/runner/worker.py odooctl/operations/models.py tests/test_api.py tests/test_runner.py tests/test_operations.py` — passed; full repo: `uv run pytest -q` — 656 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — passed; `uv run python -m build` — succeeded.
+**Result:** M14 implementation is now end-to-end complete: the SPA `dr_drill` operation kind is accepted by the API, protected by restore-class RBAC, executable by the privileged runner via the DR drill service, and covered by regression tests. The earlier manager-verified implementation blocker is resolved.
+**Implementation commit SHA:** pending
+**Push status:** pending
+**Blockers:** none.
+**Next step:** commit/push M14, then hand off to M14 security review (`t_5c9d0fea`).
+
 ### 2026-05-31 06:08 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_e777c704` — **M14 domain/SSL and backup UX** is back to **running** on `odoo-docker` as run `#42` after this manager recovery pass. No other cards are running.

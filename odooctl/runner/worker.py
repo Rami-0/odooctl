@@ -33,9 +33,12 @@ from odooctl.operations.store import OperationStore
 from odooctl.security import rbac, tokens
 from odooctl.security.principals import Principal, PrincipalKind, Role
 from odooctl.security.tokens import TokenError
+from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
+from odooctl.adapters.filestore import FilestoreAdapter
 from odooctl.services.backup import run_backup
 from odooctl.services.clone import run_clone
 from odooctl.services.context import ServiceContext
+from odooctl.services.dr import run_dr_drill
 
 if TYPE_CHECKING:
     from odooctl.registry import Registry
@@ -51,6 +54,7 @@ _KIND_ACTION: dict[str, rbac.Action] = {
     "env_destroy": rbac.Action.ENV,
     "update_modules": rbac.Action.DEPLOY,
     "rollback": rbac.Action.RESTORE,
+    "dr_drill": rbac.Action.RESTORE,
 }
 
 
@@ -240,6 +244,32 @@ def _dispatch(entry: QueueEntry, svc_ctx: ServiceContext, op_ctx: OperationConte
         source = params.get("source", "production")
         result = run_clone(svc_ctx, source, env)
         op_ctx.emit(f"clone complete: {result.url}", phase="clone")
+
+    elif kind == OperationKind.DR_DRILL.value:
+        cfg = svc_ctx.project.config
+        db_adapter = make_context_db_adapter(svc_ctx.project)
+        fs_adapter = FilestoreAdapter()
+
+        def healthcheck_fn(url: str) -> bool:
+            try:
+                from odooctl.odoo.healthcheck import check_url
+
+                check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=1, interval=1)
+                return True
+            except Exception:
+                return False
+
+        result = run_dr_drill(
+            environment=env,
+            backups_root=svc_ctx.project.backups_dir,
+            db_adapter=db_adapter,
+            fs_adapter=fs_adapter,
+            healthcheck_fn=healthcheck_fn,
+            is_protected_fn=cfg.is_protected,
+        )
+        if result.status != "success":
+            raise RuntimeError(result.message or "DR drill failed")
+        op_ctx.emit(f"DR drill complete: {result.backup_id}", phase="dr_drill")
 
     else:
         raise ValueError(f"Unsupported operation kind in runner: {kind!r}")

@@ -18,6 +18,7 @@ class OperationKind(str, Enum):
     UPDATE_MODULES = "update_modules"
     ROLLBACK = "rollback"
     PROMOTE = "promote"
+    DR_DRILL = "dr_drill"
 
 
 class OperationStatus(str, Enum):

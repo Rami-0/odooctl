@@ -15,6 +15,33 @@ from odooctl.operations.models import OperationKind
 from odooctl.operations.store import OperationStore
 
 
+def execute_to(source_environment: str, target_environment: str, backup: str = "latest", config_path: str = "odooctl.yml") -> str:
+    from odooctl.services.restore import restore_to_env
+    ctx = ServiceContext.from_config_path(config_path)
+    store = OperationStore(ctx.project.state_dir)
+    audit = AuditStore(ctx.project.state_dir)
+    result = None
+    with run_operation(
+        store,
+        audit,
+        kind=OperationKind.RESTORE,
+        project=ctx.project.config.project.name,
+        environment=target_environment,
+        actor="cli",
+        params_redacted={"source": source_environment, "target": target_environment, "backup": backup},
+        state_dir=ctx.project.state_dir,
+    ) as op_ctx:
+        op_ctx.emit(f"restoring {source_environment} backup {backup!r} into {target_environment}", phase="restore")
+        result = restore_to_env(
+            source_environment=source_environment,
+            target_environment=target_environment,
+            backup=backup,
+            ctx=ctx,
+        )
+        op_ctx.emit(f"restore complete: {result.backup_id}", phase="restore")
+    return result.backup_id  # type: ignore[union-attr]
+
+
 def execute(environment: str, backup: str = "latest", config_path: str = "odooctl.yml") -> str:
     ctx = ServiceContext.from_config_path(config_path)
     store = OperationStore(ctx.project.state_dir)

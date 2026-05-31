@@ -67,9 +67,11 @@ def test_s3_adapter_mirrors_backup_tree_locally(tmp_path):
 class FakeS3Client:
     def __init__(self):
         self.uploads = []
+        self.extra_args = []
 
-    def upload_file(self, filename, bucket, key):
+    def upload_file(self, filename, bucket, key, ExtraArgs=None):
         self.uploads.append((filename, bucket, key))
+        self.extra_args.append(ExtraArgs)
 
 
 class FakeBoto3:
@@ -105,6 +107,30 @@ def test_s3_adapter_uploads_backup_tree_with_boto3(tmp_path, monkeypatch):
     assert sorted((bucket, key) for _, bucket, key in fake.s3.uploads) == [
         ("bucket-name", "odoo/prod/backup_2026/manifest.json"),
         ("bucket-name", "odoo/prod/backup_2026/nested/db.dump"),
+    ]
+    assert fake.s3.extra_args == [None, None]
+
+
+def test_s3_adapter_passes_server_side_encryption_args(tmp_path, monkeypatch):
+    backup_dir = tmp_path / "backup_2026"
+    backup_dir.mkdir()
+    (backup_dir / "manifest.json").write_text("{}")
+    monkeypatch.setenv("ODOO_BACKUP_KMS_KEY_ID", "kms-key-id")
+    fake = FakeBoto3()
+    adapter = S3Adapter(
+        RemoteBackupConfig(
+            bucket="bucket-name",
+            encryption_algorithm="aws:kms",
+            encryption_key_env="ODOO_BACKUP_KMS_KEY_ID",
+        ),
+        root=tmp_path / "remote",
+        boto3_module=fake,
+    )
+
+    adapter.upload_backup(backup_dir)
+
+    assert fake.s3.extra_args == [
+        {"ServerSideEncryption": "aws:kms", "SSEKMSKeyId": "kms-key-id"}
     ]
 
 

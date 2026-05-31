@@ -69,6 +69,57 @@ def validate_backup_dir(
     return manifest
 
 
+def restore_to_env(
+    *,
+    source_environment: str,
+    target_environment: str,
+    backup: str = "latest",
+    ctx: "ServiceContext",
+) -> RestoreResult:
+    """Restore a backup from *source_environment* into *target_environment*.
+
+    Uses a safe staging flow: restore into a temp DB first, then atomically
+    swap/rename it into the target DB name. The target environment must not be
+    protected. The source backup is validated (checksums) but environment-mismatch
+    check is intentionally skipped so a production backup can be restored into staging.
+    """
+    from odooctl.odoo.db_swap import swap_temp_database
+
+    cfg = ctx.project.config
+
+    if cfg.is_protected(target_environment):
+        raise RuntimeError(
+            f"Cannot restore into protected environment {target_environment!r}. "
+            "Use a non-production target (e.g. staging)."
+        )
+
+    backup_dir = resolve_backup_dir(source_environment, backup, ctx.project.backups_dir)
+    # Validate checksums but skip environment-mismatch check (cross-env restore)
+    validate_backup_dir(backup_dir, expected_project=cfg.project.name)
+
+    env = cfg.env(target_environment)
+    temp_db = env.db_name + cfg.sanitization.temp_db_suffix
+
+    pg = make_context_db_adapter(ctx.project) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
+    # Restore into temp DB, not the live target DB
+    pg.restore(temp_db, backup_dir / "db.dump")
+
+    target_filestore = env.filestore_path if env.filestore_volume else str(ctx.project.resolve_path(env.filestore_path))
+    fs = make_filestore_adapter(ctx.project, env) if env.filestore_volume else FilestoreAdapter()
+    fs.restore_archive(backup_dir / "filestore.tar", target_filestore)
+
+    # Atomically promote temp DB into the target DB name
+    swap_temp_database(pg, temp_db=temp_db, target_db=env.db_name, target_env_name=target_environment)
+
+    scheme = cfg.healthcheck.scheme or env.scheme
+    url = with_db_selector(
+        public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path,
+        env.db_name if env.db_selector else None,
+    )
+    check_url(url, timeout=cfg.healthcheck.timeout_seconds, retries=cfg.healthcheck.retries, interval=cfg.healthcheck.interval_seconds)
+    return RestoreResult(backup_id=backup_dir.name)
+
+
 def run_restore(ctx: ServiceContext, environment: str, backup: str = "latest") -> RestoreResult:
     cfg = ctx.project.config
     env = cfg.env(environment)

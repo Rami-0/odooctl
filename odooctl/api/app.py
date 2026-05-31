@@ -62,8 +62,20 @@ def create_app(
     app.include_router(operations_router)
 
     if static_dir is not None and Path(static_dir).exists():
-        from fastapi.staticfiles import StaticFiles
+        from fastapi.responses import FileResponse, HTMLResponse
 
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="spa")
+        _static = Path(static_dir).resolve()
+        _index = _static / "index.html"
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def _spa(full_path: str):
+            candidate = (_static / full_path).resolve()
+            try:
+                candidate.relative_to(_static)
+            except ValueError:
+                return HTMLResponse(_index.read_text())
+            if candidate.is_file():
+                return FileResponse(str(candidate))
+            return HTMLResponse(_index.read_text())
 
     return app

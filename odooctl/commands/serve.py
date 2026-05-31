@@ -2,11 +2,21 @@
 
 FastAPI and uvicorn must be installed (``pip install odooctl[api]``).
 The server binds to 127.0.0.1 by default (localhost-only).
+
+By default, ``odooctl serve`` automatically serves the packaged SPA from
+``odooctl/web/dist/`` at ``/``. Pass ``--static-dir`` to override with a
+custom directory (useful during SPA development). The API routes under
+``/projects`` and ``/operations`` always take priority over static files.
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
+
+
+def _bundled_dist() -> Path:
+    """Return the path to the packaged SPA dist directory bundled with odooctl."""
+    return Path(__file__).parent.parent / "web" / "dist"
 
 
 def run(
@@ -31,6 +41,12 @@ def run(
         raise SystemExit(
             "API key is required. Set --api-key or ODOOCTL_API_KEY env var."
         )
+
+    # Auto-detect bundled SPA when no explicit --static-dir is given.
+    if static_dir is None:
+        bundled = _bundled_dist()
+        if bundled.exists():
+            static_dir = bundled
 
     from odooctl.api.app import create_app
 

@@ -12,6 +12,21 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 04:08 UTC — M13 review gate approved
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded the M13 review-gate approval, verification evidence, non-blocking notes, and next milestone.
+
+**Review scope:** `c370d0c..d937c9d` plus synced manager progress commit `5c74a0f` (M13 static SPA, API serving boundary, packaging, tests/docs, and push hygiene).
+**Tests:** Claude Code Opus read-only review — approved with no blocking findings; `uv run pytest tests/test_web.py tests/test_api.py::test_api_does_not_import_privileged -q` — 38 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_web.py tests/test_api.py tests/test_security.py -q` — 180 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — all checks passed; `uv run python -m build` — sdist and wheel built successfully; wheel/sdist manifest smoke verified `odooctl/web/dist/index.html`, `app.js`, `style.css`, and `odooctl/web/README.md` are packaged; `uv run pytest -q` — 575 passed, 1 StarletteDeprecationWarning.
+**Result:** Approved — `odooctl serve` serves the packaged static SPA after API routes; the UI talks only to API endpoints, uses typed confirmations for destructive flows, applies RBAC only as display gating while server RBAC remains authoritative, streams operation logs with authenticated fetch/SSE, and ships with focused tests, docs, build packaging, and a clean synced repo.
+**Reviewed commit SHA:** `d937c9d`
+**Review progress commit SHA:** pending — this entry will be committed after review verification.
+**Push status:** pending — will push the review progress update after commit.
+**Blockers:** none.
+**Non-blocking follow-ups for later:** clamp `max_polls` on `GET /operations/{id}/events`; cache `index.html` instead of synchronous `read_text()` per fallback request; add project/org scoping before any multi-tenant operation reads/cancels; decide later whether typoed API-like paths should 404 instead of returning SPA HTML.
+**Next step:** M14 domain/SSL and backup UX (`t_e777c704`) may proceed after this review progress entry is committed and pushed.
+
 ### 2026-05-31 04:04 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_cddc7524` — **M13 review gate** assigned to `odoo-reviewer`; status `running` after this manager pass closed the blocked M13 implementation handoff and dispatched the child review gate.

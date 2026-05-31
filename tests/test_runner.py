@@ -120,6 +120,16 @@ def _pre_create_op(project_dir: Path, op_id: str) -> None:
     store.save(op)
 
 
+def _pre_create_dr_drill_op(project_dir: Path, op_id: str) -> None:
+    from odooctl.operations.models import Operation, OperationKind
+    from odooctl.operations.store import OperationStore
+
+    store = OperationStore(project_dir / ".odooctl")
+    op = Operation.create(OperationKind.DR_DRILL, "test-project", "production", "api-client", {})
+    op.id = op_id
+    store.save(op)
+
+
 def _make_backup_result(project_dir: Path = None, backup_id: str = "bk001"):
     from odooctl.services.models import BackupResult
 
@@ -379,6 +389,33 @@ def test_runner_skips_cancelled_operation_after_claim(project_dir, fake_registry
     assert did_work is True
     assert not call_count
     assert store.load(op_id).status == OperationStatus.CANCELLED
+
+
+def test_runner_claims_and_executes_dr_drill(project_dir, fake_registry):
+    from odooctl.operations.models import OperationStatus
+    from odooctl.operations.store import OperationStore
+    from odooctl.runner.worker import RunnerWorker
+    from odooctl.services.dr import DrDrillResult
+
+    op_id = "drill001"
+    _pre_create_dr_drill_op(project_dir, op_id)
+    entry = _make_entry(op_id=op_id, kind="dr_drill", roles=["admin"])
+    OperationQueue(project_dir / ".odooctl").enqueue(entry)
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    with patch(
+        "odooctl.runner.worker.run_dr_drill",
+        return_value=DrDrillResult(status="success", environment="production", backup_id="bk-drill"),
+    ) as drill:
+        did_work = worker.claim_and_run()
+
+    assert did_work is True
+    drill.assert_called_once()
+    store = OperationStore(project_dir / ".odooctl")
+    op = store.load(op_id)
+    assert op.status == OperationStatus.SUCCEEDED
+    events = store.load_events(op_id)
+    assert any("DR drill complete: bk-drill" in e.message for e in events)
 
 
 def test_runner_rejects_protected_destructive_op_with_operator_role(tmp_path):

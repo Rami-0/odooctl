@@ -23,6 +23,7 @@ class BackupManifest(BaseModel):
     odoo_version: str
     backup_mode: str = "full"
     checksums: dict[str, str] = Field(default_factory=dict)
+    encryption: dict[str, str] | None = None
     status: str = "complete"
 
 

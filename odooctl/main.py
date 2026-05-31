@@ -12,6 +12,8 @@ from odooctl.commands import (
     clone as clone_cmd,
     deploy as deploy_cmd,
     doctor as doctor_cmd,
+    domain as domain_cmd,
+    dr as dr_cmd,
     env as env_cmd,
     github_actions as gha_cmd,
     import_cmd,
@@ -43,6 +45,8 @@ app.add_typer(ops_cmd.app, name="ops")
 app.add_typer(branch_cmd.app, name="branch")
 app.add_typer(catalog_cmd.app, name="catalog")
 app.add_typer(security_cmd.app, name="security")
+app.add_typer(domain_cmd.app, name="domain")
+app.add_typer(dr_cmd.app, name="dr")
 
 
 def _context_config(config: str) -> str:
@@ -82,14 +86,27 @@ def deploy(environment: str, branch: str | None = None, config: str = "odooctl.y
     deploy_cmd.execute(environment, branch, _context_config(config))
 
 @app.command()
-def backup(environment: str, config: str = "odooctl.yml"):
-    backup_id = backup_cmd.execute(environment, _context_config(config))
+def backup(
+    environment: str,
+    config: str = "odooctl.yml",
+    verify: bool = typer.Option(False, "--verify", help="Verify the backup after creation."),
+):
+    backup_id = backup_cmd.execute(environment, _context_config(config), verify=verify)
     typer.echo(backup_id)
 
 @app.command()
-def restore(environment: str, backup: str = "latest", config: str = "odooctl.yml"):
-    backup_id = restore_cmd.execute(environment, backup, _context_config(config))
-    typer.echo(f"Restored {environment} from backup {backup_id}")
+def restore(
+    environment: str,
+    backup: str = "latest",
+    config: str = "odooctl.yml",
+    to: str | None = typer.Option(None, "--to", help="Restore source environment backup into this target environment (e.g. --to staging)."),
+):
+    if to is not None:
+        backup_id = restore_cmd.execute_to(environment, to, backup, _context_config(config))
+        typer.echo(f"Restored {environment} backup {backup_id} into {to}")
+    else:
+        backup_id = restore_cmd.execute(environment, backup, _context_config(config))
+        typer.echo(f"Restored {environment} from backup {backup_id}")
 
 @app.command(name="clone")
 def clone_env(

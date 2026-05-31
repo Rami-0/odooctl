@@ -56,6 +56,7 @@ def test_operation_kind_values():
     assert OperationKind.ENV_DESTROY.value == "env_destroy"
     assert OperationKind.UPDATE_MODULES.value == "update_modules"
     assert OperationKind.ROLLBACK.value == "rollback"
+    assert OperationKind.DR_DRILL.value == "dr_drill"
 
 
 def test_operation_status_values():

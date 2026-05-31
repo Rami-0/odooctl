@@ -61,6 +61,14 @@ class S3Adapter:
         base = PurePosixPath(self.config.prefix.strip("/")) if self.config.prefix else PurePosixPath("")
         return str(base / backup_name / relative_path.as_posix()).lstrip("/")
 
+    def _sse_extra_args(self) -> dict[str, str]:
+        if not self.config.encryption_algorithm:
+            return {}
+        extra = {"ServerSideEncryption": self.config.encryption_algorithm}
+        if self.config.encryption_key_env and os.getenv(self.config.encryption_key_env):
+            extra["SSEKMSKeyId"] = os.getenv(self.config.encryption_key_env, "")
+        return extra
+
     def _mirror_locally(self, backup_dir: str | Path) -> Path:
         src = Path(backup_dir)
         dest = self.remote_dir() / src.name
@@ -81,9 +89,13 @@ class S3Adapter:
         if endpoint_url:
             client_kwargs["endpoint_url"] = endpoint_url
         client = boto3_module.client("s3", **client_kwargs)
+        extra_args = self._sse_extra_args()
         for file_path in sorted(path for path in backup_dir.rglob("*") if path.is_file()):
             key = self._object_key(backup_dir.name, file_path.relative_to(backup_dir))
-            client.upload_file(str(file_path), self.config.bucket, key)
+            if extra_args:
+                client.upload_file(str(file_path), self.config.bucket, key, ExtraArgs=extra_args)
+            else:
+                client.upload_file(str(file_path), self.config.bucket, key)
         prefix = self._object_key(backup_dir.name, Path(""))
         return f"s3://{self.config.bucket}/{prefix}".rstrip("/")
 

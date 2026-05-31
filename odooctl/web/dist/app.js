@@ -307,6 +307,7 @@
                 '<button class="tab" data-tab="doctor">Doctor</button>' +
                 '<button class="tab" data-tab="operations">Operations</button>' +
                 '<button class="tab" data-tab="backups">Backups</button>' +
+                '<button class="tab" data-tab="restore-points">Restore Points</button>' +
                 (isOperator() ? '<button class="tab" data-tab="clone">Clone</button>' : '') +
                 (isAdmin() ? '<button class="tab" data-tab="promote">Promote</button>' : '') +
                 '</div>' +
@@ -332,6 +333,9 @@
                     } else if (tabName === 'backups') {
                         content.innerHTML = buildBackupsTab(envBackups, canWrite);
                         attachBackupsTab(content, project, env);
+                    } else if (tabName === 'restore-points') {
+                        content.innerHTML = renderSpinner();
+                        fetchRestorePoints(project, env, content, canWrite);
                     } else if (tabName === 'clone') {
                         content.innerHTML = buildCloneTab(otherEnvs, canWrite, isProtected);
                         attachCloneTab(content, project, env, isProtected);
@@ -512,6 +516,69 @@
                 enqueueOp(project, { kind: 'promote', environment: sourceEnv, params: { target: target } });
             });
         });
+    }
+
+    function fetchRestorePoints(project, env, container, canWrite) {
+        apiFetch('/projects/' + encodeURIComponent(project) + '/restore-points?environment=' + encodeURIComponent(env))
+            .then(function (data) {
+                container.innerHTML = buildRestorePointsTab(data.restore_points || [], env, canWrite);
+                attachRestorePointsTab(container, project, env);
+            })
+            .catch(function (err) {
+                container.innerHTML = renderErrorAlert(err);
+            });
+    }
+
+    function buildRestorePointsTab(points, env, canWrite) {
+        var content = '<div class="info-card"><h3>Restore Points</h3>';
+        content += '<p class="text-muted">Restore points are verified local backup snapshots. Integrity is checked against manifest checksums.</p>';
+        if (canWrite) {
+            content += '<div class="tab-actions">' +
+                '<button class="btn" id="run-backup-rp-btn">Create New Backup</button>' +
+                (isAdmin() ? ' <button class="btn btn-warning" id="dr-drill-btn">DR Drill</button>' : '') +
+                '</div>';
+        }
+        if (!points.length) {
+            content += '<p class="text-muted">No restore points found for this environment.</p>';
+        } else {
+            content += '<table class="ops-table">' +
+                '<tr><th>Backup ID</th><th>Timestamp</th><th>Integrity</th></tr>';
+            points.forEach(function (p) {
+                var integrityClass = p.integrity === 'ok' ? 'succeeded' : (p.integrity === 'failed' ? 'failed' : 'queued');
+                content += '<tr>' +
+                    '<td><code>' + esc(p.backup_id) + '</code></td>' +
+                    '<td>' + esc(p.timestamp || '—') + '</td>' +
+                    '<td><span class="badge status-' + esc(integrityClass) + '">' + esc(p.integrity) + '</span></td>' +
+                    '</tr>';
+            });
+            content += '</table>';
+        }
+        content += '</div>';
+        return content;
+    }
+
+    function attachRestorePointsTab(container, project, env) {
+        var backupBtn = container.querySelector('#run-backup-rp-btn');
+        if (backupBtn) {
+            backupBtn.addEventListener('click', function () {
+                confirmAndRun(
+                    'Run backup for environment <strong>' + esc(env) + '</strong>?',
+                    'backup',
+                    function () { enqueueOp(project, { kind: 'backup', environment: env, params: {} }); }
+                );
+            });
+        }
+        var drBtn = container.querySelector('#dr-drill-btn');
+        if (drBtn) {
+            drBtn.addEventListener('click', function () {
+                confirmAndRun(
+                    'Run DR drill for <strong>' + esc(env) + '</strong>?<br>' +
+                    '<span class="text-muted">Restores the latest backup into a throwaway database, runs a healthcheck, then cleans up.</span>',
+                    'drill',
+                    function () { enqueueOp(project, { kind: 'dr_drill', environment: env, params: {} }); }
+                );
+            });
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -15,7 +15,7 @@ from odooctl.operations.models import OperationKind
 from odooctl.operations.store import OperationStore
 
 
-def execute(environment: str, config_path: str = "odooctl.yml") -> str:
+def execute(environment: str, config_path: str = "odooctl.yml", *, verify: bool = False) -> str:
     ctx = ServiceContext.from_config_path(config_path)
     store = OperationStore(ctx.project.state_dir)
     audit = AuditStore(ctx.project.state_dir)
@@ -33,4 +33,11 @@ def execute(environment: str, config_path: str = "odooctl.yml") -> str:
         op_ctx.emit("starting backup", phase="backup")
         result = run_backup(ctx, environment)
         op_ctx.emit(f"backup complete: {result.backup_id}", phase="backup")
+        if verify:
+            from odooctl.services.backup import verify_backup
+            verify_result = verify_backup(ctx.project.backups_dir, result.backup_id)
+            if verify_result.ok:
+                op_ctx.emit(f"backup verified: {result.backup_id}", phase="verify")
+            else:
+                op_ctx.emit(f"backup verification failed: {verify_result.error}", phase="verify")
     return result.backup_id  # type: ignore[union-attr]

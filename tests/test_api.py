@@ -362,6 +362,29 @@ def test_admin_can_enqueue_destructive_op_on_protected_env(client):
     assert resp.status_code == 202
 
 
+def test_admin_can_enqueue_dr_drill_on_protected_env(client):
+    """DR drill is restore-class and admin-gated for protected source envs."""
+    token = _mint_admin()
+    resp = client.post(
+        "/projects/test-project/operations",
+        json={"kind": "dr_drill", "environment": "production", "params": {}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 202
+    assert resp.json()["kind"] == "dr_drill"
+
+
+def test_operator_cannot_enqueue_dr_drill_on_protected_env(client):
+    """Operator cannot enqueue restore-class DR drills against protected envs."""
+    token = _mint_operator()
+    resp = client.post(
+        "/projects/test-project/operations",
+        json={"kind": "dr_drill", "environment": "production", "params": {}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
 def test_cancel_operation_removes_queue_file(client, project_dir):
     """Cancelling a queued operation must remove its pending queue file."""
     token = _mint_operator()

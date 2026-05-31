@@ -36,6 +36,7 @@ _KIND_ACTION: dict[str, Action] = {
     "env_destroy": Action.ENV,
     "update_modules": Action.DEPLOY,
     "rollback": Action.RESTORE,
+    "dr_drill": Action.RESTORE,
 }
 
 

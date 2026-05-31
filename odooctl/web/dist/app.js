@@ -310,6 +310,7 @@
                 '<button class="tab" data-tab="restore-points">Restore Points</button>' +
                 (isOperator() ? '<button class="tab" data-tab="clone">Clone</button>' : '') +
                 (isAdmin() ? '<button class="tab" data-tab="promote">Promote</button>' : '') +
+                (isOperator() ? '<button class="tab" data-tab="migrate">Migrate</button>' : '') +
                 '</div>' +
                 '<div class="tab-content" id="tab-content">' +
                 buildOverviewTab(envCfg, statusEnv) +
@@ -342,6 +343,9 @@
                     } else if (tabName === 'promote') {
                         content.innerHTML = buildPromoteTab(otherEnvs, isProtected);
                         attachPromoteTab(content, project, env);
+                    } else if (tabName === 'migrate') {
+                        content.innerHTML = buildMigrateTab(canWrite, isProtected);
+                        attachMigrateTab(content, project, env, isProtected);
                     }
                 });
             });
@@ -514,6 +518,46 @@
             var msg = 'Promote <strong>' + esc(sourceEnv) + '</strong> &rarr; <strong>' + esc(target) + '</strong>.<br>This will merge branches and redeploy <strong>' + esc(target) + '</strong>.';
             confirmAndRun(msg, 'promote', function () {
                 enqueueOp(project, { kind: 'promote', environment: sourceEnv, params: { target: target } });
+            });
+        });
+    }
+
+    function buildMigrateTab(canWrite, isProtected) {
+        if (!canWrite) {
+            var msg = isProtected
+                ? 'Admin role required to run migration rehearsal on a protected environment.'
+                : 'Operator role required to run migration rehearsal.';
+            return renderAlert(msg, 'warning');
+        }
+        return '<div class="op-form">' +
+            '<h3>Migration Rehearsal</h3>' +
+            '<p>Clones the environment into a throwaway database, upgrades to the target version, healthchecks, produces a report, and drops the throwaway database. Production data is never modified.</p>' +
+            '<label>Target version (e.g. 18.0):<input type="text" id="migrate-to" placeholder="18.0" autocomplete="off"></label>' +
+            '<label><input type="checkbox" id="migrate-openupgrade"> Use OpenUpgrade (OCA) for the upgrade command</label>' +
+            '<label><input type="checkbox" id="migrate-keep"> Keep throwaway database after rehearsal (for debugging)</label>' +
+            '<div class="tab-actions mt-2"><button class="btn btn-danger" id="migrate-rehearse-btn">Run Rehearsal</button></div>' +
+            renderAlert('Rehearsal never modifies the source database or filestore. All changes apply only to a throwaway database that is dropped after the run.', 'info') +
+            (isProtected ? renderAlert('⚠ Protected environment — rehearsal clones production data into a temporary database.', 'warning') : '') +
+            '</div>';
+    }
+
+    function attachMigrateTab(container, project, env, isProtected) {
+        var btn = container.querySelector('#migrate-rehearse-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var toInput = container.querySelector('#migrate-to');
+            var to = toInput ? toInput.value.trim() : '';
+            if (!to) { showToast('Enter a target version (e.g. 18.0).', 'error'); return; }
+            var useOpenupgrade = !!(container.querySelector('#migrate-openupgrade') || {}).checked;
+            var keep = !!(container.querySelector('#migrate-keep') || {}).checked;
+            var msg = 'Run upgrade rehearsal for <strong>' + esc(env) + '</strong> &rarr; <strong>' + esc(to) + '</strong>.<br>' +
+                '<span class="text-muted">Throwaway database will be ' + (keep ? 'kept after the run.' : 'dropped after the run.') + '</span>';
+            confirmAndRun(msg, 'rehearse', function () {
+                enqueueOp(project, {
+                    kind: 'migrate_rehearsal',
+                    environment: env,
+                    params: { to: to, openupgrade: useOpenupgrade, keep: keep }
+                });
             });
         });
     }

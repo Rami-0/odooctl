@@ -19,6 +19,7 @@ from odooctl.commands import (
     import_cmd,
     init as init_cmd,
     logs as logs_cmd,
+    migrate as migrate_cmd,
     ops as ops_cmd,
     project as project_cmd,
     promote as promote_cmd,
@@ -47,6 +48,7 @@ app.add_typer(catalog_cmd.app, name="catalog")
 app.add_typer(security_cmd.app, name="security")
 app.add_typer(domain_cmd.app, name="domain")
 app.add_typer(dr_cmd.app, name="dr")
+app.add_typer(migrate_cmd.app, name="migrate")
 
 
 def _context_config(config: str) -> str:

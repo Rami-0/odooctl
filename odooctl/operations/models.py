@@ -19,6 +19,7 @@ class OperationKind(str, Enum):
     ROLLBACK = "rollback"
     PROMOTE = "promote"
     DR_DRILL = "dr_drill"
+    MIGRATE_REHEARSAL = "migrate_rehearsal"
 
 
 class OperationStatus(str, Enum):

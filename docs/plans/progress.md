@@ -21,7 +21,8 @@ Primary plan index: `docs/plans/README.md`
 - Tests/result: manager independently reran `uv run pytest tests/test_backup_verify.py -q` — 19 passed; `uv run pytest -q` — 661 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/services/restore.py tests/test_backup_verify.py` — passed; `uv run python -m build` — succeeded.
 - Blockers: none currently on the board. Rami input is not required because the remediation handoff was a procedural review-required gate backed by passing local verification, a synced remote state, and an explicit re-review task.
 - Auto-resolved this run: completed `t_1c479b1d` with a manager approval summary/metadata, unblocked `t_5c9d0fea`, ran `hermes kanban --board odooctl dispatch`, and verified the security review respawned as run `#47`. This was safe because the only remaining step is the already-requested independent M14 security re-review.
-- Push status: no new milestone-code push was needed this tick; repo was already synced to `origin/master` at `46213c8`. Manager progress update commit/push pending below.
+- Progress-file commit SHA: `f6e31fa`
+- Push status: succeeded — pushed manager progress update `f6e31fa` to `origin/master`. No new milestone-code push was needed this tick; the repo had already been synced to `origin/master` at `46213c8` before this management update.
 - Next step: let `odoo-security` finish `t_5c9d0fea`; if it approves M14, verify `t_8b7a971e` (M15 migration assistant) promotes/spawns next.
 
 ### 2026-05-31 — M14 B1 security remediation: production-source restore sanitization

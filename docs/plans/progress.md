@@ -12,6 +12,24 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 07:15 UTC — M14 security review blocked
+
+**Changed files:**
+- `docs/plans/progress.md` — recorded the M14 security review result and remediation handoff.
+
+**Review scope:** audited Traefik/ACME/domain attach/verify/detach, backup verification/encryption metadata, restore-to-staging, DR drill, API enqueue RBAC, runner dispatch, operation kinds, and docs for secret handling, safe restores, privilege boundaries, shell command safety, and deployment-sensitive flows.
+
+**Tests/checks:** `uv run pytest tests/test_domain.py tests/test_dr.py tests/test_restore_points.py tests/test_backup_verify.py tests/test_runner.py tests/test_api.py tests/test_backup.py -q` — 122 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/domains odooctl/services/domain.py odooctl/services/restore.py odooctl/services/restore_points.py odooctl/services/dr.py odooctl/services/backup.py odooctl/commands/domain.py odooctl/commands/dr.py odooctl/commands/restore.py odooctl/api/routes_operations.py odooctl/runner/worker.py` — passed.
+
+**Result:** not security-approved as-is. Blocking finding B1: `odooctl/services/restore.py::restore_to_env` restores production backup data into staging/non-protected targets without the sanitization guard used by `odooctl/services/clone.py::run_clone`, risking production PII/secrets/integrations and real side effects in staging. Non-blocking hardening: validate Traefik domain rule input, revalidate config on domain attach, point DR drill healthcheck at the throwaway DB, and reconcile API-enqueued `restore` with runner dispatch support.
+
+**Follow-up created:** `t_a11a2123` — M14 security remediation: sanitize production-to-staging restores, assigned to `odoo-backend` and dependent on this review card.
+
+**Commit SHA:** pending.
+**Push status:** pending.
+**Blockers:** M14 security approval blocked on B1 remediation and re-review.
+**Next step:** `odoo-backend` should remediate B1, add regression coverage/docs, rerun gates, commit/push, then return to security review.
+
 ### 2026-05-31 07:10 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_5c9d0fea` — **M14 security review** assigned to `odoo-security`; status `running` after this manager pass closed the parent M14 implementation handoff and dispatched the child security review gate. No other cards are running.

@@ -12,6 +12,22 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 01:13 UTC — M12 protected-env RBAC remediation
+
+**Changed files:**
+- `odooctl/api/routes_operations.py` — loads the project context and resolves the target environment before enqueue authorization, passes `protected=ctx.config.is_protected(body.environment)` into RBAC, and embeds principal roles in runner capability tokens.
+- `odooctl/runner/worker.py` — reconstructs a token-derived principal from claimed queue-entry capability claims and re-checks the protected-env RBAC floor before nonce consumption, lock acquisition, or dispatch.
+- `tests/test_api.py` — added regressions proving operator API tokens receive 403 for destructive operations on protected environments while admin tokens can enqueue.
+- `tests/test_runner.py` — added a protected target fixture and runner regression proving a forged/malformed protected destructive entry with only operator roles is rejected before dispatch.
+- `docs/plans/progress.md` — recorded remediation evidence and push hygiene.
+
+**Tests:** RED focused run before production fix: `uv run pytest tests/test_api.py::test_operator_cannot_enqueue_destructive_op_on_protected_env tests/test_api.py::test_admin_can_enqueue_destructive_op_on_protected_env tests/test_runner.py::test_runner_rejects_protected_destructive_op_with_operator_role -q` — 1 failed, 2 passed (operator protected clone returned 202 instead of 403); GREEN focused run after fix — 3 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_security.py tests/test_api.py tests/test_runner.py -q` — 164 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/api/routes_operations.py odooctl/runner/worker.py tests/test_api.py tests/test_runner.py` — all checks passed; `uv run pytest -q` — 538 passed, 1 StarletteDeprecationWarning.
+**Result:** Remediated the `t_c8f027f4` blocking finding: protected-env destructive enqueue now enforces the M11 admin+ floor in the API, and the privileged runner defensively rejects protected destructive entries whose token roles do not meet the same floor before dispatching work.
+**Implementation commit SHA:** `ddf17b2`
+**Push status:** pending — progress entry not yet committed/pushed at the time of this log entry.
+**Blockers:** none for remediation; handoff should return to the M12 security review gate for independent verification.
+**Next step:** re-run/unblock `t_c8f027f4` so `odoo-security` can review the protected-env RBAC fix before M13 starts.
+
 ### 2026-05-31 00:57 UTC — Hourly Kanban manager check
 
 - Active task(s): `t_c68f5587` — **M12 protected-env RBAC remediation** assigned to `odoo-backend`; status `running` after this manager pass spawned the backend fix task. `t_c8f027f4` remains **blocked** as the security review gate pending the remediation result.

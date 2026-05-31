@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 04:04 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_cddc7524` — **M13 review gate** assigned to `odoo-reviewer`; status `running` after this manager pass closed the blocked M13 implementation handoff and dispatched the child review gate.
+- Done since last run: `t_bf02e8bf` — **M13 web UI MVP** is now manager-approved/closed. The blocker was manager-resolvable because the frontend worker had already committed and pushed the milestone, included explicit verification evidence, and left no unresolved product/policy questions; the only failure was iteration-budget exhaustion while trying to summarize.
+- Board status: `done=15`, `running=1`, `blocked=0`, `ready=0`, `todo=4` after dispatch. Milestone order remains intact: M13 review gate is the only active card before M14 `t_e777c704` can promote.
+- Current repo state: branch `master`; `HEAD` `d937c9d` (`docs: record M13 push status`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: manager reran `uv run pytest tests/test_web.py tests/test_api.py::test_api_does_not_import_privileged -q` — 38 passed, 1 StarletteDeprecationWarning; `uv run pytest tests/test_web.py tests/test_api.py tests/test_security.py -q` — 180 passed, 1 StarletteDeprecationWarning; `uv run ruff check .` — passed; `uv run python -m build` — succeeded.
+- Push status: no new milestone-code push existed before this manager progress update; repo was already synced to `origin/master` at `d937c9d`.
+- Blockers: none on the board. Rami input is not required because the blocked card already had durable repo evidence, synced remote state, and a clear next dependency.
+- Auto-resolved this run: completed `t_bf02e8bf` with a manager approval summary/metadata, ran `hermes kanban --board odooctl dispatch`, and verified child `t_cddc7524` promoted/spawned. This was safe because the block was procedural and the implementation was independently re-verified against live repo state.
+- Next step: let `odoo-reviewer` finish `t_cddc7524`; if it approves M13, verify M14 domain/SSL and backup UX `t_e777c704` promotes/spawns next.
+
 ### 2026-05-31 — M13 Web UI MVP implemented
 
 **Changed files:**

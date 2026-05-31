@@ -12,6 +12,18 @@ Primary plan index: `docs/plans/README.md`
 
 ## Progress log
 
+### 2026-05-31 08:13 UTC — Hourly Kanban manager check
+
+- Active task(s): `t_5c9d0fea` — **M14 security review** is back to **running** on `odoo-security` as run `#47` after this manager pass approved the remediation handoff and re-dispatched the review gate. No other cards are running.
+- Done since last run: `t_1c479b1d` — **M14 security remediation: sanitize production-to-staging restores (dispatchable)** is now manager-approved/closed. The blocker was manager-resolvable because the worker had already committed and pushed the fix, included precise regression coverage, and left no unresolved user/product/policy questions.
+- Board status after dispatch: `done=19`, `running=1`, `blocked=0`, `ready=0`, `todo=3`. Milestone order remains intact: M14 security review is the only active card before `t_8b7a971e` (M15 migration assistant) can promote.
+- Current repo state: branch `master`; `HEAD` `46213c8` (`docs: record M14 B1 push status`); `origin/master` matches local `HEAD` (`ahead/behind = 0/0`); worktree clean before this progress update.
+- Tests/result: manager independently reran `uv run pytest tests/test_backup_verify.py -q` — 19 passed; `uv run pytest -q` — 661 passed, 1 StarletteDeprecationWarning; `uv run ruff check odooctl/services/restore.py tests/test_backup_verify.py` — passed; `uv run python -m build` — succeeded.
+- Blockers: none currently on the board. Rami input is not required because the remediation handoff was a procedural review-required gate backed by passing local verification, a synced remote state, and an explicit re-review task.
+- Auto-resolved this run: completed `t_1c479b1d` with a manager approval summary/metadata, unblocked `t_5c9d0fea`, ran `hermes kanban --board odooctl dispatch`, and verified the security review respawned as run `#47`. This was safe because the only remaining step is the already-requested independent M14 security re-review.
+- Push status: no new milestone-code push was needed this tick; repo was already synced to `origin/master` at `46213c8`. Manager progress update commit/push pending below.
+- Next step: let `odoo-security` finish `t_5c9d0fea`; if it approves M14, verify `t_8b7a971e` (M15 migration assistant) promotes/spawns next.
+
 ### 2026-05-31 — M14 B1 security remediation: production-source restore sanitization
 
 **Changed files:**

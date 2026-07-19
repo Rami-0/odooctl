@@ -60,3 +60,7 @@ nav:
   - Security:
       - Security notes: security.md
       - RBAC: rbac.md
+  - Project:
+      - Contributing: CONTRIBUTING.md
+      - Code of conduct: CODE_OF_CONDUCT.md
+      - Security policy: SECURITY.md

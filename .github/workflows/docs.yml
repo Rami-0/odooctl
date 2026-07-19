@@ -24,8 +24,11 @@ jobs:
       - name: Build site
         run: |
           pip install mkdocs-material
-          # index.md is generated from README.md at build time
-          cp README.md docs/index.md
+          # index.md is generated from README.md at build time. README uses
+          # GitHub-relative links (docs/foo.md, CONTRIBUTING.md); rewrite them
+          # to the in-site paths and stage the root governance files.
+          cp CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md docs/ 2>/dev/null || true
+          sed -E 's#\]\(docs/#](#g' README.md > docs/index.md
           mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3
         with:

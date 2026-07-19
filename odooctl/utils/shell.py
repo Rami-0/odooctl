@@ -113,5 +113,49 @@ def run_pipe_stdin(
     return result
 
 
+def run_pipe(
+    producer: Sequence[str],
+    consumer: Sequence[str],
+    *,
+    cwd: str | None = None,
+    env: Mapping[str, str] | None = None,
+    check: bool = True,
+) -> CommandResult:
+    """Pipe producer stdout into consumer stdin without invoking a shell.
+
+    Replaces ``sh -c "producer | consumer"`` so that no operand is ever
+    shell-interpreted. The byte stream never passes through Python text
+    decoding, keeping it safe for PostgreSQL custom-format dumps.
+    """
+    merged_env = _merged_env(env)
+    producer_proc = subprocess.Popen(
+        list(producer), cwd=cwd, env=merged_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    assert producer_proc.stdout is not None
+    consumer_proc = subprocess.Popen(
+        list(consumer),
+        cwd=cwd,
+        env=merged_env,
+        stdin=producer_proc.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    # Close our handle so the producer receives SIGPIPE if the consumer exits.
+    producer_proc.stdout.close()
+    consumer_stdout, consumer_stderr = consumer_proc.communicate()
+    producer_stderr = producer_proc.stderr.read() if producer_proc.stderr else b""
+    producer_rc = producer_proc.wait()
+    display_args = [*producer, "|", *consumer]
+    stderr = redact(
+        (producer_stderr + consumer_stderr).decode(errors="replace"), merged_env
+    )
+    stdout = redact(consumer_stdout.decode(errors="replace"), merged_env)
+    returncode = producer_rc if producer_rc != 0 else consumer_proc.returncode
+    result = CommandResult(list(display_args), returncode, stdout, stderr)
+    if check and returncode != 0:
+        raise CommandError(result)
+    return result
+
+
 def join_csv(values: Iterable[str]) -> str:
     return ",".join(v.strip() for v in values if v and v.strip())

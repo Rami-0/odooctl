@@ -11,9 +11,9 @@ from rich.table import Table
 
 from odooctl.adapters.db import make_db_adapter
 from odooctl.adapters.filestore import make_filestore_adapter
+from odooctl.cli_selector import resolve_config_path
 from odooctl.config import load_config
 from odooctl.context import ProjectContext
-from odooctl.registry import resolve_project_context
 from odooctl.operations.audit import AuditStore
 from odooctl.operations.engine import run_operation
 from odooctl.operations.models import OperationKind
@@ -23,15 +23,8 @@ app = typer.Typer(help="Manage named Odoo environments in this project.", add_co
 console = Console()
 
 
-def _config_path(config: str) -> Path:
-    ctx = click.get_current_context(silent=True)
-    root = ctx.find_root() if ctx is not None else None
-    obj = root.obj if root is not None and isinstance(root.obj, dict) else {}
-    project = obj.get("project")
-    project_dir = obj.get("project_dir")
-    if project or project_dir is not None:
-        return resolve_project_context(project=project, project_dir=project_dir, config=config).config_path
-    return ProjectContext.from_config_path(config).config_path
+def _config_path(ctx: typer.Context, config: str) -> Path:
+    return Path(resolve_config_path(ctx, config))
 
 
 def _load_raw(path: Path) -> dict:
@@ -50,10 +43,11 @@ def _write_raw(path: Path, data: dict) -> None:
 
 @app.command("list")
 def list_envs(
+    ctx: typer.Context,
     config: str = "odooctl.yml",
     json_output: bool = typer.Option(False, "--json", "--json-output"),
 ):
-    cfg = load_config(_config_path(config))
+    cfg = load_config(_config_path(ctx, config))
     if json_output:
         import json
 
@@ -91,11 +85,12 @@ def list_envs(
 
 @app.command("show")
 def show_env(
+    ctx: typer.Context,
     name: str,
     config: str = "odooctl.yml",
     json_output: bool = typer.Option(False, "--json", "--json-output"),
 ):
-    cfg = load_config(_config_path(config))
+    cfg = load_config(_config_path(ctx, config))
     env = cfg.env(name)
     if json_output:
         import json
@@ -107,6 +102,7 @@ def show_env(
 
 @app.command("create")
 def create_env(
+    ctx: typer.Context,
     name: str,
     clone_from: str = typer.Option(..., "--clone-from", help="Source environment to clone from."),
     branch: str | None = typer.Option(None, "--branch", help="Git branch for the new environment."),
@@ -126,7 +122,7 @@ def create_env(
     if scheme not in {"http", "https"}:
         raise click.ClickException("--scheme must be 'http' or 'https'")
 
-    path = _config_path(config)
+    path = _config_path(ctx, config)
     data = _load_raw(path)
     if name in data["environments"]:
         raise click.ClickException(f"Environment already exists: {name}")
@@ -193,6 +189,7 @@ def create_env(
 
 @app.command("open")
 def open_env(
+    ctx: typer.Context,
     name: str,
     from_branch: str = typer.Option(..., "--from", help="Feature branch to bind this environment to."),
     from_env: str = typer.Option("production", "--from-env", help="Source environment to clone/sanitize from."),
@@ -212,7 +209,7 @@ def open_env(
     if name in {"production", "staging"}:
         raise click.ClickException(f"Refusing to open a reserved environment name: {name}")
 
-    path = _config_path(config)
+    path = _config_path(ctx, config)
     data = _load_raw(path)
     if name in data["environments"]:
         raise click.ClickException(f"Environment already exists: {name}")
@@ -278,6 +275,7 @@ def open_env(
 
 @app.command("destroy")
 def destroy_env(
+    ctx: typer.Context,
     name: str,
     purge: bool = typer.Option(False, "--purge", help="Also purge the non-production DB and filestore before removing config."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Confirm destructive config removal."),
@@ -285,7 +283,7 @@ def destroy_env(
 ):
     if name == "production":
         raise click.ClickException("Refusing to destroy the production environment")
-    path = _config_path(config)
+    path = _config_path(ctx, config)
     data = _load_raw(path)
     if name not in data["environments"]:
         raise click.ClickException(f"Unknown environment: {name}")
@@ -294,9 +292,9 @@ def destroy_env(
     cfg = load_config(path)
     env = cfg.env(name)
     if purge:
-        ctx = ProjectContext(path.parent, path, cfg)
-        op_store = OperationStore(ctx.state_dir)
-        audit = AuditStore(ctx.state_dir)
+        project_ctx = ProjectContext(path.parent, path, cfg)
+        op_store = OperationStore(project_ctx.state_dir)
+        audit = AuditStore(project_ctx.state_dir)
         with run_operation(
             op_store,
             audit,
@@ -305,11 +303,11 @@ def destroy_env(
             environment=name,
             actor="cli",
             params_redacted={"name": name, "purge": purge},
-            state_dir=ctx.state_dir,
+            state_dir=project_ctx.state_dir,
         ) as op_ctx:
             op_ctx.emit(f"purging environment {name}", phase="env_destroy")
-            db = make_db_adapter(ctx)
-            fs = make_filestore_adapter(ctx, env)
+            db = make_db_adapter(project_ctx)
+            fs = make_filestore_adapter(project_ctx, env)
             db.drop(env.db_name)
             fs.delete(str(env.filestore_path))
             op_ctx.emit(f"environment {name} purged", phase="env_destroy")

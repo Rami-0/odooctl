@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from odooctl.cli_selector import selector_obj
 from odooctl.registry import resolve_project_context
 from odooctl.services.branch import get_branch_statuses
 from odooctl.services.context import ServiceContext
@@ -24,15 +25,12 @@ def _ctx(config: str, project: str | None = None, project_dir: str | None = None
 
 @app.command("status")
 def branch_status(
+    ctx: typer.Context,
     config: str = "odooctl.yml",
     json_output: bool = typer.Option(False, "--json", "--json-output"),
 ):
     """Show branch, commit, drift, and tier for each configured environment."""
-    import click
-
-    ctx_cli = click.get_current_context(silent=True)
-    root = ctx_cli.find_root() if ctx_cli is not None else None
-    obj = root.obj if root is not None and isinstance(root.obj, dict) else {}
+    obj = selector_obj(ctx)
     svc_ctx = _ctx(config, obj.get("project"), obj.get("project_dir"))
 
     statuses = get_branch_statuses(svc_ctx)

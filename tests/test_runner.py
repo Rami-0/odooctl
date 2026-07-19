@@ -478,3 +478,82 @@ def test_runner_once_processes_one_item(project_dir, fake_registry):
         worker.run_loop(once=True)
 
     assert call_count == 1
+
+def test_run_loop_once_returns_true_on_success(project_dir, fake_registry):
+    from odooctl.runner.worker import RunnerWorker
+
+    op_id = "exit000"
+    _pre_create_op(project_dir, op_id)
+    OperationQueue(project_dir / ".odooctl").enqueue(_make_entry(op_id=op_id))
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    with patch("odooctl.runner.worker.run_backup", return_value=_make_backup_result()):
+        assert worker.run_loop(once=True) is True
+
+
+def test_run_loop_once_returns_false_on_failed_operation(project_dir, fake_registry):
+    from odooctl.runner.worker import RunnerWorker
+
+    op_id = "exit001"
+    _pre_create_op(project_dir, op_id)
+    OperationQueue(project_dir / ".odooctl").enqueue(_make_entry(op_id=op_id))
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    with patch("odooctl.runner.worker.run_backup", side_effect=RuntimeError("disk full")):
+        assert worker.run_loop(once=True) is False
+
+
+def test_run_loop_once_returns_false_on_rejected_token(project_dir, fake_registry):
+    from odooctl.runner.worker import RunnerWorker
+
+    op_id = "exit002"
+    _pre_create_op(project_dir, op_id)
+    good = tokens.mint(TEST_KEY, action="backup", environment="production", project="test-project", ttl_seconds=300)
+    entry = QueueEntry.create(
+        op_id=op_id,
+        kind="backup",
+        project="test-project",
+        environment="production",
+        actor="api-client",
+        params_redacted={},
+        token=good[:-5] + "XXXXX",
+    )
+    OperationQueue(project_dir / ".odooctl").enqueue(entry)
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    assert worker.run_loop(once=True) is False
+
+
+def test_run_loop_once_returns_true_on_empty_queue(project_dir, fake_registry):
+    from odooctl.runner.worker import RunnerWorker
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    assert worker.run_loop(once=True) is True
+
+
+def test_run_loop_fail_fast_stops_on_failure(project_dir, fake_registry):
+    from odooctl.runner.worker import RunnerWorker
+
+    op_id = "exit003"
+    _pre_create_op(project_dir, op_id)
+    OperationQueue(project_dir / ".odooctl").enqueue(_make_entry(op_id=op_id))
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    with patch("odooctl.runner.worker.run_backup", side_effect=RuntimeError("boom")):
+        assert worker.run_loop(fail_fast=True) is False
+
+
+def test_runner_command_exits_nonzero_on_failed_operation(project_dir, fake_registry, monkeypatch):
+    import pytest as _pytest
+
+    from odooctl.commands import runner as runner_cmd
+
+    op_id = "exit004"
+    _pre_create_op(project_dir, op_id)
+    OperationQueue(project_dir / ".odooctl").enqueue(_make_entry(op_id=op_id))
+
+    monkeypatch.setattr("odooctl.registry.load_registry", lambda: fake_registry)
+    with patch("odooctl.runner.worker.run_backup", side_effect=RuntimeError("boom")):
+        with _pytest.raises(SystemExit) as excinfo:
+            runner_cmd.run(once=True, api_key=TEST_KEY)
+    assert excinfo.value.code == 1

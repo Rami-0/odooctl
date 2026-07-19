@@ -5,16 +5,16 @@ repo_url: https://github.com/Rami-0/odooctl
 repo_name: Rami-0/odooctl
 edit_uri: edit/master/docs/
 
-# Newsprint design system: permanent light mode, ink-on-paper, Odoo purple accent.
+# Vercel-style dark theme: near-black, hairline borders, Geist type.
 theme:
   name: material
   palette:
-    scheme: default
+    scheme: slate
     primary: custom
     accent: custom
   font:
-    text: Lora
-    code: JetBrains Mono
+    text: Geist
+    code: Geist Mono
   features:
     - navigation.sections
     - navigation.top
@@ -22,7 +22,7 @@ theme:
     - search.suggest
 
 extra_css:
-  - stylesheets/newsprint.css
+  - stylesheets/vercel.css
 
 markdown_extensions:
   - admonition

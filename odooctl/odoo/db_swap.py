@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Callable, Protocol
 
 
 class SwapPsqlAdapter(Protocol):
@@ -41,16 +41,21 @@ def swap_temp_database(
     temp_db: str,
     target_db: str,
     target_env_name: str,
+    is_protected_fn: Callable[[str], bool] | None = None,
     maintenance_db: str = "postgres",
 ) -> None:
     """Atomically promote a prepared temp DB into the target DB name.
 
-    The target environment name guard prevents accidental promotion over the
-    production environment. Callers are expected to restore and sanitize
-    ``temp_db`` before invoking this function.
+    ``is_protected_fn`` (typically ``OdooCtlConfig.is_protected``) guards
+    against accidental promotion over a protected environment such as
+    production; callers that omit it must enforce that policy themselves
+    before invoking this function. Callers are expected to restore and
+    sanitize ``temp_db`` before invoking this function.
     """
-    if target_env_name == "production":
-        raise RuntimeError("Refusing to swap a temporary database into the production environment")
+    if is_protected_fn is not None and is_protected_fn(target_env_name):
+        raise RuntimeError(
+            f"Refusing to swap a temporary database into protected environment '{target_env_name}'"
+        )
     if temp_db == target_db:
         raise RuntimeError("Temporary database name must differ from target database name")
     terminate_connections(pg, target_db, maintenance_db=maintenance_db)

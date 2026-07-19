@@ -396,6 +396,31 @@ def test_clone_rejects_unsanitized_production_clone_even_in_preview(tmp_path: Pa
         execute("production", "staging", False, str(config), preview=True)
 
 
+def test_clone_rejects_unsanitized_clone_from_protected_tier_source(tmp_path: Path):
+    """A source env with tier: production but a non-'production' name must get
+    the same sanitize refusal as one literally named 'production'."""
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  prod-eu:\n    tier: production\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: prod-eu\n    sanitize: true\n"""
+    )
+
+    with pytest.raises(RuntimeError, match="without sanitization enabled"):
+        execute("prod-eu", "staging", False, str(config), preview=True)
+
+
+def test_clone_preview_reports_protected_tier_source_as_production_source(tmp_path: Path, monkeypatch, capsys):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  prod-eu:\n    tier: production\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: prod-eu\n    sanitize: true\n"""
+    )
+    (tmp_path / "docker-compose.yml").touch()
+
+    execute("prod-eu", "staging", True, str(config), preview=True)
+
+    out = capsys.readouterr().out
+    assert "production_source=yes" in out
+
+
 def test_clone_rejects_production_clone_when_target_config_disables_sanitization(tmp_path: Path):
     config = tmp_path / "odooctl.yml"
     config.write_text(

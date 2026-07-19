@@ -1,12 +1,67 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Literal
 
 import yaml
 import click
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+
+# Defense-in-depth input validation (audit findings C3/F8). These values flow
+# into subprocess argv, container paths, docker volume names, and Traefik YAML,
+# so they are constrained at the config boundary even though shell sinks were
+# already removed.
+IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]*$"
+IDENTIFIER_MAX_LENGTH = 64
+_IDENTIFIER_RE = re.compile(IDENTIFIER_PATTERN)
+
+HOSTNAME_PATTERN = r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)*$"
+HOSTNAME_MAX_LENGTH = 253
+_HOSTNAME_RE = re.compile(HOSTNAME_PATTERN)
+
+
+def _redacted(value: object) -> str:
+    return str(value)[:32]
+
+
+def validate_identifier(value: str, field_name: str) -> str:
+    """Validate a docker/compose/database identifier; return it unchanged.
+
+    Raises ValueError when *value* is not a safe identifier (alphanumeric
+    start, then alphanumerics/dots/underscores/hyphens, no '..', max 64 chars).
+    """
+    if (
+        not isinstance(value, str)
+        or len(value) > IDENTIFIER_MAX_LENGTH
+        or ".." in value
+        or not _IDENTIFIER_RE.fullmatch(value)
+    ):
+        raise ValueError(
+            f"{field_name} {_redacted(value)!r} is invalid: must match {IDENTIFIER_PATTERN} "
+            f"with no '..', max {IDENTIFIER_MAX_LENGTH} characters"
+        )
+    return value
+
+
+def validate_hostname(value: str, field_name: str) -> str:
+    """Validate a DNS hostname; return it normalized to lowercase.
+
+    Raises ValueError when *value* is not a valid DNS hostname (labels of
+    alphanumerics and hyphens, dot-separated, max 253 chars; no wildcards).
+    """
+    normalized = value.lower() if isinstance(value, str) else value
+    if (
+        not isinstance(normalized, str)
+        or len(normalized) > HOSTNAME_MAX_LENGTH
+        or not _HOSTNAME_RE.fullmatch(normalized)
+    ):
+        raise ValueError(
+            f"{field_name} {_redacted(value)!r} is invalid: must be a valid DNS hostname "
+            f"matching {HOSTNAME_PATTERN}, max {HOSTNAME_MAX_LENGTH} characters"
+        )
+    return normalized
 
 
 class ProjectConfig(BaseModel):
@@ -40,6 +95,18 @@ class EnvironmentConfig(BaseModel):
     auto_deploy: bool = False
     last_deployed_commit: str | None = None
 
+    @field_validator("db_name", "filestore_volume")
+    @classmethod
+    def identifier_fields_must_be_safe(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return value
+        return validate_identifier(value, info.field_name)
+
+    @field_validator("domain")
+    @classmethod
+    def domain_must_be_valid_hostname(cls, value: str, info: ValidationInfo) -> str:
+        return validate_hostname(value, info.field_name)
+
 
 class PostgresConfig(BaseModel):
     host: str = "localhost"
@@ -50,6 +117,11 @@ class PostgresConfig(BaseModel):
     internal_host: str | None = None
     service_user: str | None = None
     service_password_env: str | None = None
+
+    @field_validator("service")
+    @classmethod
+    def service_must_be_safe(cls, value: str, info: ValidationInfo) -> str:
+        return validate_identifier(value, info.field_name)
 
     @model_validator(mode="after")
     def fill_container_defaults(self) -> "PostgresConfig":
@@ -85,6 +157,11 @@ class OdooConfig(BaseModel):
     db_password_env: str | None = None
     filestore_container_path: str = "/var/lib/odoo"
     without_demo: str = "True"
+
+    @field_validator("service")
+    @classmethod
+    def service_must_be_safe(cls, value: str, info: ValidationInfo) -> str:
+        return validate_identifier(value, info.field_name)
 
 
 class RemoteBackupConfig(BaseModel):
@@ -153,6 +230,8 @@ class OdooCtlConfig(BaseModel):
     def must_have_environments(cls, value: dict[str, EnvironmentConfig]) -> dict[str, EnvironmentConfig]:
         if not value:
             raise ValueError("at least one environment is required")
+        for name in value:
+            validate_identifier(name, "environment name")
         return value
 
     @model_validator(mode="after")

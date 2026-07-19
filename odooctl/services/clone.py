@@ -38,8 +38,8 @@ def run_clone(
     if dst.clone_from != source:
         raise RuntimeError(f"Environment '{target}' must be cloned from '{dst.clone_from}', not '{source}'")
     should_sanitize = dst.sanitize if sanitize is None else sanitize
-    if source == "production" and not should_sanitize:
-        raise RuntimeError("Refusing to clone production data without sanitization enabled")
+    if cfg.is_protected(source) and not should_sanitize:
+        raise RuntimeError("Refusing to clone protected environment data without sanitization enabled")
 
     compose_path = ctx.project.compose_file
     if not compose_path.exists():
@@ -56,7 +56,7 @@ def run_clone(
         )
         print(f"source_branch={src.branch} target_branch={dst.branch} clone_from={dst.clone_from}")
         print(f"affected_integrations={','.join(dst.update_modules) or 'none'}")
-        print(f"production_source={'yes' if source == 'production' else 'no'}")
+        print(f"production_source={'yes' if cfg.is_protected(source) else 'no'}")
         return CloneResult(url=base_url)
 
     missing_env_vars = cfg.missing_env_vars()
@@ -85,7 +85,13 @@ def run_clone(
     fs.copy(src_filestore, dst_filestore)
     if should_sanitize:
         sanitize_database(pg, temp_db, dst, cfg, sanitization_profile, sql_files=ctx.project.sanitization_sql_files())
-    swap_temp_database(pg, temp_db=temp_db, target_db=dst.db_name, target_env_name=target)
+    swap_temp_database(
+        pg,
+        temp_db=temp_db,
+        target_db=dst.db_name,
+        target_env_name=target,
+        is_protected_fn=cfg.is_protected,
+    )
     compose = DockerComposeAdapter(cfg.runtime.compose_file, project_dir=str(ctx.project.root))
     update_modules_compose(
         compose,

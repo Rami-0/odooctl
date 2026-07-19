@@ -97,3 +97,39 @@ def test_no_shell_dash_c_sinks_in_source_tree():
         if '"sh", "-lc"' in text or '"sh", "-c"' in text or "'sh', '-lc'" in text or "'sh', '-c'" in text:
             offenders.append(str(path))
     assert offenders == [], f"shell -c sinks found: {offenders}"
+
+
+def test_command_error_redacts_secrets_in_argv(monkeypatch):
+    """CommandError's composed message (args + stderr) must be redacted."""
+    from odooctl.utils.shell import CommandError, CommandResult
+
+    monkeypatch.setenv("ODOOCTL_TEST_PASSWORD", "argv-secret-value-123")
+    err = CommandError(
+        CommandResult(["odoo", "--db_password", "argv-secret-value-123"], 1, "", "")
+    )
+    assert "argv-secret-value-123" not in str(err)
+    assert "***REDACTED***" in str(err)
+    # The raw result stays untouched for programmatic inspection.
+    assert err.result.args[-1] == "argv-secret-value-123"
+
+
+def test_run_command_error_does_not_leak_secret_env_value(monkeypatch):
+    """A failing run() whose argv/stderr contain a sensitive env value raises a redacted error."""
+    import pytest
+
+    from odooctl.utils.shell import CommandError, run
+
+    secret = "shell-secret-value-456"
+    monkeypatch.setenv("ODOOCTL_TEST_PASSWORD", secret)
+    with pytest.raises(CommandError) as excinfo:
+        run(
+            [
+                sys.executable,
+                "-c",
+                f"import sys; sys.stderr.write('auth failed: {secret}'); sys.exit(3)",
+                secret,
+            ]
+        )
+    message = str(excinfo.value)
+    assert secret not in message
+    assert "***REDACTED***" in message

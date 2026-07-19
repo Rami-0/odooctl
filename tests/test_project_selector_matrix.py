@@ -53,9 +53,9 @@ def _config_of(mock) -> Path | None:
 COMMAND_MATRIX = [
     (["deploy", "staging"], "odooctl.commands.deploy.execute", None),
     (["backup", "staging"], "odooctl.commands.backup.execute", "bk-1"),
-    (["restore", "staging"], "odooctl.commands.restore.execute", "bk-1"),
+    (["restore", "staging", "-y"], "odooctl.commands.restore.execute", "bk-1"),
     (
-        ["restore", "production", "--to", "staging"],
+        ["restore", "production", "--to", "staging", "-y"],
         "odooctl.commands.restore.execute_to",
         "bk-1",
     ),
@@ -137,3 +137,39 @@ def test_env_subcommand_honors_project_dir(project_dir: Path, empty_cwd: Path):
     result = runner.invoke(app, ["--project-dir", str(project_dir), "env", "list"])
     assert result.exit_code == 0, result.output
     assert "production" in result.output
+
+
+def test_restore_without_yes_prompts_and_aborts(project_dir: Path, empty_cwd: Path):
+    with patch("odooctl.commands.restore.execute") as mock:
+        result = runner.invoke(
+            app, ["-C", str(project_dir), "restore", "staging"], input="n\n"
+        )
+    assert result.exit_code == 1
+    assert not mock.called
+
+
+def test_restore_confirmation_accepts_y(project_dir: Path, empty_cwd: Path):
+    with patch("odooctl.commands.restore.execute", return_value="bk-1") as mock:
+        result = runner.invoke(
+            app, ["-C", str(project_dir), "restore", "staging"], input="y\n"
+        )
+    assert result.exit_code == 0, result.output
+    assert mock.called
+
+
+def test_rollback_full_without_yes_aborts(project_dir: Path, empty_cwd: Path):
+    with patch("odooctl.commands.rollback.execute") as mock:
+        result = runner.invoke(
+            app,
+            ["-C", str(project_dir), "rollback", "staging", "--mode", "full"],
+            input="n\n",
+        )
+    assert result.exit_code == 1
+    assert not mock.called
+
+
+def test_rollback_code_mode_needs_no_confirmation(project_dir: Path, empty_cwd: Path):
+    with patch("odooctl.commands.rollback.execute") as mock:
+        result = runner.invoke(app, ["-C", str(project_dir), "rollback", "staging"])
+    assert result.exit_code == 0, result.output
+    assert mock.called

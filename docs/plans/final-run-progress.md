@@ -62,8 +62,10 @@ the user to review/merge (merge-without-review is outside my authorization).
 - RUNNING: README full-rewrite agent (verifies every command against --help before documenting).
 - TODO: screenshots (needs a running UI; placeholder comments in README), first-run measurement, error-message polish (deferred — good state already).
 
-### Phase 5 — Launch prep + cross-model review: DONE (security fixes applied)
-- Cross-model review: Opus re-scan complete → 13 remediations verified + 9 findings. ALL FIXED and pushed (commit "post-rescan security hardening"): H1 API project-scope, H2 audit HWM truncation-detection + runner unkeyed warning, H3 nonce atomic flock+expiry, M1 temp-db collision, M2 filestore_path validation, M4 unconditional key floor, L1 testclient host. M3 accepted low-risk, L2 mitigated. 976 unit tests green on both venvs; CI green all Python versions.
+### Phase 5 — Launch prep + cross-model review: DONE (two review rounds fixed)
+- Round 1 (Opus): 13 remediations verified + 9 findings. ALL FIXED (commit "post-rescan security hardening"): H1 API project-scope, H2 audit HWM truncation-detection + runner unkeyed warning, H3 nonce atomic flock+expiry, M1 temp-db collision, M2 filestore_path validation, M4 unconditional key floor, L1 testclient host. M3 accepted low → later fixed in round 2. L2 mitigated.
+- Round 2 (GPT via codex CLI — stdin-fix made it work): confirmed round-1 fixes hold, 7 more findings. Fixed with tests (commit "second-round re-scan findings"): #3 crash/failure-safe DB swap (rename-aside via new database_exists on real adapters; both models flagged it), #6 registry containment in API+runner (registry.context_from_registered), #4 CommandError merged-env redaction, #1 filestore tar member validation. #2/#5/#7 deferred with rationale under operator-trust model → experiments/2026-07-19-post-hardening-rescan/codex-findings-triage.md.
+- 983 unit tests green on both venvs; CI green all Python versions. Integration re-run on Odoo 19 in progress to exercise real-Postgres swap path.
 - Findings + resolution recorded in experiments/2026-07-19-post-hardening-rescan/opus-rescan-findings.md.
 - Launch metadata done earlier: release.yml (PyPI trusted publishing), dependabot, templates, CODEOWNERS, 0.2.0, mkdocs.
 - STILL REQUIRES USER (outward-facing): make repo public; PyPI trusted-publisher + tag v0.2.0 to publish. Dependabot PRs #1-#5 for user to merge.

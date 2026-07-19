@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from odooctl.api.auth import require_action
+from odooctl.api.auth import enforce_project_scope, require_action
 from odooctl.security.rbac import Action
 
 router = APIRouter()
@@ -20,6 +20,8 @@ def _registry(request: Request):
 def _load_ctx(request: Request, project: str):
     from odooctl.context import ProjectContext
 
+    # A per-project token must not reach another project's config/state.
+    enforce_project_scope(request, project)
     reg = _registry(request)
     proj = reg.projects.get(project)
     if proj is None:
@@ -36,7 +38,12 @@ def list_projects(
     principal=Depends(require_action(Action.READ)),
 ):
     reg = _registry(request)
-    return {"projects": sorted(reg.projects.keys())}
+    names = sorted(reg.projects.keys())
+    # A token scoped to one project only learns of that project.
+    claim = str(getattr(request.state, "token_project", None) or "")
+    if claim != "*":
+        names = [n for n in names if n == claim]
+    return {"projects": names}
 
 
 @router.get("/projects/{project}")
@@ -45,6 +52,7 @@ def get_project(
     request: Request,
     principal=Depends(require_action(Action.READ)),
 ):
+    enforce_project_scope(request, project)
     reg = _registry(request)
     proj = reg.projects.get(project)
     if proj is None:

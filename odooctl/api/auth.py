@@ -11,8 +11,6 @@ No privileged imports — satisfies the runner contract.
 """
 from __future__ import annotations
 
-import os
-
 from fastapi import Depends, Header, HTTPException, Request
 
 from odooctl.security import rbac, tokens
@@ -30,11 +28,11 @@ def get_principal(
     token_str: str = Depends(_bearer_token),
 ) -> Principal:
     api_key: str = request.app.state.api_key
-    # Key-strength floor (F24): refuse to authenticate against a weak
-    # environment-supplied ODOOCTL_API_KEY. ``create_app`` already rejects this
-    # at startup for the env-sourced key; this is defense in depth for apps
-    # constructed another way.
-    if len(api_key) < tokens.MIN_API_KEY_LENGTH and os.environ.get("ODOOCTL_API_KEY") == api_key:
+    # Key-strength floor (F24): refuse to authenticate against any weak server
+    # key. ``create_app`` already rejects a weak key at startup; this is a
+    # backstop for apps constructed another way, and applies regardless of how
+    # the key was supplied.
+    if len(api_key) < tokens.MIN_API_KEY_LENGTH:
         raise HTTPException(status_code=500, detail="Server API key is too weak")
     try:
         payload = tokens.verify(api_key, token_str, action="api")
@@ -68,6 +66,19 @@ def get_principal(
         roles=frozenset(role_set),
         display=sub,
     )
+
+
+def enforce_project_scope(request: Request, project: str) -> None:
+    """Reject access when the token's project claim does not cover *project*.
+
+    A token minted with a concrete ``proj`` claim (not ``"*"``) is confined to
+    that one project: it must not read from or enqueue against any other
+    project. Session tokens use ``proj="*"`` and are unaffected. Responds 404
+    (not 403) so a scoped token cannot enumerate which other projects exist.
+    """
+    claim = str(getattr(request.state, "token_project", None) or "")
+    if claim != "*" and claim != project:
+        raise HTTPException(status_code=404, detail=f"Project {project!r} not found")
 
 
 def require_action(action: rbac.Action):

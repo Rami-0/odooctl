@@ -15,7 +15,7 @@ from odooctl.security import tokens  # noqa: E402
 
 _DIST = Path(__file__).parent.parent / "odooctl" / "web" / "dist"
 
-TEST_KEY = "test-m14-key-789"
+TEST_KEY = "test-m14-key-789-0123456789abcdef0123"
 
 MINIMAL_CONFIG = """\
 project:

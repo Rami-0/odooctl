@@ -15,8 +15,6 @@ No privileged imports — satisfies the runner contract.
 """
 from __future__ import annotations
 
-import os
-import warnings
 from pathlib import Path
 from typing import Callable
 
@@ -33,6 +31,7 @@ def create_app(
     *,
     registry_loader: Callable | None = None,
     allowed_hosts: list[str] | None = None,
+    extra_allowed_hosts: list[str] | None = None,
     static_dir: Path | None = None,
 ) -> FastAPI:
     """Create and configure the odooctl FastAPI application.
@@ -42,21 +41,17 @@ def create_app(
         ``odooctl.registry.load_registry`` so tests can inject a fake.
     :param allowed_hosts: Hosts allowed by ``TrustedHostMiddleware``; defaults
         to ``["127.0.0.1", "localhost"]`` for localhost-only operation.
+    :param extra_allowed_hosts: Additional hosts appended to the default set
+        (e.g. tests pass ``["testclient"]``); ignored when ``allowed_hosts`` is
+        given explicitly.
     :param static_dir: Optional path to a pre-built SPA dist directory mounted
         at ``/`` after all API routes.
     """
-    # Key-strength floor (F24): a short HMAC key makes bearer/capability
-    # tokens brute-forceable. Hard-fail when the weak key is the operator's
-    # environment-supplied ODOOCTL_API_KEY (the `odooctl serve` path); warn
-    # for programmatically injected keys (embedding/tests).
-    if len(api_key) < tokens.MIN_API_KEY_LENGTH:
-        if os.environ.get("ODOOCTL_API_KEY") == api_key:
-            tokens.enforce_key_strength(api_key)
-        warnings.warn(
-            f"api_key is shorter than {tokens.MIN_API_KEY_LENGTH} characters; "
-            "use a stronger key in production.",
-            stacklevel=2,
-        )
+    # Key-strength floor (F24): a short HMAC key makes bearer/capability tokens
+    # brute-forceable, so it is rejected unconditionally regardless of how the
+    # key reached us. This is the primary defense; ``get_principal`` re-checks
+    # as a backstop.
+    tokens.enforce_key_strength(api_key)
 
     if registry_loader is None:
         from odooctl.registry import load_registry
@@ -73,7 +68,12 @@ def create_app(
     app.state.registry_loader = registry_loader
 
     if allowed_hosts is None:
-        allowed_hosts = ["127.0.0.1", "localhost", "testclient"]
+        # Localhost-only by default. "testclient" (the Starlette TestClient
+        # default Host) is deliberately NOT in the production default; tests
+        # opt in via extra_allowed_hosts.
+        allowed_hosts = ["127.0.0.1", "localhost"]
+        if extra_allowed_hosts:
+            allowed_hosts = [*allowed_hosts, *extra_allowed_hosts]
 
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 

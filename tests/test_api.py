@@ -490,10 +490,12 @@ def test_create_app_rejects_short_env_sourced_key(monkeypatch, fake_registry):
         create_app(api_key="short-key", registry_loader=lambda: fake_registry)
 
 
-def test_create_app_warns_on_short_programmatic_key(fake_registry):
+def test_create_app_rejects_short_programmatic_key(fake_registry):
+    """F24 / re-scan M4: the key floor is unconditional — a weak key is
+    rejected regardless of whether it came from the environment."""
     from odooctl.api.app import create_app
 
-    with pytest.warns(UserWarning, match="32"):
+    with pytest.raises(ValueError, match="at least 32"):
         create_app(api_key="short-key", registry_loader=lambda: fake_registry)
 
 
@@ -541,3 +543,66 @@ def test_cancel_operation_removes_queue_file(client, project_dir):
     assert resp2.status_code == 200
 
     assert not (queue_dir / f"{op_id}.json").exists()
+
+
+# --- Re-scan H1: token project-scope enforcement ---
+
+
+def _mint_scoped(project, roles=("operator",), now=None):
+    """A capability token confined to a single project via its ``proj`` claim."""
+    return tokens.mint(
+        TEST_KEY,
+        action="api",
+        environment="*",
+        project=project,
+        ttl_seconds=300,
+        now=now,
+        roles=list(roles),
+    )
+
+
+def test_scoped_token_cannot_read_other_project_audit(client):
+    """A token scoped to project 'acme' must not read 'test-project' data."""
+    token = _mint_scoped("acme", roles=["admin"])
+    resp = client.get("/projects/test-project/audit", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 404
+
+
+def test_scoped_token_cannot_enqueue_against_other_project(client):
+    token = _mint_scoped("acme", roles=["operator"])
+    resp = client.post(
+        "/projects/test-project/operations",
+        json={"kind": "backup", "environment": "production", "params": {}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 404
+
+
+def test_scoped_token_reaches_its_own_project(client):
+    token = _mint_scoped("test-project", roles=["admin"])
+    resp = client.get("/projects/test-project/audit", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+
+
+def test_wildcard_token_reaches_any_project(client):
+    token = _mint_operator()  # project="*"
+    resp = client.get("/projects/test-project/audit", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+
+
+def test_scoped_token_list_projects_is_filtered(client):
+    token = _mint_scoped("acme", roles=["viewer"])
+    resp = client.get("/projects", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    # 'acme' isn't registered, so the scoped view is empty; crucially it does
+    # not leak 'test-project'.
+    assert resp.json()["projects"] == []
+
+
+def test_scoped_token_status_and_backups_blocked(client):
+    token = _mint_scoped("acme", roles=["operator"])
+    for path in ("/projects/test-project/status", "/projects/test-project/backups",
+                 "/projects/test-project/environments", "/projects/test-project/restore-points",
+                 "/projects/test-project"):
+        resp = client.get(path, headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 404, path

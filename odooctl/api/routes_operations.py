@@ -112,12 +112,14 @@ def enqueue_operation(
     request: Request,
     principal=Depends(get_principal),
 ):
+    from odooctl.api.auth import enforce_project_scope
     from odooctl.api.queue import OperationQueue, QueueEntry
     from odooctl.operations.models import Operation, OperationKind
     from odooctl.operations.store import OperationStore
     from odooctl.security import rbac, tokens
     from odooctl.security.redaction import redact
 
+    enforce_project_scope(request, project)
     ctx = _load_ctx(request, project)
 
     # Resolve the target environment before authorization so protected-env

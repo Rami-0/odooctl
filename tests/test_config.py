@@ -316,3 +316,83 @@ def test_example_configs_still_validate():
     multidb = EXAMPLE_PATH.parent / "multidb" / "odooctl.yml"
     if multidb.exists():
         load_config(multidb)
+
+
+# --- Re-scan M1: cross-environment temp-DB collision ---
+
+_COLLISION_CONFIG = """project:
+  name: demo
+  odoo_version: "19.0"
+runtime:
+  compose_file: docker-compose.yml
+sanitization:
+  temp_db_suffix: _incoming
+environments:
+  production:
+    branch: main
+    domain: prod.example.com
+    db_name: odoo
+    filestore_path: filestore/odoo
+  staging:
+    branch: staging
+    domain: staging.example.com
+    db_name: odoo_incoming
+    filestore_path: filestore/odoo_incoming
+odoo:
+  image: registry/odoo:19
+"""
+
+
+def test_temp_db_collision_is_rejected(tmp_path: Path):
+    # staging.db_name (odoo_incoming) == production.db_name + _incoming, so a
+    # clone/restore into production would drop staging's live DB.
+    path = tmp_path / "odooctl.yml"
+    path.write_text(_COLLISION_CONFIG)
+    with pytest.raises(ValueError, match="collides with the live db_name"):
+        load_config(path)
+
+
+def test_normal_two_env_config_still_validates(tmp_path: Path):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(example_config())
+    cfg = load_config(path)
+    assert cfg.env("production").db_name != cfg.env("staging").db_name
+
+
+# --- Re-scan M2: filestore_path validation ---
+
+
+def _cfg_with_filestore_path(fp: str) -> str:
+    return f"""project:
+  name: demo
+  odoo_version: "19.0"
+runtime:
+  compose_file: docker-compose.yml
+environments:
+  production:
+    branch: main
+    domain: prod.example.com
+    db_name: odoo_prod
+    filestore_path: "{fp}"
+odoo:
+  image: registry/odoo:19
+"""
+
+
+@pytest.mark.parametrize("bad", ["/", "", "foo/../bar", "filestore/../../etc"])
+def test_filestore_path_rejects_dangerous_values(tmp_path: Path, bad: str):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(_cfg_with_filestore_path(bad))
+    with pytest.raises(ValueError):
+        load_config(path)
+
+
+@pytest.mark.parametrize(
+    "good",
+    ["filestore/odoo_prod", "/var/lib/odoo/filestore/odoo_prod", "/srv/filestore/prod"],
+)
+def test_filestore_path_accepts_valid_values(tmp_path: Path, good: str):
+    path = tmp_path / "odooctl.yml"
+    path.write_text(_cfg_with_filestore_path(good))
+    cfg = load_config(path)
+    assert cfg.env("production").filestore_path == good

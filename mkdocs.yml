@@ -1,6 +1,6 @@
 site_name: odooctl
 site_description: CLI-first, Odoo-aware control plane for self-hosted Odoo on Docker Compose
-site_url: https://rami-0.github.io/odooctl/
+site_url: https://rami-0.github.io/odooctl/docs/
 repo_url: https://github.com/Rami-0/odooctl
 repo_name: Rami-0/odooctl
 edit_uri: edit/master/docs/

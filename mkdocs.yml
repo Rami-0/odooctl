@@ -26,6 +26,9 @@ theme:
 extra_css:
   - stylesheets/vercel.css
 
+extra:
+  homepage: https://rami-0.github.io/odooctl/
+
 markdown_extensions:
   - admonition
   - pymdownx.superfences

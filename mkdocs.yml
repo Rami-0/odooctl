@@ -5,26 +5,24 @@ repo_url: https://github.com/Rami-0/odooctl
 repo_name: Rami-0/odooctl
 edit_uri: edit/master/docs/
 
+# Newsprint design system: permanent light mode, ink-on-paper, Odoo purple accent.
 theme:
   name: material
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: deep purple
-      toggle:
-        icon: material/weather-night
-        name: Dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: deep purple
-      toggle:
-        icon: material/weather-sunny
-        name: Light mode
+    scheme: default
+    primary: custom
+    accent: custom
+  font:
+    text: Lora
+    code: JetBrains Mono
   features:
     - navigation.sections
     - navigation.top
     - content.code.copy
     - search.suggest
+
+extra_css:
+  - stylesheets/newsprint.css
 
 markdown_extensions:
   - admonition

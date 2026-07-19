@@ -1,6 +1,6 @@
 # Getting help
 
-- **Documentation** — <https://rami-0.github.io/odooctl/> covers install,
+- **Documentation** — <https://rami-0.github.io/odooctl/docs/> covers install,
   configuration, backup/restore, staging clones, deploys, rollback,
   migration rehearsal, and the API.
 - **Questions & ideas** — use

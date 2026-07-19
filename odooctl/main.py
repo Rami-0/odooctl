@@ -37,7 +37,6 @@ from odooctl.commands import (
 
 app = typer.Typer(
     help="Odoo-aware deployment CLI for self-hosted Docker Compose projects.",
-    add_completion=False,
 )
 app.add_typer(project_cmd.app, name="project")
 app.add_typer(env_cmd.app, name="env")
@@ -242,6 +241,7 @@ def import_project(
     output: Path = typer.Option(Path("odooctl.yml"), "--output", "-o", help="Output path for generated config."),
     skip_doctor: bool = typer.Option(False, "--skip-doctor", help="Skip preflight doctor checks after adoption."),
     skip_backup: bool = typer.Option(False, "--skip-backup", help="Skip safety backup after adoption."),
+    allow_outside: bool = typer.Option(False, "--allow-outside", help="Permit --output paths outside the current and imported project directories."),
 ) -> None:
     """Import an existing Docker Compose Odoo deployment (read-only detection, then optional adoption).
 
@@ -264,6 +264,7 @@ def import_project(
         output=output,
         skip_doctor=skip_doctor,
         skip_backup=skip_backup,
+        allow_outside=allow_outside,
     )
 
 

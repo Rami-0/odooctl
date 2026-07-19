@@ -9,7 +9,7 @@ import pytest
 from odooctl.api.queue import OperationQueue, QueueEntry
 from odooctl.security import tokens
 
-TEST_KEY = "test-runner-key-xyz"
+TEST_KEY = "test-runner-key-xyz-0123456789abcdef"
 
 MINIMAL_CONFIG = """\
 project:
@@ -620,3 +620,87 @@ def test_engine_persists_redacted_operation_error(tmp_path, monkeypatch):
     assert op.status == OperationStatus.FAILED
     assert secret not in (op.error or "")
     assert "***REDACTED***" in (op.error or "")
+
+
+# --- NonceStore purge / format tests (F12) — appended, do not modify above ---
+
+
+def test_nonce_store_stores_timestamped_entries(tmp_path):
+    """New format: {"nonces": {nonce: consumed_at_iso}}."""
+    import json as _json
+    from datetime import datetime
+
+    from odooctl.runner.worker import NonceStore
+
+    store = NonceStore(tmp_path)
+    store.mark_consumed("nonce-a")
+
+    raw = _json.loads((tmp_path / "consumed_nonces.json").read_text())
+    assert isinstance(raw["nonces"], dict)
+    assert "nonce-a" in raw["nonces"]
+    # the value is a parseable ISO timestamp
+    datetime.fromisoformat(raw["nonces"]["nonce-a"])
+
+
+def test_nonce_store_purges_entries_older_than_retention(tmp_path):
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+
+    from odooctl.runner.worker import NONCE_RETENTION_SECONDS, NonceStore
+
+    assert NONCE_RETENTION_SECONDS == 7200  # 2 × max token TTL
+
+    now = datetime.now(timezone.utc)
+    old_ts = (now - timedelta(seconds=NONCE_RETENTION_SECONDS + 60)).isoformat()
+    recent_ts = (now - timedelta(seconds=60)).isoformat()
+    (tmp_path / "consumed_nonces.json").write_text(
+        _json.dumps({"nonces": {"ancient": old_ts, "recent": recent_ts}})
+    )
+
+    store = NonceStore(tmp_path)
+    # Before any write, both are still recorded as consumed.
+    assert store.is_consumed("ancient")
+    assert store.is_consumed("recent")
+
+    store.mark_consumed("fresh")
+
+    assert not store.is_consumed("ancient")  # purged
+    assert store.is_consumed("recent")
+    assert store.is_consumed("fresh")
+
+
+def test_nonce_store_replay_blocked_within_token_validity(tmp_path):
+    """Replay protection must hold within the token TTL despite purging."""
+    from odooctl.runner.worker import NonceStore
+
+    store = NonceStore(tmp_path)
+    store.mark_consumed("replayed-nonce")
+    # Later consumptions (which trigger purges) must not evict a fresh nonce.
+    for i in range(5):
+        store.mark_consumed(f"other-{i}")
+    assert store.is_consumed("replayed-nonce")
+
+
+def test_nonce_store_accepts_legacy_list_format(tmp_path):
+    """Old {"nonces": [..]} files stay consumed and migrate on first write."""
+    import json as _json
+    from datetime import datetime
+
+    from odooctl.runner.worker import NonceStore
+
+    (tmp_path / "consumed_nonces.json").write_text(
+        _json.dumps({"nonces": ["legacy-a", "legacy-b"]})
+    )
+    store = NonceStore(tmp_path)
+    assert store.is_consumed("legacy-a")
+    assert store.is_consumed("legacy-b")
+    assert not store.is_consumed("unknown")
+
+    store.mark_consumed("new-nonce")
+
+    raw = _json.loads((tmp_path / "consumed_nonces.json").read_text())
+    assert isinstance(raw["nonces"], dict)
+    # legacy entries migrated to now-timestamps, still blocked
+    for nonce in ("legacy-a", "legacy-b", "new-nonce"):
+        assert store.is_consumed(nonce)
+        datetime.fromisoformat(raw["nonces"][nonce])

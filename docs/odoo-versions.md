@@ -70,7 +70,7 @@ When moving a project to a new Odoo major version:
 3. Run `odooctl backup production` in the old known-good stack.
 4. Restore or clone into a staging database on the new image.
 5. Run `odooctl update-modules staging --modules <your modules>`.
-6. Confirm `/web/login` and any custom health route respond.
+6. Confirm `/web/health` and any custom health route return HTTP 200 (redirects count as unhealthy).
 7. Review Odoo logs for deprecated CLI flags or addon migration warnings.
 
 ## Integration coverage

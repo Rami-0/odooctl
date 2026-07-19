@@ -69,7 +69,7 @@ sanitization:
 
 healthcheck:
   scheme: http
-  path: /web/login
+  path: /web/health
   retries: 12
   interval_seconds: 3
 

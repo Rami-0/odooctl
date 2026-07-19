@@ -44,7 +44,7 @@ def check_url(url: str, *, timeout: int = 5, retries: int = 12, interval: int = 
                 last_error = f"unexpected HTTP status {response.status}"
         except HTTPError as exc:
             if 300 <= exc.code < 400:
-                last_error = f"redirect ({exc.code}) is not a healthy response; point the healthcheck at a 2xx endpoint such as /web/login"
+                last_error = f"redirect ({exc.code}) is not a healthy response; point the healthcheck at a 2xx endpoint such as /web/health"
             else:
                 last_error = exc
         except (URLError, TimeoutError, ConnectionError, OSError, HTTPException) as exc:

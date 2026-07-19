@@ -36,6 +36,10 @@ app.add_typer(token_app, name="token")
 
 console = Console()
 
+# The API and runner both verify tokens with ODOOCTL_API_KEY, so mint with the
+# same key by default. ODOOCTL_RUNNER_KEY remains available via --key-env for
+# deployments that intentionally split signing domains.
+DEFAULT_KEY_ENV = "ODOOCTL_API_KEY"
 RUNNER_KEY_ENV = "ODOOCTL_RUNNER_KEY"
 
 
@@ -213,7 +217,7 @@ def token_mint(
     project: str = typer.Option(..., "--project", help="Target project."),
     ttl: int = typer.Option(300, "--ttl", help="Time-to-live in seconds."),
     subject: str | None = typer.Option(None, "--subject", help="Optional subject (principal identity)."),
-    key_env: str = typer.Option(RUNNER_KEY_ENV, "--key-env", help="Env var holding the runner signing key."),
+    key_env: str = typer.Option(DEFAULT_KEY_ENV, "--key-env", help="Env var holding the signing key (must match what the API/runner verify with)."),
     role: list[str] = typer.Option([], "--role", help="Role to embed in the token (repeatable, e.g. --role operator)."),
 ) -> None:
     """Mint a signed capability token for a single scoped runner action."""
@@ -237,7 +241,7 @@ def token_verify(
     action: str | None = typer.Option(None, "--action"),
     environment: str | None = typer.Option(None, "--env", "--environment"),
     project: str | None = typer.Option(None, "--project"),
-    key_env: str = typer.Option(RUNNER_KEY_ENV, "--key-env"),
+    key_env: str = typer.Option(DEFAULT_KEY_ENV, "--key-env"),
     stdin: bool = typer.Option(False, "--stdin", help="Read the token from stdin instead of argv."),
 ) -> None:
     """Verify a capability token's signature, expiry, and scope.

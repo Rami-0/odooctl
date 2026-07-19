@@ -7,6 +7,7 @@ and the project filestore.
 from __future__ import annotations
 
 import os
+import sys
 
 
 def run(*, once: bool = False, fail_fast: bool = False, api_key: str | None = None) -> None:
@@ -16,6 +17,16 @@ def run(*, once: bool = False, fail_fast: bool = False, api_key: str | None = No
         raise SystemExit(
             "API key is required. Set --api-key or ODOOCTL_API_KEY env var."
         )
+
+    # Key-strength floor (F24): a short HMAC key makes every capability token
+    # this runner verifies brute-forceable offline.
+    from odooctl.security import tokens
+
+    try:
+        tokens.enforce_key_strength(api_key)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1)
 
     from odooctl.registry import load_registry
     from odooctl.runner.worker import RunnerWorker

@@ -207,7 +207,7 @@ class RedactionConfig(BaseModel):
 
 
 class HealthcheckConfig(BaseModel):
-    path: str = "/web/login"
+    path: str = "/web/health"
     scheme: Literal["http", "https"] | None = None
     timeout_seconds: int = 5
     retries: int = 12
@@ -430,7 +430,7 @@ sanitization:
   temp_db_suffix: _incoming
 
 healthcheck:
-  path: /web/login
+  path: /web/health
   timeout_seconds: 5
   retries: 12
   interval_seconds: 5

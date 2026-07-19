@@ -6,12 +6,17 @@ hand it to uvicorn. By default the app binds to localhost-only via
 
 Optional static SPA: pass ``static_dir`` pointing to a pre-built SPA dist
 directory and it will be mounted at ``/`` (served as a fallback after API
-routes).
+routes). The SPA fallback ``index.html`` is read once at app creation and
+served from memory for the lifetime of the process; ``odooctl serve`` is a
+long-running process, so after rebuilding the SPA dist, restart the server
+to pick up a new ``index.html``.
 
 No privileged imports — satisfies the runner contract.
 """
 from __future__ import annotations
 
+import os
+import warnings
 from pathlib import Path
 from typing import Callable
 
@@ -20,6 +25,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from odooctl.api.routes_operations import router as operations_router
 from odooctl.api.routes_projects import router as projects_router
+from odooctl.security import tokens
 
 
 def create_app(
@@ -39,6 +45,19 @@ def create_app(
     :param static_dir: Optional path to a pre-built SPA dist directory mounted
         at ``/`` after all API routes.
     """
+    # Key-strength floor (F24): a short HMAC key makes bearer/capability
+    # tokens brute-forceable. Hard-fail when the weak key is the operator's
+    # environment-supplied ODOOCTL_API_KEY (the `odooctl serve` path); warn
+    # for programmatically injected keys (embedding/tests).
+    if len(api_key) < tokens.MIN_API_KEY_LENGTH:
+        if os.environ.get("ODOOCTL_API_KEY") == api_key:
+            tokens.enforce_key_strength(api_key)
+        warnings.warn(
+            f"api_key is shorter than {tokens.MIN_API_KEY_LENGTH} characters; "
+            "use a stronger key in production.",
+            stacklevel=2,
+        )
+
     if registry_loader is None:
         from odooctl.registry import load_registry
 
@@ -65,7 +84,10 @@ def create_app(
         from fastapi.responses import FileResponse, HTMLResponse
 
         _static = Path(static_dir).resolve()
-        _index = _static / "index.html"
+        # Cache the SPA fallback index.html bytes at startup instead of
+        # re-reading the file on every request. Rebuilding the SPA dist
+        # requires a server restart to pick up a new index.html.
+        _index_bytes = (_static / "index.html").read_bytes()
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def _spa(full_path: str):
@@ -73,9 +95,9 @@ def create_app(
             try:
                 candidate.relative_to(_static)
             except ValueError:
-                return HTMLResponse(_index.read_text())
+                return HTMLResponse(_index_bytes)
             if candidate.is_file():
                 return FileResponse(str(candidate))
-            return HTMLResponse(_index.read_text())
+            return HTMLResponse(_index_bytes)
 
     return app

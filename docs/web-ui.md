@@ -40,6 +40,10 @@ odooctl/web/
 ```
 
 Edit `dist/app.js` and `dist/style.css` directly — no build step needed.
+Note: `index.html` is read once when the server starts and cached in memory
+for the SPA fallback (`odooctl serve` is a long-running process), so changes
+to `index.html` require a server restart; `app.js` and `style.css` are served
+from disk on each request.
 
 ## Running the UI
 
@@ -53,15 +57,28 @@ ODOOCTL_API_KEY=mysecret odooctl serve
 # Override with a custom dist directory (for local development)
 ODOOCTL_API_KEY=mysecret odooctl serve --static-dir path/to/custom/dist
 
-# Custom host/port
-ODOOCTL_API_KEY=mysecret odooctl serve --host 0.0.0.0 --port 9000
+# Custom port (keep the default localhost-only bind)
+ODOOCTL_API_KEY=mysecret odooctl serve --host 127.0.0.1 --port 9000
 ```
+
+> **Warning:** do not bind to a non-loopback address (e.g. `--host 0.0.0.0`).
+> The server speaks plain HTTP and is designed for localhost-only operation;
+> exposing it puts bearer tokens on the wire unencrypted and lets anyone with
+> a token enqueue privileged operations. Use an SSH tunnel (or an
+> authenticating TLS reverse proxy plus firewall rules) for remote access.
 
 Open `http://localhost:8787/` and paste an API token. Generate one with:
 
 ```bash
-odooctl security token mint --role operator
+odooctl security token mint \
+  --action api --env "*" --project "*" \
+  --key-env ODOOCTL_API_KEY \
+  --role operator
 ```
+
+Note the explicit `--key-env ODOOCTL_API_KEY`: the mint command's `--key-env`
+defaults to `ODOOCTL_RUNNER_KEY`, but the API server verifies tokens with the
+key it was started with (`ODOOCTL_API_KEY`). See `docs/rbac.md`.
 
 ## Pages
 

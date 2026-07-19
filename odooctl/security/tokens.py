@@ -32,6 +32,16 @@ _ALG = "HS256"
 
 _RESERVED_CLAIMS = frozenset({"act", "env", "proj", "iat", "exp", "nonce", "sub"})
 
+#: Default capability-token lifetime. Kept short (5 minutes) so a captured
+#: token's replay window is small; callers may still override ``ttl_seconds``.
+DEFAULT_TTL_SECONDS = 300
+
+#: Minimum length (in characters/bytes) accepted for the shared HMAC signing
+#: key (``ODOOCTL_API_KEY``). Applied at the operator-facing entry points
+#: (``odooctl serve`` / ``odooctl runner`` / API app startup) via
+#: :func:`enforce_key_strength`.
+MIN_API_KEY_LENGTH = 32
+
 
 class TokenError(Exception):
     """Base class for capability-token failures."""
@@ -66,13 +76,29 @@ def _coerce_key(key: str | bytes) -> bytes:
     return key.encode("utf-8") if isinstance(key, str) else key
 
 
+def enforce_key_strength(key: str | bytes, *, source: str = "ODOOCTL_API_KEY") -> None:
+    """Reject signing keys shorter than :data:`MIN_API_KEY_LENGTH`.
+
+    A short HMAC key makes both bearer tokens and capability tokens brute-
+    forceable offline. Entry points that accept the operator-supplied key
+    (``odooctl serve``, ``odooctl runner``, ``create_app``) call this before
+    minting or verifying anything.
+    """
+    if len(key) < MIN_API_KEY_LENGTH:
+        raise ValueError(
+            f"{source} is too weak: it must be at least {MIN_API_KEY_LENGTH} "
+            f"characters (got {len(key)}). Generate one with e.g. "
+            "`python -c 'import secrets; print(secrets.token_hex(32))'`."
+        )
+
+
 def mint(
     key: str | bytes,
     *,
     action: str,
     environment: str,
     project: str,
-    ttl_seconds: int = 300,
+    ttl_seconds: int = DEFAULT_TTL_SECONDS,
     subject: str | None = None,
     nonce: str | None = None,
     now: float | None = None,

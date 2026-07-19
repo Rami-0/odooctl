@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from odooctl.config import validate_identifier
 from odooctl.registry import add_project, load_registry, remove_project, use_project
 
 app = typer.Typer(help="Manage globally registered odooctl projects.", add_completion=False)
@@ -19,6 +20,13 @@ def add(
     config: str = typer.Option("odooctl.yml", "--config", help="Config path relative to the project."),
     no_use: bool = typer.Option(False, "--no-use", help="Register without making it active."),
 ):
+    # Project names flow into registry keys and state paths; enforce the same
+    # identifier rule as config env names so a name cannot inject path
+    # components (audit finding F10).
+    try:
+        validate_identifier(name, "project name")
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     project = add_project(name, path, config, make_active=not no_use)
     typer.echo(f"Registered project {project.name}: {project.path} ({project.config})")
 

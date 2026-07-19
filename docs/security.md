@@ -39,12 +39,43 @@ finding, so it is stated here explicitly.
   and never imports privileged modules (enforced by `security/runner_contract`).
   API clients act under RBAC roles; destructive operations require capability
   tokens minted with the runner key, verified with single-use nonces.
+  Capability tokens default to a 300-second TTL; consumed nonces are retained
+  for 2 hours (2 × the maximum token TTL) and then purged, so replay stays
+  blocked for every token's validity window without unbounded growth.
+- **API key strength**: `ODOOCTL_API_KEY` must be at least 32 characters;
+  `odooctl serve` and `odooctl runner` refuse shorter keys at startup.
+  Cancelling an operation is a write action (`cancel`, operator-or-higher) —
+  viewer tokens cannot cancel — and `/operations/{id}` reads/cancel are
+  restricted to the project named in the token's `proj` claim when it is not
+  `"*"`.
 - **Roles**: viewers cannot mutate; operators cannot bypass protected-environment
   floors; protected environments (`is_protected()`: the `production` name or
   any env with `tier: production`) require elevated confirmation paths.
 - **Secrets**: referenced by env-var name in config, resolved only at execution
   time in the privileged process, redacted from logs, errors, and streamed
   operation events.
+
+### Audit-trail integrity (optional HMAC keying)
+
+The audit trail (`.odooctl/audit.jsonl`) chains entries with a hash so
+in-place tampering is detectable. By default the chain uses an **unkeyed**
+SHA-256 — sufficient against accidental corruption and naive edits, but an
+attacker with write access to the file can truncate the chain, alter entries,
+and recompute the hashes.
+
+Set the `ODOOCTL_AUDIT_KEY` environment variable (in the runner/CLI process
+that writes audit entries) to switch the chain to
+`HMAC-SHA256(key, prev_hash || entry)`. Without the key, forged or rehashed
+chains fail verification (`odooctl.operations.audit.verify_chain`, which reads
+the same env var or accepts an explicit `key=` argument). Notes:
+
+- Unkeyed remains the default for backward compatibility; existing unkeyed
+  chains keep verifying as long as `ODOOCTL_AUDIT_KEY` is unset.
+- Enabling the key starts keying **new** entries only; verification of a chain
+  written partly unkeyed and partly keyed will fail across the boundary, so
+  rotate/archive `audit.jsonl` when enabling the key.
+- Keep the key outside the state directory (host secret manager or service
+  environment), or an attacker who can read the state dir can re-key the chain.
 
 If your deployment needs a lower-trust config-authoring role (e.g. developers
 may edit addon lists but not volumes or compose paths), put that policy in

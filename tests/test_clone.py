@@ -129,7 +129,10 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
     execute("production", "staging", True, str(config), sanitization_profile="minimal")
 
     assert any("UPDATE ir_mail_server SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging_incoming")
-    assert not any("UPDATE ir_cron SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging_incoming")
+    # Audit F7: crons stay disabled even under the minimal profile.
+    assert any("UPDATE ir_cron SET active = false" in sql for _, (db, sql) in events if db == "odoo_staging_incoming")
+    # Aggressive credential scrubs are reserved for normal/strict profiles.
+    assert not any("auth_passkey_key" in sql for _, (db, sql) in events if db == "odoo_staging_incoming")
 
 
 def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeypatch):

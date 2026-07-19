@@ -28,7 +28,7 @@ def run_dr_drill(
     healthcheck_fn: Callable[[str], bool],
     is_protected_fn: Callable[[str], bool] | None = None,
     throwaway_db_suffix: str = "_dr_drill",
-    healthcheck_url: str = "http://localhost:8069/web/login",
+    healthcheck_url: str = "http://localhost:8069/web/health",
 ) -> DrDrillResult:
     """Run a DR drill for *environment* (the SOURCE whose latest backup is drilled).
 

@@ -538,6 +538,49 @@ def test_rehearsal_report_contains_all_required_fields(tmp_path):
     assert required.issubset(data.keys())
 
 
+def test_rehearsal_report_path_escape_is_contained(tmp_path):
+    """F19: hostile env/version strings must not write reports outside report_dir."""
+    from odooctl.migration.rehearse import rehearse_upgrade, UpgradeResult
+
+    report_dir = tmp_path / "reports"
+    outside_before = set(tmp_path.iterdir())
+    rehearse_upgrade(
+        source_env="../../evil",
+        source_version="../17.0",
+        target_version="18.0/../../../escape",
+        source_db="prod_db",
+        db_adapter=MagicMock(),
+        healthcheck_fn=lambda url: True,
+        upgrade_fn=lambda db, ver: UpgradeResult(ok=True, installed_after=["base"]),
+        report_dir=report_dir,
+    )
+
+    # The report landed inside report_dir, and nothing was written elsewhere.
+    report_files = list(report_dir.glob("*.json"))
+    assert len(report_files) == 1
+    assert report_files[0].resolve().parent == report_dir.resolve()
+    assert set(tmp_path.iterdir()) - outside_before == {report_dir}
+    # Path separators and '..' were stripped from the filename.
+    assert "/" not in report_files[0].name
+    assert ".." not in report_files[0].name
+
+
+def test_rehearsal_report_sanitize_component():
+    """F19: filename components follow the identifier rule."""
+    from odooctl.migration.rehearse import _sanitize_component
+
+    assert _sanitize_component("production") == "production"
+    assert _sanitize_component("17.0") == "17.0"
+    assert _sanitize_component("../../etc/passwd") == "etc_passwd"
+    assert _sanitize_component("a/b\\c") == "a_b_c"
+    assert _sanitize_component("..") == "unknown"
+    assert _sanitize_component("") == "unknown"
+    assert len(_sanitize_component("x" * 200)) == 64
+    sanitized = _sanitize_component("....//weird")
+    assert ".." not in sanitized and "/" not in sanitized
+    assert sanitized[0].isalnum()
+
+
 def test_rehearsal_failed_report_has_next_actions():
     from odooctl.migration.rehearse import rehearse_upgrade, UpgradeResult
 

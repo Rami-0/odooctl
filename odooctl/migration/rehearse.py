@@ -16,6 +16,7 @@ Safety contract
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -216,15 +217,43 @@ def rehearse_upgrade(
     return report
 
 
+def _sanitize_component(value: str) -> str:
+    """Sanitize a user-influenced report filename component (audit finding F19).
+
+    Applies the identifier rule from :mod:`odooctl.config`: only
+    ``[A-Za-z0-9._-]`` characters, no ``..``, alphanumeric start, max 64 chars.
+    Invalid characters are replaced instead of raising so a failure report is
+    still written even for hostile inputs.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", str(value))
+    while ".." in cleaned:
+        cleaned = cleaned.replace("..", ".")
+    cleaned = cleaned.lstrip("._-") or "unknown"
+    return cleaned[:64]
+
+
 def _save_report_to_dir(report: RehearsalReport, report_dir: Path | None) -> None:
+    """Write the JSON report inside *report_dir* only.
+
+    Path containment (audit finding F19): the filename is derived from
+    user-influenced values (env name, version strings), so each component is
+    sanitized and the resolved output path is required to stay inside
+    ``report_dir`` (the project's ``.odooctl/migration_reports`` directory).
+    """
     if report_dir is None:
         return
     report_dir.mkdir(parents=True, exist_ok=True)
     fname = (
-        f"migration_rehearsal_{report.source_env}_{report.source_version}"
-        f"_to_{report.target_version}.json"
+        f"migration_rehearsal_{_sanitize_component(report.source_env)}"
+        f"_{_sanitize_component(report.source_version)}"
+        f"_to_{_sanitize_component(report.target_version)}.json"
     )
-    report_file = report_dir / fname
+    root = report_dir.resolve()
+    report_file = (root / fname).resolve()
+    if report_file.parent != root:
+        raise ValueError(
+            f"Report path {report_file} escapes the report directory {root}"
+        )
     report_file.write_text(json.dumps(report.to_dict(), indent=2))
     if report.log_path is None:
         report.log_path = str(report_file)

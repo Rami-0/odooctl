@@ -783,3 +783,90 @@ def test_engine_lock_acquisition_failure_leaves_audit_trail(tmp_path):
     chain = audit.load_chain()
     failed_audits = [e for e in chain if e.outcome == "failed"]
     assert len(failed_audits) >= 1
+
+
+# ---- HMAC-keyed audit chain (F13) ----
+
+AUDIT_TEST_KEY = "audit-chain-hmac-key-0123456789abcdef"
+
+
+def _audit_entry(i=0):
+    from odooctl.operations.models import AuditEntry
+
+    return AuditEntry(actor="cli", action=f"action_{i}", target="staging",
+                      params_redacted={}, outcome="succeeded",
+                      op_id=f"op{i}", timestamp="2026-01-01T00:00:00+00:00")
+
+
+def test_audit_keyed_chain_roundtrip(tmp_path):
+    from odooctl.operations.audit import AuditStore, verify_chain
+
+    audit = AuditStore(tmp_path, key=AUDIT_TEST_KEY)
+    for i in range(3):
+        audit.append(_audit_entry(i))
+    chain = audit.load_chain()
+    assert verify_chain(chain, key=AUDIT_TEST_KEY) is True
+    # without the key (or with the wrong key) the keyed chain does not verify
+    assert verify_chain(chain) is False
+    assert verify_chain(chain, key="wrong-key-0123456789abcdefwrongkey") is False
+
+
+def test_audit_keyed_chain_via_env_var(tmp_path, monkeypatch):
+    from odooctl.operations.audit import AuditStore, verify_chain
+
+    monkeypatch.setenv("ODOOCTL_AUDIT_KEY", AUDIT_TEST_KEY)
+    audit = AuditStore(tmp_path)  # picks the key up from the environment
+    for i in range(2):
+        audit.append(_audit_entry(i))
+    chain = audit.load_chain()
+    assert verify_chain(chain) is True  # env key applies to verification too
+
+    monkeypatch.delenv("ODOOCTL_AUDIT_KEY")
+    assert verify_chain(chain) is False  # unkeyed verify rejects keyed chain
+
+
+def test_audit_unkeyed_default_unchanged(tmp_path, monkeypatch):
+    """Compatibility: without ODOOCTL_AUDIT_KEY the chain stays plain SHA-256."""
+    from odooctl.operations.audit import AuditStore, _hash_entry, verify_chain
+
+    monkeypatch.delenv("ODOOCTL_AUDIT_KEY", raising=False)
+    audit = AuditStore(tmp_path)
+    entry = audit.append(_audit_entry(0))
+    assert entry.current_hash == _hash_entry(entry.to_dict(), "")
+    assert verify_chain(audit.load_chain()) is True
+
+
+def test_audit_keyed_chain_detects_truncate_and_rehash(tmp_path):
+    """F13 attack: truncate the file and rehash without the key.
+
+    Against an unkeyed chain this forgery verifies; with ODOOCTL_AUDIT_KEY set
+    the attacker cannot recompute valid HMAC links.
+    """
+    import json as _json
+
+    from odooctl.operations.audit import AuditStore, _hash_entry, verify_chain
+
+    audit = AuditStore(tmp_path, key=AUDIT_TEST_KEY)
+    for i in range(3):
+        audit.append(_audit_entry(i))
+
+    # Attacker (no key): drop the middle entry, then rewrite the whole file
+    # with recomputed unkeyed hashes so the chain "links up" again.
+    lines = [ln for ln in audit.path.read_text().splitlines() if ln.strip()]
+    kept = [_json.loads(lines[0]), _json.loads(lines[2])]
+    prev_hash = ""
+    forged_lines = []
+    for record in kept:
+        record["prev_hash"] = prev_hash
+        body = {k: v for k, v in record.items() if k != "current_hash"}
+        record["current_hash"] = _hash_entry(body, prev_hash)  # unkeyed rehash
+        prev_hash = record["current_hash"]
+        forged_lines.append(_json.dumps(record))
+    audit.path.write_text("\n".join(forged_lines) + "\n")
+
+    chain = audit.load_chain()
+    assert len(chain) == 2
+    # The forgery is self-consistent under the unkeyed scheme...
+    assert verify_chain(chain) is True
+    # ...but fails once verification uses the HMAC key.
+    assert verify_chain(chain, key=AUDIT_TEST_KEY) is False

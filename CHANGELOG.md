@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Production-hardening pass driven by the 2026-05-31 security audits
+(reports 1–4 in `experiments/2026-05-31-kanban-scan-suite/`).
+
+### Security
+
+- Removed all `sh -lc` command composition: filestore operations use
+  list-argv execs and DB cloning pipes `pg_dump` into `pg_restore` through a
+  new no-shell `run_pipe()` helper. A guard test keeps shell sinks out.
+- Config-boundary validation: environment/db/service/volume names must match
+  a strict identifier rule; domains must be valid DNS hostnames (normalized
+  to lowercase) and are re-validated when Traefik rules are built.
+- Every protected-environment policy check goes through `is_protected()`
+  (name `production` or `tier: production`); literal name comparisons are
+  gone and a guard test keeps them out.
+- Database passwords never appear on process argv (passed via
+  `docker compose exec -e PGPASSWORD` name-only injection); command errors,
+  operation-store errors, and streamed events are redacted.
+- Sanitization now also covers the legacy `payment_acquirer` table, freezes
+  `web.base.url`, clears OAuth client secrets and IAP tokens, and deletes
+  Odoo 19 `auth_passkey` WebAuthn credentials; crons are disabled under
+  every profile including `minimal`.
+- Capability tokens default to a 300 s TTL; consumed-nonce records are
+  purged after 2 h; `ODOOCTL_API_KEY` must be at least 32 characters.
+- Operation cancel is a write action (viewers get 403) and `/operations/*`
+  endpoints enforce the token's project scope.
+- Audit chains can be HMAC-keyed via `ODOOCTL_AUDIT_KEY`, making
+  truncate-and-rehash tampering detectable.
+- Path containment for backup ids, registry config paths, project names,
+  migration report paths, and `import --output` (new `--allow-outside`).
+- `security token mint`/`verify` sign with `ODOOCTL_API_KEY` by default —
+  the key the API and runner actually verify with.
+
+### Safety
+
+- `restore` restores into a temporary database and swaps only after
+  `pg_restore` succeeds (verify-before-destroy), for both same-environment
+  and cross-environment restores.
+- A failed protected-environment deploy automatically restores its own
+  pre-deploy backup when the database may have been mutated, and records
+  the recovery outcome in deployment metadata.
+- `restore` and `rollback --mode full` require `--yes` or interactive
+  confirmation.
+- Health checks require HTTP 2xx and treat redirects as unhealthy; the
+  default health path is now `/web/health` (Odoo 15+).
+- `runner --once` exits non-zero when the processed operation failed;
+  `runner --fail-fast` stops the loop on the first failure.
+
+### Added
+
+- GitHub Actions CI (ruff, pytest on Python 3.11–3.13 with a coverage
+  floor, package build + wheel smoke test) and a tag-driven release
+  workflow using PyPI trusted publishing.
+- Real-Odoo integration harness (`tests/integration/`): disposable Docker
+  stacks per Odoo version covering the full operator lifecycle, including
+  API-enqueue → runner execution parity.
+- `--project`/`--project-dir` regression matrix across every config-taking
+  command; the selector is threaded explicitly through `typer.Context`.
+- Shell completion; web UI empty states, running-operation indicator, and
+  role-aware Migrate gating; MkDocs documentation site configuration.
+
+### Changed
+
+- `click` is a direct dependency (typer ≥ 0.27 no longer provides it).
+- The default healthcheck path changed from `/web/login` to `/web/health`.
+
 ## [0.1.0] - 2026-05-30
 
 Initial public release of `odooctl`, a CLI-first, Odoo-aware deployment

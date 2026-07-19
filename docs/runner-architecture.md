@@ -106,10 +106,9 @@ runner records consumed token nonces (`consumed_nonces.json`) and rejects
 repeats, so a token cannot be replayed for the same scope either.
 
 Signing-key note: the runner verifies capability tokens with the key from
-`ODOOCTL_API_KEY` — the same key the API server uses to mint them. The
-`odooctl security token mint` CLI defaults its `--key-env` to
-`ODOOCTL_RUNNER_KEY`; pass `--key-env ODOOCTL_API_KEY` when hand-minting a
-token that the API or runner must accept (see `docs/rbac.md`).
+`ODOOCTL_API_KEY` — the same key the API server uses to mint them, and the
+default `--key-env` of `odooctl security token mint`, so hand-minted tokens
+verify without extra flags (see `docs/rbac.md`).
 
 ## Why a stdlib-only crypto core
 

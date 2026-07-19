@@ -172,7 +172,7 @@ Cancelling an operation is a **write action** (`cancel`): it requires
 operator-or-higher, never a viewer/read token.
 
 ```console
-$ export ODOOCTL_RUNNER_KEY=...     # signing key, never on argv
+$ export ODOOCTL_API_KEY=...     # signing key, never on argv
 $ odooctl security token mint --action backup --env production --project acme --ttl 300
 $ odooctl security token verify --stdin --action backup --env production --project acme < token.txt
 ```
@@ -180,18 +180,14 @@ $ odooctl security token verify --stdin --action backup --env production --proje
 ### Which signing key?
 
 `odooctl security token mint` / `token verify` read the signing key from the
-env var named by `--key-env`, which **defaults to `ODOOCTL_RUNNER_KEY`**. The
-example above therefore only round-trips within the CLI.
+env var named by `--key-env`, which **defaults to `ODOOCTL_API_KEY`** — the
+same key both the API server (`odooctl serve`) and the runner
+(`odooctl runner`) verify with. Tokens minted with defaults therefore work
+against the running services. `--key-env ODOOCTL_RUNNER_KEY` remains
+available for deployments that intentionally split signing domains; tokens
+minted under a different key are rejected by the API/runner.
 
-The running services use a different env var: both the API server
-(`odooctl serve`) and the runner (`odooctl runner`) load their verification
-key from **`ODOOCTL_API_KEY`** — the API verifies session bearer tokens with
-it, and the runner verifies queued capability tokens with it (those are minted
-internally by the API with the same key). A token minted with the CLI default
-key env will **not** be accepted by the API or runner unless
-`ODOOCTL_RUNNER_KEY` and `ODOOCTL_API_KEY` hold the same key material.
-
-To mint a session token the API will accept, pass the key env explicitly:
+Example minting a session token the API will accept:
 
 ```console
 $ odooctl security token mint \

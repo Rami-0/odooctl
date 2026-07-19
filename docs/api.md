@@ -73,11 +73,10 @@ odooctl security token mint \
 ```
 
 **Signing key:** the API server verifies bearer tokens with the key it was
-started with (`ODOOCTL_API_KEY`). The `token mint` command's `--key-env`
-option *defaults* to `ODOOCTL_RUNNER_KEY`, so you must pass
-`--key-env ODOOCTL_API_KEY` explicitly (as above) — a token minted with the
-default key env will not verify against the API unless both env vars hold the
-same key material.
+started with (`ODOOCTL_API_KEY`), and `token mint`'s `--key-env` option
+defaults to the same `ODOOCTL_API_KEY`, so tokens minted with defaults verify
+against the API. Pass `--key-env ODOOCTL_RUNNER_KEY` only if your deployment
+deliberately uses a separate signing domain.
 
 Token payload fields:
 

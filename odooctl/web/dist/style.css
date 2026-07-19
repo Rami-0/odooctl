@@ -174,6 +174,8 @@ h3 { font-size: 1rem; margin-bottom: 0.5rem; }
 }
 .tab.active  { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 .tab:hover   { color: var(--text); }
+.tab:disabled { opacity: 0.45; cursor: not-allowed; }
+.tab:disabled:hover { color: var(--muted); }
 .tab-content { padding: 1rem 0; }
 
 /* ---- Tables ---- */
@@ -195,6 +197,26 @@ h3 { font-size: 1rem; margin-bottom: 0.5rem; }
 }
 .ops-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
 .ops-table tr:hover td { background: #fafafa; }
+
+/* Running operation row: subtle pulse while in flight */
+.ops-table tr.op-running td { background: #f2f7ff; }
+.op-running .badge.status-running {
+    animation: op-pulse 1.3s ease-in-out infinite;
+}
+.op-running .badge.status-running::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-right: 0.35em;
+    vertical-align: middle;
+}
+@keyframes op-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+}
 
 /* ---- Info cards (overview) ---- */
 .overview-grid {
@@ -372,6 +394,19 @@ h3 { font-size: 1rem; margin-bottom: 0.5rem; }
 .mt-1 { margin-top: 0.5rem; }
 .mt-2 { margin-top: 1rem; }
 .text-muted { color: var(--muted); font-size: 0.88rem; }
+
+/* ---- Empty states ---- */
+.empty-state {
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 1.4rem 1.5rem;
+    margin-top: 0.75rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+.empty-state .empty-hint { margin-top: 0.4rem; font-size: 0.85rem; }
 
 /* ---- Responsive ---- */
 @media (max-width: 640px) {

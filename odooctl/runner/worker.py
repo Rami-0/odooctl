@@ -15,14 +15,17 @@ transitively via the service layer. It must never be imported by odooctl.api.
 """
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 import time
+import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from odooctl.api.queue import OperationQueue, QueueEntry
-from odooctl.operations.audit import AuditEntry, AuditStore
+from odooctl.operations.audit import AUDIT_KEY_ENV_VAR, AuditEntry, AuditStore
 from odooctl.operations.engine import OperationContext
 from odooctl.operations.locks import EnvironmentLock, LockAcquisitionError
 from odooctl.operations.models import (
@@ -81,46 +84,80 @@ class NonceStore:
 
     def __init__(self, state_dir: Path) -> None:
         self._path = state_dir / "consumed_nonces.json"
+        self._lock_path = state_dir / "consumed_nonces.lock"
         state_dir.mkdir(parents=True, exist_ok=True)
 
     def _load(self) -> dict[str, str]:
-        """Return ``{nonce: consumed_at_iso}``, migrating the legacy list form."""
+        """Return ``{nonce: expiry_iso}``, migrating the legacy list form.
+
+        A truncated/corrupt file (e.g. a crash during a non-atomic write in an
+        older version) yields ``{}`` — with atomic writes below this is no
+        longer produced, but reads stay defensive.
+        """
         if not self._path.exists():
             return {}
         try:
             raw = json.loads(self._path.read_text()).get("nonces", {})
         except Exception:
             return {}
+        default_expiry = (
+            datetime.now(timezone.utc) + timedelta(seconds=NONCE_RETENTION_SECONDS)
+        ).isoformat()
         if isinstance(raw, dict):
             return {str(n): str(ts) for n, ts in raw.items()}
         if isinstance(raw, list):
-            # Legacy format: consumption time unknown — treat as consumed now
-            # so replay stays blocked; the entry ages out on the normal purge.
-            now_iso = datetime.now(timezone.utc).isoformat()
-            return {str(n): now_iso for n in raw}
+            # Legacy format: no timestamp — keep blocked for a full retention
+            # window so replay stays blocked; ages out on the normal purge.
+            return {str(n): default_expiry for n in raw}
         return {}
+
+    def _write_atomic(self, nonces: dict[str, str]) -> None:
+        tmp = self._path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"nonces": nonces}))
+        os.replace(tmp, self._path)
+
+    @staticmethod
+    def _purge(nonces: dict[str, str], now: datetime) -> dict[str, str]:
+        kept: dict[str, str] = {}
+        for name, ts in nonces.items():
+            try:
+                expiry = datetime.fromisoformat(ts)
+            except (TypeError, ValueError):
+                kept[name] = (now + timedelta(seconds=NONCE_RETENTION_SECONDS)).isoformat()
+                continue
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            if expiry >= now:
+                kept[name] = ts
+        return kept
 
     def is_consumed(self, nonce: str) -> bool:
         return nonce in self._load()
 
-    def mark_consumed(self, nonce: str) -> None:
-        nonces = self._load()
-        now = datetime.now(timezone.utc)
-        nonces[nonce] = now.isoformat()
-        cutoff = now - timedelta(seconds=NONCE_RETENTION_SECONDS)
-        kept: dict[str, str] = {}
-        for name, ts in nonces.items():
-            try:
-                consumed_at = datetime.fromisoformat(ts)
-            except (TypeError, ValueError):
-                # Unparseable timestamp: keep the nonce blocked, reset its clock.
-                kept[name] = now.isoformat()
-                continue
-            if consumed_at.tzinfo is None:
-                consumed_at = consumed_at.replace(tzinfo=timezone.utc)
-            if consumed_at >= cutoff:
-                kept[name] = ts
-        self._path.write_text(json.dumps({"nonces": kept}))
+    def consume(self, nonce: str, *, expires_at: datetime | None = None) -> bool:
+        """Atomically claim *nonce*. Returns False if it was already consumed.
+
+        The whole check-and-mark runs under an exclusive file lock, closing the
+        TOCTOU window between a separate ``is_consumed``/``mark_consumed`` pair
+        and across concurrent runner processes. The nonce is retained until at
+        least its token's expiry (``expires_at``), never purged early.
+        """
+        with self._lock_path.open("w") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            now = datetime.now(timezone.utc)
+            nonces = self._purge(self._load(), now)
+            if nonce in nonces:
+                self._write_atomic(nonces)
+                return False
+            floor = now + timedelta(seconds=NONCE_RETENTION_SECONDS)
+            expiry = max(floor, expires_at) if expires_at else floor
+            nonces[nonce] = expiry.isoformat()
+            self._write_atomic(nonces)
+            return True
+
+    def mark_consumed(self, nonce: str, *, expires_at: datetime | None = None) -> None:
+        # Backward-compatible unconditional mark, now atomic + locked.
+        self.consume(nonce, expires_at=expires_at)
 
 
 class RunnerWorker:
@@ -130,6 +167,18 @@ class RunnerWorker:
         self._registry = registry
         self._api_key = api_key
         self.last_run_ok: bool = True
+        # One-time notice when the audit chain is unkeyed: without
+        # ODOOCTL_AUDIT_KEY the hash chain is plain SHA-256, so an attacker with
+        # filesystem write access could forge or rehash entries. The chain still
+        # detects truncation via the high-water mark, but tamper-evidence needs
+        # the key.
+        if not os.environ.get(AUDIT_KEY_ENV_VAR):
+            warnings.warn(
+                "Audit chain is unkeyed (ODOOCTL_AUDIT_KEY not set); entries are "
+                "not cryptographically tamper-evident. Set ODOOCTL_AUDIT_KEY for "
+                "HMAC-protected audit logging.",
+                stacklevel=2,
+            )
 
     def claim_and_run(self) -> bool:
         """Claim and execute one operation. Returns True if work was done.
@@ -196,9 +245,15 @@ class RunnerWorker:
             queue.fail(entry.op_id)
             return False
 
-        # Single-use nonce check
+        # Single-use nonce check: atomic claim under a file lock closes the
+        # check-then-mark race and retains the nonce until the token's own
+        # expiry so a long-TTL token can never be replayed after purge.
         nonce = payload.get("nonce", "")
-        if nonce_store.is_consumed(nonce):
+        token_exp = payload.get("exp")
+        expires_at = None
+        if isinstance(token_exp, (int, float)):
+            expires_at = datetime.fromtimestamp(token_exp, tz=timezone.utc)
+        if not nonce_store.consume(nonce, expires_at=expires_at):
             store.update_status(
                 entry.op_id,
                 OperationStatus.FAILED,
@@ -206,7 +261,6 @@ class RunnerWorker:
             )
             queue.fail(entry.op_id)
             return False
-        nonce_store.mark_consumed(nonce)
 
         # Transition to RUNNING and emit start event
         store.update_status(entry.op_id, OperationStatus.RUNNING)

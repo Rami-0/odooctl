@@ -46,6 +46,11 @@ class AuditStore:
         # Chain-hash HMAC key; defaults to ODOOCTL_AUDIT_KEY when set, else
         # the chain remains unkeyed (plain SHA-256) for compatibility.
         self._key = _resolve_key(key)
+        # High-water mark sidecar (F13 / re-scan H2): records the entry count and
+        # last hash so tail-truncation or whole-file deletion is detectable — a
+        # plain hash chain stays internally valid after its newest entries are
+        # removed. MAC'd with the audit key when keyed.
+        self._hwm_path = state_dir / "audit.hwm"
 
     def append(self, entry: AuditEntry) -> AuditEntry:
         # Exclusive lock on a sidecar file guards the read-last-hash + write as one
@@ -57,9 +62,60 @@ class AuditStore:
             entry.prev_hash = prev_hash
             entry_dict = entry.to_dict()
             entry.current_hash = _hash_entry(entry_dict, prev_hash, self._key)
+            count = self._count_lines() + 1
             with self.path.open("a") as f:
                 f.write(entry.to_json() + "\n")
+            self._write_hwm(count, entry.current_hash)
         return entry
+
+    def _count_lines(self) -> int:
+        if not self.path.exists():
+            return 0
+        return sum(1 for ln in self.path.read_text().splitlines() if ln.strip())
+
+    def _hwm_mac(self, count: int, last_hash: str) -> str:
+        canon = f"{count}:{last_hash}".encode()
+        if self._key:
+            return hmac.new(self._key, canon, hashlib.sha256).hexdigest()
+        return hashlib.sha256(canon).hexdigest()
+
+    def _write_hwm(self, count: int, last_hash: str) -> None:
+        payload = {"count": count, "last_hash": last_hash, "mac": self._hwm_mac(count, last_hash)}
+        tmp = self._hwm_path.with_suffix(".hwm.tmp")
+        tmp.write_text(json.dumps(payload))
+        os.replace(tmp, self._hwm_path)
+
+    def _read_hwm(self) -> dict | None:
+        if not self._hwm_path.exists():
+            return None
+        try:
+            return json.loads(self._hwm_path.read_text())
+        except Exception:
+            return None
+
+    def verify(self) -> bool:
+        """Verify chain integrity AND completeness against the high-water mark.
+
+        Returns False if any link is tampered (as ``verify_chain``) OR if the
+        chain is shorter than the recorded high-water mark, its last hash does
+        not match, or the HWM's own MAC is invalid (truncation / deletion).
+        A chain with no HWM sidecar (legacy) is verified by chain links only.
+        """
+        entries = self.load_chain()
+        if not verify_chain(entries, key=self._key):
+            return False
+        hwm = self._read_hwm()
+        if hwm is None:
+            return True
+        count = int(hwm.get("count", 0))
+        last_hash = str(hwm.get("last_hash", ""))
+        if not hmac.compare_digest(str(hwm.get("mac", "")), self._hwm_mac(count, last_hash)):
+            return False
+        if len(entries) < count:
+            return False
+        if count > 0 and entries[count - 1].current_hash != last_hash:
+            return False
+        return True
 
     def _last_hash(self) -> str:
         if not self.path.exists():

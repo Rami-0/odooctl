@@ -651,20 +651,21 @@ def test_nonce_store_purges_entries_older_than_retention(tmp_path):
     assert NONCE_RETENTION_SECONDS == 7200  # 2 × max token TTL
 
     now = datetime.now(timezone.utc)
-    old_ts = (now - timedelta(seconds=NONCE_RETENTION_SECONDS + 60)).isoformat()
-    recent_ts = (now - timedelta(seconds=60)).isoformat()
+    # Stored values are expiry timestamps: an expiry in the past is purged, one
+    # in the future is kept.
+    expired = (now - timedelta(seconds=60)).isoformat()
+    future = (now + timedelta(seconds=NONCE_RETENTION_SECONDS)).isoformat()
     (tmp_path / "consumed_nonces.json").write_text(
-        _json.dumps({"nonces": {"ancient": old_ts, "recent": recent_ts}})
+        _json.dumps({"nonces": {"ancient": expired, "recent": future}})
     )
 
     store = NonceStore(tmp_path)
-    # Before any write, both are still recorded as consumed.
-    assert store.is_consumed("ancient")
+    # Before any write, the not-yet-expired entry is recorded as consumed.
     assert store.is_consumed("recent")
 
     store.mark_consumed("fresh")
 
-    assert not store.is_consumed("ancient")  # purged
+    assert not store.is_consumed("ancient")  # expired → purged
     assert store.is_consumed("recent")
     assert store.is_consumed("fresh")
 
@@ -704,3 +705,40 @@ def test_nonce_store_accepts_legacy_list_format(tmp_path):
     for nonce in ("legacy-a", "legacy-b", "new-nonce"):
         assert store.is_consumed(nonce)
         datetime.fromisoformat(raw["nonces"][nonce])
+
+
+def test_nonce_consume_is_single_use_atomic(tmp_path):
+    from odooctl.runner.worker import NonceStore
+
+    store = NonceStore(tmp_path)
+    assert store.consume("abc") is True   # first claim wins
+    assert store.consume("abc") is False  # replay rejected
+    assert store.is_consumed("abc")
+
+
+def test_nonce_consume_retains_until_token_expiry(tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    from odooctl.runner.worker import NONCE_RETENTION_SECONDS, NonceStore
+
+    store = NonceStore(tmp_path)
+    # A token whose TTL exceeds the default retention must keep its nonce until
+    # the token actually expires, not be purged early.
+    far_future = datetime.now(timezone.utc) + timedelta(seconds=NONCE_RETENTION_SECONDS * 4)
+    store.consume("longlived", expires_at=far_future)
+    # Simulate a later mark that triggers a purge pass; the long-lived nonce
+    # must survive because its stored expiry is far in the future.
+    store.consume("other")
+    assert store.is_consumed("longlived")
+
+
+def test_nonce_store_survives_corrupt_file(tmp_path):
+    from odooctl.runner.worker import NonceStore
+
+    store = NonceStore(tmp_path)
+    store.consume("a")
+    # A truncated/corrupt file (older non-atomic write) must not crash; consume
+    # still works and re-establishes a valid store.
+    (tmp_path / "consumed_nonces.json").write_text('{"nonces": {"a": ')  # truncated JSON
+    assert store.consume("b") is True
+    assert store.is_consumed("b")

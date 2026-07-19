@@ -870,3 +870,51 @@ def test_audit_keyed_chain_detects_truncate_and_rehash(tmp_path):
     assert verify_chain(chain) is True
     # ...but fails once verification uses the HMAC key.
     assert verify_chain(chain, key=AUDIT_TEST_KEY) is False
+
+
+# --- Re-scan H2: audit chain truncation detection ---
+
+
+def test_audit_verify_detects_tail_truncation(tmp_path):
+    from odooctl.operations.audit import AuditStore
+    from odooctl.operations.models import AuditEntry
+
+    store = AuditStore(tmp_path)
+    for i in range(3):
+        store.append(AuditEntry(actor="u", action="backup", target="prod", params_redacted={}, outcome="succeeded", op_id=f"op{i}", timestamp="2026-07-19T00:00:00Z"))
+    assert store.verify() is True
+
+    # Truncate the newest entry: the remaining prefix is still a valid chain,
+    # but the high-water mark records 3 entries.
+    lines = (tmp_path / "audit.jsonl").read_text().splitlines()
+    (tmp_path / "audit.jsonl").write_text("\n".join(lines[:-1]) + "\n")
+
+    from odooctl.operations.audit import verify_chain
+    assert verify_chain(store.load_chain()) is True  # prefix looks intact
+    assert store.verify() is False  # HWM catches the truncation
+
+
+def test_audit_verify_detects_whole_file_deletion(tmp_path):
+    from odooctl.operations.audit import AuditStore
+    from odooctl.operations.models import AuditEntry
+
+    store = AuditStore(tmp_path)
+    store.append(AuditEntry(actor="u", action="backup", target="prod", params_redacted={}, outcome="succeeded", op_id="op0", timestamp="2026-07-19T00:00:00Z"))
+    (tmp_path / "audit.jsonl").write_text("")  # attacker empties the log
+    assert store.verify() is False
+
+
+def test_audit_verify_keyed_hwm_resists_forged_high_water_mark(tmp_path, monkeypatch):
+    monkeypatch.setenv("ODOOCTL_AUDIT_KEY", "audit-key-0123456789abcdef0123456789")
+    from odooctl.operations.audit import AuditStore
+    from odooctl.operations.models import AuditEntry
+
+    store = AuditStore(tmp_path)
+    for i in range(3):
+        store.append(AuditEntry(actor="u", action="backup", target="prod", params_redacted={}, outcome="succeeded", op_id=f"op{i}", timestamp="2026-07-19T00:00:00Z"))
+    # Attacker truncates the log AND forges the HWM to count=2 without the key.
+    lines = (tmp_path / "audit.jsonl").read_text().splitlines()
+    (tmp_path / "audit.jsonl").write_text("\n".join(lines[:-1]) + "\n")
+    import json as _json
+    (tmp_path / "audit.hwm").write_text(_json.dumps({"count": 2, "last_hash": "x", "mac": "forged"}))
+    assert store.verify() is False

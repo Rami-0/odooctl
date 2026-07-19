@@ -107,6 +107,30 @@ class EnvironmentConfig(BaseModel):
     def domain_must_be_valid_hostname(cls, value: str, info: ValidationInfo) -> str:
         return validate_hostname(value, info.field_name)
 
+    @field_validator("filestore_path")
+    @classmethod
+    def filestore_path_must_be_safe(cls, value: str, info: ValidationInfo) -> str:
+        # ``filestore_path`` reaches ``rm -rf``/``shutil.rmtree``/``cp -a`` and,
+        # for the Docker backend, is reduced to its basename. A value with an
+        # empty basename (``/``, trailing slash only) or ``..`` components can
+        # target the filestore root or escape it. Accept both relative
+        # (``filestore/odoo_prod``) and absolute (``/var/lib/odoo/...``) paths.
+        from pathlib import PurePosixPath
+
+        display = str(value)[:64]
+        if not value or not value.strip():
+            raise ValueError(f"{info.field_name} must not be empty")
+        parts = PurePosixPath(value).parts
+        if ".." in parts:
+            raise ValueError(
+                f"{info.field_name} {display!r} must not contain '..' path segments"
+            )
+        if not PurePosixPath(value).name:
+            raise ValueError(
+                f"{info.field_name} {display!r} must reference a named directory, not a root path"
+            )
+        return value
+
 
 class PostgresConfig(BaseModel):
     host: str = "localhost"
@@ -307,6 +331,22 @@ class OdooCtlConfig(BaseModel):
                 )
             if env.promotes_to == name:
                 raise ValueError(f"Environment '{name}' cannot promotes_to itself")
+
+        # A clone/restore/rehearsal restores into ``<db_name><temp_db_suffix>``
+        # and then drops/renames it. If that temp name equals another env's live
+        # db_name, promoting one environment would silently DROP another's
+        # database. Reject the collision at load time.
+        suffix = self.sanitization.temp_db_suffix
+        for name, env in self.environments.items():
+            temp_db = env.db_name + suffix
+            owner = seen_db_names.get(temp_db)
+            if owner is not None and owner != name:
+                raise ValueError(
+                    f"Environment '{name}' temp database '{temp_db}' "
+                    f"(db_name + temp_db_suffix '{suffix}') collides with the live "
+                    f"db_name of environment '{owner}'; a clone or restore into "
+                    f"'{name}' would drop '{owner}'. Change the db_name or temp_db_suffix."
+                )
         return self
 
     def is_protected(self, name: str) -> bool:

@@ -43,7 +43,26 @@
   box-shadow: none !important;
   color: var(--v-fg);
 }
-.md-header__title { font-weight: 600; font-size: 0.85rem; }
+.md-header__button.md-logo {
+  align-items: center;
+  display: flex;
+  margin: 0 0.35rem 0 0;
+  padding: 0.4rem;
+}
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  display: block;
+  height: 1.35rem;
+  width: 1.35rem;
+}
+.md-header__title {
+  align-items: center;
+  display: flex;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.md-header__topic { line-height: 1.2; }
 .md-header__button:hover { color: var(--v-accent); opacity: 1; }
 .md-source { font-size: 0.6rem; }
 .md-source__repository { color: var(--v-gray); }
@@ -77,6 +96,7 @@
 
 /* ---- Sidebars ---- */
 .md-nav__title { color: var(--v-fg) !important; background: transparent !important; box-shadow: none !important; }
+.md-nav__title .md-logo { display: none; }
 .md-nav__item--section > .md-nav__link {
   color: var(--v-fg) !important;
   font-weight: 600;

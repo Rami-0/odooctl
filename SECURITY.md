@@ -18,14 +18,11 @@ version on the `master` branch only.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Preferred reporting channel:
-
-1. Open a private vulnerability report via GitHub's
-   [private vulnerability reporting](https://github.com/Rami-0/odooctl/security/advisories/new)
-   on the `Rami-0/odooctl` repository.
-2. If private reporting is not available to you, contact the maintainers at
-   `<MAINTAINER_SECURITY_EMAIL>` (placeholder — replace with the project
-   security contact once published).
+Report privately via GitHub's
+[private vulnerability reporting](https://github.com/Rami-0/odooctl/security/advisories/new)
+on the `Rami-0/odooctl` repository. This is the coordinated channel — it keeps
+the report confidential until a fix is released and lets us credit you in the
+advisory.
 
 Please include:
 

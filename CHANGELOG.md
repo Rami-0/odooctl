@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-19
+
 Production-hardening pass driven by the 2026-05-31 security audits
 (reports 1–4 in `experiments/2026-05-31-kanban-scan-suite/`).
 
@@ -127,5 +129,6 @@ secret redaction, optional real S3 uploads, documentation, and tests.
 - `odooctl doctor` warns when referenced secrets are shorter than the
   configured minimum or fall on the redaction ignore list.
 
-[Unreleased]: https://github.com/Rami-0/odooctl/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rami-0/odooctl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Rami-0/odooctl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Rami-0/odooctl/releases/tag/v0.1.0

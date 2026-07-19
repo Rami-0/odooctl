@@ -37,7 +37,7 @@ def check_url(url: str, *, timeout: int = 5, retries: int = 12, interval: int = 
     last_error: Exception | str | None = None
     for _ in range(retries):
         try:
-            req = Request(url, headers={"User-Agent": "odooctl/0.1"})
+            req = Request(url, headers={"User-Agent": "odooctl"})
             with urlopen(req, timeout=timeout) as response:
                 if 200 <= response.status < 300:
                     return True

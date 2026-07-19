@@ -62,7 +62,14 @@ the user to review/merge (merge-without-review is outside my authorization).
 - RUNNING: README full-rewrite agent (verifies every command against --help before documenting).
 - TODO: screenshots (needs a running UI; placeholder comments in README), first-run measurement, error-message polish (deferred — good state already).
 
-### Phase 5 — Launch prep + cross-model review: IN PROGRESS
+### Phase 5 — Launch prep + cross-model review: DONE (security fixes applied)
+- Cross-model review: Opus re-scan complete → 13 remediations verified + 9 findings. ALL FIXED and pushed (commit "post-rescan security hardening"): H1 API project-scope, H2 audit HWM truncation-detection + runner unkeyed warning, H3 nonce atomic flock+expiry, M1 temp-db collision, M2 filestore_path validation, M4 unconditional key floor, L1 testclient host. M3 accepted low-risk, L2 mitigated. 976 unit tests green on both venvs; CI green all Python versions.
+- Findings + resolution recorded in experiments/2026-07-19-post-hardening-rescan/opus-rescan-findings.md.
+- Launch metadata done earlier: release.yml (PyPI trusted publishing), dependabot, templates, CODEOWNERS, 0.2.0, mkdocs.
+- STILL REQUIRES USER (outward-facing): make repo public; PyPI trusted-publisher + tag v0.2.0 to publish. Dependabot PRs #1-#5 for user to merge.
+- NOTE: earlier this session hit a ~2h window (session limit + repo write-gate) that blocked the fixes; they were applied once write access returned.
+
+### Phase 5 original launch-prep detail
 - DONE: .github/workflows/release.yml (tag → test → build → PyPI trusted publishing → GH release), dependabot.yml, ISSUE_TEMPLATE/{bug,feature}.yml, PULL_REQUEST_TEMPLATE.md, CODEOWNERS. Version bumped to 0.2.0 (pyproject + __init__ + changelog heading). SECURITY.md placeholder email removed → GitHub private advisory is the sole channel.
 - RUNNING: cross-model adversarial re-scan — GPT via `codex exec -s read-only` (scratchpad/codex-review.md) AND an Opus subagent — both verifying the 13 remediations hold + hunting new bugs.
 - TODO after reviews return: triage findings, fix any real HIGH/MED, re-run suite, commit. THEN (needs user confirmation, do not do autonomously): flip repo public, set up PyPI trusted-publisher + tag v0.2.0 to publish.

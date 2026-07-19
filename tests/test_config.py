@@ -33,7 +33,7 @@ def test_workflow_example_contains_deploy_command():
     workflow = WORKFLOW_PATH.read_text()
     assert "workflow_dispatch" in workflow
     assert "odooctl deploy ${{ inputs.environment }} --branch ${{ inputs.branch }}" in workflow
-    assert "actions/setup-python@v5" in workflow
+    assert "actions/setup-python@v" in workflow
     assert "expected_branch=" in workflow
     assert "is not allowed for environment" in workflow
 

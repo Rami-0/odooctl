@@ -134,15 +134,27 @@ def restore_to_env(
 
 
 def run_restore(ctx: ServiceContext, environment: str, backup: str = "latest") -> RestoreResult:
+    """Restore *environment* from one of its own backups.
+
+    Verify-before-destroy: the dump is restored into a temp database first,
+    so a corrupt or failing restore never destroys the live database. Only
+    after pg_restore succeeds is the temp DB swapped into place.
+    """
+    from odooctl.odoo.db_swap import swap_temp_database
+
     cfg = ctx.project.config
     env = cfg.env(environment)
     backup_dir = resolve_backup_dir(environment, backup, ctx.project.backups_dir)
     validate_backup_dir(backup_dir, expected_project=cfg.project.name, expected_environment=environment, restore_mode="full")
     pg = make_context_db_adapter(ctx.project) if cfg.runtime.execution_mode == "docker" else PostgresAdapter(cfg.postgres)
-    pg.restore(env.db_name, backup_dir / "db.dump")
+    temp_db = env.db_name + cfg.sanitization.temp_db_suffix
+    pg.restore(temp_db, backup_dir / "db.dump")
     target_filestore = env.filestore_path if env.filestore_volume else str(ctx.project.resolve_path(env.filestore_path))
     fs = make_filestore_adapter(ctx.project, env) if env.filestore_volume else FilestoreAdapter()
     fs.restore_archive(backup_dir / "filestore.tar", target_filestore)
+    # Same-environment recovery may target a protected env by design; the CLI
+    # confirmation gate (--yes) is the policy layer for this path.
+    swap_temp_database(pg, temp_db=temp_db, target_db=env.db_name, target_env_name=environment)
     scheme = cfg.healthcheck.scheme or env.scheme
     url = with_db_selector(
         public_url(env.domain, scheme=scheme, port=env.port) + cfg.healthcheck.path,

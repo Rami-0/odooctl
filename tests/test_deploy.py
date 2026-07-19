@@ -227,7 +227,13 @@ def test_deploy_production_records_recovery_restart_failure_honestly(tmp_path: P
 
     assert compose.calls[-1] == ("restart", ("odoo",))
     assert store.saved[-1].status == "failed"
-    assert store.saved[-1].message == "healthcheck failed; recovery restart failed: container restart failed"
+    message = store.saved[-1].message
+    assert message.startswith("healthcheck failed")
+    # The DB may have been mutated (module update ran), so the pre-deploy
+    # backup restore is attempted; in this fixture it cannot succeed.
+    assert "pre-deploy backup restore FAILED" in message
+    assert "restore manually from backup production_2026" in message
+    assert "recovery restart failed: container restart failed" in message
 
 
 def test_deploy_missing_environment_fails_before_any_action(tmp_path: Path, monkeypatch):
@@ -409,3 +415,75 @@ def test_deploy_emits_stage_progress_messages(tmp_path: Path, monkeypatch, capsy
     assert "[deploy] rollout" in out
     assert "[deploy] verify" in out
     assert "[deploy] done" in out
+
+
+def test_deploy_production_restores_pre_deploy_backup_when_db_mutated(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    store = DummyStore()
+    compose = DummyCompose("docker-compose.yml")
+    restores: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(deploy_svc, "backup_execute", lambda ctx, environment: BackupResult(backup_id="production_2026"))
+    monkeypatch.setattr(deploy_svc, "git_commit", lambda cwd=None: "feedbeef")
+    monkeypatch.setattr(deploy_svc, "run", lambda args, stream=True, cwd=None: None)
+    monkeypatch.setattr(deploy_svc, "PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr(deploy_svc, "DockerComposeAdapter", lambda compose_file, **kwargs: compose)
+    monkeypatch.setattr(deploy_svc, "update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr(deploy_svc, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
+    monkeypatch.setattr(deploy_svc, "MetadataStore", lambda root: store)
+    monkeypatch.setattr(deploy_svc, "_assert_clean_worktree", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "odooctl.services.restore.run_restore",
+        lambda ctx, environment, backup="latest": restores.append((environment, backup)),
+    )
+
+    try:
+        deploy_cmd.execute("production", "main", str(config))
+    except RuntimeError:
+        pass
+
+    assert restores == [("production", "production_2026")]
+    assert "database restored from pre-deploy backup production_2026" in store.saved[-1].message
+
+
+def test_deploy_failure_before_rollout_does_not_touch_database(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    store = DummyStore()
+
+    class FailingPullCompose(DummyCompose):
+        def pull(self, service: str):
+            raise RuntimeError("registry unreachable")
+
+    compose = FailingPullCompose("docker-compose.yml")
+    restores: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(deploy_svc, "backup_execute", lambda ctx, environment: BackupResult(backup_id="production_2026"))
+    monkeypatch.setattr(deploy_svc, "git_commit", lambda cwd=None: "feedbeef")
+    monkeypatch.setattr(deploy_svc, "run", lambda args, stream=True, cwd=None: None)
+    monkeypatch.setattr(deploy_svc, "PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr(deploy_svc, "DockerComposeAdapter", lambda compose_file, **kwargs: compose)
+    monkeypatch.setattr(deploy_svc, "MetadataStore", lambda root: store)
+    monkeypatch.setattr(deploy_svc, "_assert_clean_worktree", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "odooctl.services.restore.run_restore",
+        lambda ctx, environment, backup="latest": restores.append((environment, backup)),
+    )
+
+    try:
+        deploy_cmd.execute("production", "main", str(config))
+    except RuntimeError:
+        pass
+
+    # Failure before any module update: DB untouched, no restore attempted.
+    assert restores == []
+    assert "registry unreachable" in store.saved[-1].message

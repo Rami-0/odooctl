@@ -4,17 +4,16 @@ This guide takes a globally installed `odooctl` from zero to a first verified Do
 
 ## 1. Install
 
-Use `pipx` for operator machines:
+PyPI publication is coming soon; until then, install from a source checkout:
 
 ```bash
-pipx install odooctl
+git clone https://github.com/Rami-0/odooctl && cd odooctl
+pipx install .
+# or
+uv tool install .
 ```
 
-Or use `uv`:
-
-```bash
-uv tool install odooctl
-```
+Once published, `pipx install odooctl` / `uv tool install odooctl` will work directly.
 
 Install optional S3 support only when you need remote backup uploads:
 
@@ -27,6 +26,8 @@ uv tool install 'odooctl[s3]'
 ## 2. Prepare a project repo
 
 Run `odooctl` from a tracked Odoo project directory that contains your `docker-compose.yml`, addons, Odoo config, and `odooctl.yml`.
+
+You do not have to write `odooctl.yml` by hand: `odooctl import <path>` generates it from an existing Docker Compose deployment (read-only preview first, `--yes` to write), and `odooctl setup` scaffolds it for a brand-new project from a catalog stack template.
 
 For Docker Compose deployments, prefer Docker-native execution mode so operators do not need host PostgreSQL clients:
 
@@ -67,7 +68,7 @@ Set referenced secrets in the operator environment, then run `doctor`:
 
 ```bash
 export ODOO_DB_PASSWORD='change-me'
-odooctl doctor -p acme
+odooctl -p acme doctor
 ```
 
 `doctor` verifies config loading, project paths, required environment variables, Docker Compose files, sanitization SQL files, and redaction-secret quality. Short/common test values such as `odoo` can be listed under `redaction.ignore_values` for local experiments.
@@ -75,7 +76,7 @@ odooctl doctor -p acme
 ## 5. Back up production
 
 ```bash
-odooctl backup production -p acme
+odooctl -p acme backup production --verify
 ```
 
 A full backup contains:
@@ -90,7 +91,7 @@ A full backup contains:
 Define a non-production environment with `clone_from: production`, `sanitize: true`, and distinct DB/filestore names. Then run:
 
 ```bash
-odooctl clone production staging --sanitize -p acme
+odooctl -p acme clone production staging --sanitize
 ```
 
 For local multi-database stacks served by one Odoo HTTP service, enable `db_selector: true`; health checks will use `?db=<database>`.
@@ -100,8 +101,8 @@ For local multi-database stacks served by one Odoo HTTP service, enable `db_sele
 Generate installable systemd or cron snippets:
 
 ```bash
-odooctl schedule backup --env production --cron '0 2 * * *' -p acme
-odooctl schedule doctor --env production --systemd --on-calendar daily -p acme
+odooctl -p acme schedule backup --env production --format cron --interval '0 2 * * *'
+odooctl -p acme schedule doctor --env production --format systemd --interval daily
 ```
 
 `odooctl schedule` prints files/snippets only. Review and install them with your OS process manager.

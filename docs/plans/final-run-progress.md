@@ -4,7 +4,7 @@ Purpose: session-resumable state for the roadmap execution
 (`docs/plans/roadmap-2026-07-production-readiness.md`). If a new session
 starts, read this file first, then `git log --oneline -15`.
 
-Last updated: 2026-07-19 ~17:55 UTC (update this line on every edit)
+Last updated: 2026-07-19 ~18:05 UTC (update this line on every edit)
 
 ## Ground rules in effect
 
@@ -33,7 +33,15 @@ Last updated: 2026-07-19 ~17:55 UTC (update this line on every edit)
 - Trust model documented in docs/security.md ("odooctl.yml is operator-trusted" + enforced boundaries).
 - click declared as direct dep (typer 0.27 dropped it); tests robust to click ≥8.2 stdout/stderr split + unrendered ClickExceptions (`_all_output` helper in test_env_cmd.py). Suite verified on BOTH pinned venv (.venv) and latest-deps venv (scratchpad fresh-venv).
 
-### Phase 2 — Safety & correctness polish: IN PROGRESS (4 agents fanned out)
+### Phase 2 — Safety & correctness polish: DONE (pushed, CI green)
+All four agents merged + integrated. Also: token mint/verify CLI now defaults
+to signing with ODOOCTL_API_KEY (was ODOOCTL_RUNNER_KEY — a real key-mismatch
+bug the docs-drift agent surfaced); tests/test_runner.py TEST_KEY lengthened to
+32+ chars so the C2 regression test exercises op failure, not the key floor.
+Dependabot immediately opened 5 GitHub-Actions bump PRs (#1-#5) — LEFT OPEN for
+the user to review/merge (merge-without-review is outside my authorization).
+
+### Phase 2 original agent scope (for reference)
 - DONE by me: healthcheck strictness (2.6), restore/rollback confirmations (2.1), shell completion enabled in main.py.
 - Agent "sanitization completeness" (2.2): DONE — payment_acquirer legacy table, web.base.url.freeze, OAuth secrets cleared, iap_account tokens, Odoo-19 `auth_passkey_key` DELETE (guarded), crons disabled in ALL profiles incl. minimal. docs/staging-clone.md updated. 896 passed.
 - Agent "RBAC + token/audit hardening" (2.3+2.5): RUNNING — Action.CANCEL as write, project scoping on reads/cancel, TTL 300s default, nonce purge w/ timestamps, HMAC-keyed audit chain (ODOOCTL_AUDIT_KEY), API key ≥32 chars floor, events max_polls clamp.
@@ -49,8 +57,10 @@ Last updated: 2026-07-19 ~17:55 UTC (update this line on every edit)
 - `import --allow-outside` flag wired in main.py (containment agent left it as a kwarg).
 - TODO: api parity test after Phase 2 agents merge, full 17/18/19 matrix, docs/operations/integration-testing.md, optional nightly cron.
 
-### Phase 4 — Product & UX: NOT STARTED (except completion + README Status para via docs agent)
-- Planned: README full rewrite w/ screenshots, mkdocs site, --json everywhere, error-message polish, web UI papercuts (hide Migrate for operators on protected envs), first-run measurement.
+### Phase 4 — Product & UX: IN PROGRESS
+- DONE: web UI papercuts agent (Migrate disabled for operator on protected env w/ tooltip, empty states w/ CLI hints, running-op pulse indicator, title+inline-SVG favicon; 48 web tests green). mkdocs.yml + .github/workflows/docs.yml (GitHub Pages, README→index.md at build) scaffolded. docs/operations/integration-testing.md written.
+- RUNNING: README full-rewrite agent (verifies every command against --help before documenting).
+- TODO: screenshots (needs a running UI; placeholder comments in README), first-run measurement, error-message polish (deferred — good state already).
 
 ### Phase 5 — Launch prep + cross-model review: NOT STARTED
 - Planned: issue/PR templates, CODEOWNERS, dependabot, release.yml (tag → build → PyPI trusted publishing), version 0.2.0, SECURITY.md contact (needs user input: real email), adversarial re-scan via fresh Opus agent + GPT via `codex exec`, THEN ask user to flip repo public + create PyPI project.

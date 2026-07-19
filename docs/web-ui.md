@@ -76,9 +76,9 @@ odooctl security token mint \
   --role operator
 ```
 
-Note the explicit `--key-env ODOOCTL_API_KEY`: the mint command's `--key-env`
-defaults to `ODOOCTL_RUNNER_KEY`, but the API server verifies tokens with the
-key it was started with (`ODOOCTL_API_KEY`). See `docs/rbac.md`.
+The mint command signs with `ODOOCTL_API_KEY` by default — the same key the
+API server verifies with, so the explicit `--key-env` above is optional. See
+`docs/rbac.md`.
 
 ## Pages
 

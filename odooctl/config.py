@@ -149,7 +149,7 @@ class PostgresConfig(BaseModel):
 
 class OdooConfig(BaseModel):
     image: str
-    config_path: str = "./odoo.conf"
+    config_path: str = "/etc/odoo/odoo.conf"
     addons_paths: list[str] = Field(default_factory=list)
     service: str = "odoo"
     db_host: str | None = None
@@ -389,7 +389,7 @@ redaction:
 
 odoo:
   image: registry.example.com/odoo:19.0
-  config_path: ./odoo.conf
+  config_path: /etc/odoo/odoo.conf
   service: odoo
   addons_paths:
     - /mnt/extra-addons

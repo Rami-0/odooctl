@@ -86,6 +86,7 @@ backups:
 odoo:
   image: odoo:{version}
   service: odoo
+  config_path: /etc/odoo/odoo.conf
   db_host: db
   db_user: odoo
   db_password_env: ODOO_DB_PASSWORD
@@ -225,6 +226,9 @@ def odoo_stack(request, tmp_path_factory) -> OdooStack:
 
     env = os.environ.copy()
     env["ODOO_DB_PASSWORD"] = DB_PASSWORD
+    # For the harness's own psql assertions (docker compose exec -e PGPASSWORD
+    # forwards the value from the client environment).
+    env["PGPASSWORD"] = DB_PASSWORD
     # Isolate the registry so `project add` never touches the operator's config.
     env["XDG_CONFIG_HOME"] = str(root / "xdg")
 

@@ -115,6 +115,13 @@
         return '<span class="spinner"></span>Loading…';
     }
 
+    function renderEmptyState(message, hint) {
+        return '<div class="empty-state">' +
+            '<p>' + esc(message) + '</p>' +
+            (hint ? '<p class="empty-hint">Run: <code>' + esc(hint) + '</code></p>' : '') +
+            '</div>';
+    }
+
     // -------------------------------------------------------------------------
     // Router
     // -------------------------------------------------------------------------
@@ -176,7 +183,10 @@
             var projects = data.projects || [];
             var content = '<h2>Projects</h2>';
             if (!projects.length) {
-                content += '<p class="text-muted">No registered projects. Run <code>odooctl project register</code> first.</p>';
+                content += renderEmptyState(
+                    'No projects registered.',
+                    'odooctl project add <name> --path /srv/odoo/<name>'
+                );
             } else {
                 content += '<div class="project-grid">';
                 projects.forEach(function (p) {
@@ -241,7 +251,10 @@
 
             content += '<h2>Recent Operations</h2>';
             if (!recentOps.length) {
-                content += '<p class="text-muted">No recent operations.</p>';
+                content += renderEmptyState(
+                    'No operations yet for this project.',
+                    'odooctl backup <env>'
+                );
             } else {
                 content += buildOpsTable(recentOps);
             }
@@ -294,6 +307,9 @@
 
             var isProtected = !!envCfg.protected;
             var canWrite = isOperator() && (!isProtected || isAdmin());
+            // M15: operator-only principals must not launch migration rehearsal
+            // against a protected source env (server enforces; this is UX).
+            var migrateBlocked = isProtected && isOperator() && !isAdmin();
 
             var crumb = '<nav class="breadcrumb">' +
                 '<a href="#/">Dashboard</a> &rsaquo; ' +
@@ -310,7 +326,13 @@
                 '<button class="tab" data-tab="restore-points">Restore Points</button>' +
                 (isOperator() ? '<button class="tab" data-tab="clone">Clone</button>' : '') +
                 (isAdmin() ? '<button class="tab" data-tab="promote">Promote</button>' : '') +
-                (isOperator() ? '<button class="tab" data-tab="migrate">Migrate</button>' : '') +
+                (isOperator()
+                    ? '<button class="tab" data-tab="migrate"' +
+                        (migrateBlocked
+                            ? ' disabled title="Protected environment: migration rehearsal requires the admin role (you have operator). Server-side RBAC enforces this."'
+                            : '') +
+                        '>Migrate</button>'
+                    : '') +
                 '</div>' +
                 '<div class="tab-content" id="tab-content">' +
                 buildOverviewTab(envCfg, statusEnv) +
@@ -329,7 +351,7 @@
                     } else if (tabName === 'doctor') {
                         content.innerHTML = buildDoctorTab(envCfg, statusEnv);
                     } else if (tabName === 'operations') {
-                        content.innerHTML = envOps.length ? buildOpsTable(envOps) : '<p class="text-muted">No operations for this environment.</p>';
+                        content.innerHTML = envOps.length ? buildOpsTable(envOps) : renderEmptyState('No operations for this environment.', 'odooctl backup <env>');
                         attachOpsTableEvents(content);
                     } else if (tabName === 'backups') {
                         content.innerHTML = buildBackupsTab(envBackups, canWrite);
@@ -395,7 +417,7 @@
 
     function buildOpsTable(ops) {
         var rows = ops.map(function (op) {
-            return '<tr>' +
+            return '<tr' + (op.status === 'running' ? ' class="op-running"' : '') + '>' +
                 '<td><code>' + esc(op.op_id.slice(0, 8)) + '&hellip;</code></td>' +
                 '<td>' + esc(op.kind) + '</td>' +
                 '<td>' + esc(op.environment) + '</td>' +
@@ -425,7 +447,10 @@
             content += renderAlert('Admin role required to back up a protected environment.', 'warning');
         }
         if (!backups.length) {
-            content += '<p class="text-muted">No backups found for this environment.</p>';
+            content += renderEmptyState(
+                'No backups found for this environment.',
+                'odooctl backup <env>'
+            );
         } else {
             content += '<table class="ops-table">' +
                 '<tr><th>Timestamp</th><th>Path</th><th>Size</th></tr>';

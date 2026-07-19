@@ -606,3 +606,32 @@ def test_scoped_token_status_and_backups_blocked(client):
                  "/projects/test-project"):
         resp = client.get(path, headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 404, path
+
+
+def test_api_rejects_registry_config_escaping_project_root(tmp_path):
+    """Re-scan #6: a hand-edited registry entry whose config escapes the
+    project root must not be loaded by the API loaders."""
+    from odooctl.api.app import create_app
+    from odooctl.registry import Registry, RegisteredProject
+
+    proj_root = tmp_path / "proj"
+    proj_root.mkdir()
+    (proj_root / "odooctl.yml").write_text(MINIMAL_CONFIG)
+    # Attacker points config outside the root.
+    outside = tmp_path / "evil.yml"
+    outside.write_text(MINIMAL_CONFIG)
+
+    reg = Registry(
+        path=tmp_path / "registry.toml",
+        active="test-project",
+        projects={
+            "test-project": RegisteredProject(
+                name="test-project", path=proj_root, config="../evil.yml"
+            )
+        },
+    )
+    app = create_app(api_key=TEST_KEY, registry_loader=lambda: reg, allowed_hosts=["*"])
+    client = TestClient(app)
+    token = _mint_admin()
+    resp = client.get("/projects/test-project/status", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 404

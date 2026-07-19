@@ -63,6 +63,17 @@ class DockerPostgresAdapter:
     def ping(self, db_name: str) -> None:
         run(self._cmd("pg_isready", "-d", db_name, *self.base_args()), cwd=self.project_dir, env=self._password_env())
 
+    def database_exists(self, db_name: str) -> bool:
+        from odooctl.odoo.db_swap import quote_literal
+
+        result = run(
+            self._cmd("psql", *self.base_args(), "-d", "postgres", "-tAc",
+                      f"SELECT 1 FROM pg_database WHERE datname = {quote_literal(db_name)}"),
+            cwd=self.project_dir,
+            env=self._password_env(),
+        )
+        return result.stdout.strip() == "1"
+
     def dump(self, db_name: str, output: str | Path) -> None:
         from odooctl.utils.shell import run_capture_bytes
 

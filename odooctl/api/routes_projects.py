@@ -18,7 +18,7 @@ def _registry(request: Request):
 
 
 def _load_ctx(request: Request, project: str):
-    from odooctl.context import ProjectContext
+    from odooctl.registry import context_from_registered
 
     # A per-project token must not reach another project's config/state.
     enforce_project_scope(request, project)
@@ -27,7 +27,8 @@ def _load_ctx(request: Request, project: str):
     if proj is None:
         raise HTTPException(status_code=404, detail=f"Project {project!r} not found")
     try:
-        return ProjectContext.from_config_path(proj.config, root=proj.path)
+        # Path containment: reject a registry config that escapes its root.
+        return context_from_registered(proj)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

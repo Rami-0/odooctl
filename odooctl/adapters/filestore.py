@@ -11,6 +11,34 @@ from odooctl.utils.paths import ensure_dir
 from odooctl.utils.shell import run
 
 
+def _validate_tar_members(archive: Path) -> None:
+    """Reject a filestore archive with unsafe members before extraction.
+
+    Codex re-scan #1: a crafted/imported backup could carry absolute paths,
+    ``..`` traversal, or symlink/hardlink/device members that escape the
+    extraction directory and overwrite sibling filestores or container files
+    (manifest checksums prove consistency, not safety). We reject any such
+    member up front; extraction still stages into a private temp dir.
+    """
+    import tarfile
+    from pathlib import PurePosixPath
+
+    try:
+        with tarfile.open(archive, "r:*") as tf:
+            for member in tf.getmembers():
+                name = member.name
+                if name.startswith("/") or PurePosixPath(name).is_absolute():
+                    raise RuntimeError(f"Unsafe absolute path in archive: {name!r}")
+                if ".." in PurePosixPath(name).parts:
+                    raise RuntimeError(f"Unsafe '..' traversal in archive: {name!r}")
+                if member.islnk() or member.issym():
+                    raise RuntimeError(f"Refusing archive with link member: {name!r}")
+                if member.isdev() or member.ischr() or member.isblk() or member.isfifo():
+                    raise RuntimeError(f"Refusing archive with special-file member: {name!r}")
+    except tarfile.TarError as exc:
+        raise RuntimeError(f"Could not read filestore archive {archive}: {exc}") from exc
+
+
 class FilestoreBackend(Protocol):
     def archive(self, filestore_path: str, output: str | Path) -> None: ...
     def restore_archive(self, archive_path: str | Path, target_path: str) -> None: ...
@@ -31,9 +59,12 @@ class FilestoreAdapter:
         if not archive.exists():
             raise FileNotFoundError(f"Filestore archive does not exist: {archive_path}")
         target = Path(target_path)
+        _validate_tar_members(archive)
         ensure_dir(target.parent)
         with tempfile.TemporaryDirectory(dir=target.parent, prefix=f".{target.name}.restore-") as tmpdir:
-            run(["tar", "-xf", str(archive), "-C", tmpdir], stream=True)
+            # --no-same-owner/-permissions avoid honoring attacker-set metadata;
+            # members were already validated to be traversal- and link-free.
+            run(["tar", "--no-same-owner", "--no-same-permissions", "-xf", str(archive), "-C", tmpdir], stream=True)
             extracted = Path(tmpdir) / target.name
             if not extracted.exists():
                 children = list(Path(tmpdir).iterdir())

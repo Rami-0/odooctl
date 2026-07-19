@@ -18,9 +18,13 @@ class CommandResult:
     stderr: str
 
 class CommandError(RuntimeError):
-    def __init__(self, result: CommandResult):
+    def __init__(self, result: CommandResult, env: Mapping[str, str] | None = None):
+        # Redact with the merged per-call environment (codex re-scan #4): a
+        # secret supplied via the call's ``env=`` (e.g. PGPASSWORD) may not be
+        # present in ``os.environ``, so ``redact(env=os.environ)`` alone would
+        # miss it. ``result.args``/``result.stderr`` can echo such a value.
         message = f"Command failed ({result.returncode}): {' '.join(result.args)}\n{result.stderr}"
-        super().__init__(redact(message))
+        super().__init__(redact(message, env))
         self.result = result
 
 def redact(
@@ -59,7 +63,7 @@ def run(args: Sequence[str], *, check: bool = True, cwd: str | None = None, env:
         proc = subprocess.run(list(args), cwd=cwd, env=merged_env, text=True, capture_output=True)
         result = CommandResult(list(args), proc.returncode, redact(proc.stdout, merged_env), redact(proc.stderr, merged_env))
     if check and result.returncode != 0:
-        raise CommandError(result)
+        raise CommandError(result, merged_env)
     return result
 
 def _merged_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -90,7 +94,7 @@ def run_capture_bytes(
     stderr = redact(proc.stderr.decode(errors="replace"), merged_env)
     result = CommandResult(list(args), proc.returncode, str(output_path), stderr)
     if check and result.returncode != 0:
-        raise CommandError(result)
+        raise CommandError(result, merged_env)
     return result
 
 
@@ -110,7 +114,7 @@ def run_pipe_stdin(
     stderr = redact(proc.stderr.decode(errors="replace"), merged_env)
     result = CommandResult(list(args), proc.returncode, stdout, stderr)
     if check and result.returncode != 0:
-        raise CommandError(result)
+        raise CommandError(result, merged_env)
     return result
 
 
@@ -154,7 +158,7 @@ def run_pipe(
     returncode = producer_rc if producer_rc != 0 else consumer_proc.returncode
     result = CommandResult(list(display_args), returncode, stdout, stderr)
     if check and returncode != 0:
-        raise CommandError(result)
+        raise CommandError(result, merged_env)
     return result
 
 

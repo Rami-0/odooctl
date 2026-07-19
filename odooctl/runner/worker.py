@@ -187,10 +187,12 @@ class RunnerWorker:
         ``self.last_run_ok`` so callers (``run_loop``) can report failures.
         """
         for proj_name, proj in self._registry.projects.items():
-            from odooctl.context import ProjectContext
+            from odooctl.registry import context_from_registered
 
             try:
-                ctx = ProjectContext.from_config_path(proj.config, root=proj.path)
+                # Path containment: the privileged runner must not load a config
+                # that escapes the registered project root (codex re-scan #6).
+                ctx = context_from_registered(proj)
             except Exception:
                 continue
 

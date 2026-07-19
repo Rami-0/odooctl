@@ -16,6 +16,16 @@ class PostgresAdapter:
     def ping(self, db_name: str) -> None:
         run(["psql", *self.base_args(), "-d", db_name, "-v", "ON_ERROR_STOP=1", "-c", "SELECT 1"], env=self.env())
 
+    def database_exists(self, db_name: str) -> bool:
+        from odooctl.odoo.db_swap import quote_literal
+
+        result = run(
+            ["psql", *self.base_args(), "-d", "postgres", "-tAc",
+             f"SELECT 1 FROM pg_database WHERE datname = {quote_literal(db_name)}"],
+            env=self.env(),
+        )
+        return result.stdout.strip() == "1"
+
     def dump(self, db_name: str, output: str | Path) -> None:
         run(["pg_dump", *self.base_args(), "-Fc", "-d", db_name, "-f", str(output)], env=self.env(), stream=True)
 

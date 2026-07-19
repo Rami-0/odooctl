@@ -133,3 +133,19 @@ def test_run_command_error_does_not_leak_secret_env_value(monkeypatch):
     message = str(excinfo.value)
     assert secret not in message
     assert "***REDACTED***" in message
+
+
+def test_command_error_redacts_per_call_env_secret_not_in_os_environ():
+    """Re-scan #4: a secret passed only via the call's env= (not os.environ)
+    must still be redacted from the composed CommandError message."""
+    from odooctl.utils.shell import CommandError, run
+
+    secret = "per-call-pg-password-xyz"
+    with __import__("pytest").raises(CommandError) as excinfo:
+        run(
+            ["sh", "-c", f"echo using {secret} >&2; exit 4"],
+            env={"PGPASSWORD": secret},
+        )
+    msg = str(excinfo.value)
+    assert secret not in msg
+    assert "***REDACTED***" in msg

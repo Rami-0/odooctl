@@ -69,3 +69,60 @@ def test_swap_allows_unprotected_target_per_config_policy():
 def test_database_quoting_handles_special_characters():
     assert quote_identifier('weird"db') == '"weird""db"'
     assert quote_literal("team's db") == "'team''s db'"
+
+
+# --- Re-scan #3: crash/failure-safe swap when the adapter can query existence ---
+
+
+class ExistsAwarePostgres:
+    """Fake with database_exists — exercises the rename-aside swap path."""
+
+    def __init__(self, existing):
+        self.databases = set(existing)
+        self.renames: list[tuple[str, str]] = []
+        self.drops: list[str] = []
+        self.fail_promote = False
+
+    def database_exists(self, name):
+        return name in self.databases
+
+    def psql(self, db_name, sql):
+        if "RENAME TO" in sql:
+            # ALTER DATABASE "old" RENAME TO "new";
+            import re
+            m = re.search(r'ALTER DATABASE "(.+?)" RENAME TO "(.+?)"', sql)
+            old, new = m.group(1), m.group(2)
+            if self.fail_promote and old.endswith("_incoming"):
+                raise RuntimeError("rename failed")
+            self.renames.append((old, new))
+            self.databases.discard(old)
+            self.databases.add(new)
+        elif "DROP DATABASE IF EXISTS" in sql:
+            import re
+            name = re.search(r'DROP DATABASE IF EXISTS "(.+?)"', sql).group(1)
+            self.drops.append(name)
+            self.databases.discard(name)
+
+
+def test_swap_rename_aside_keeps_target_present_throughout():
+    pg = ExistsAwarePostgres(existing={"odoo_staging", "odoo_staging_incoming"})
+    swap_temp_database(pg, temp_db="odoo_staging_incoming", target_db="odoo_staging", target_env_name="staging")
+    # Final state: target present with promoted data, aside dropped.
+    assert "odoo_staging" in pg.databases
+    assert "odoo_staging__old_swap" not in pg.databases
+    assert "odoo_staging_incoming" not in pg.databases
+
+
+def test_swap_restores_original_when_promotion_rename_fails():
+    pg = ExistsAwarePostgres(existing={"odoo_staging", "odoo_staging_incoming"})
+    pg.fail_promote = True
+    with pytest.raises(RuntimeError, match="rename failed"):
+        swap_temp_database(pg, temp_db="odoo_staging_incoming", target_db="odoo_staging", target_env_name="staging")
+    # The original database is restored — the target name is never left absent.
+    assert "odoo_staging" in pg.databases
+
+
+def test_swap_into_fresh_target_that_does_not_exist():
+    pg = ExistsAwarePostgres(existing={"odoo_staging_incoming"})  # no live target yet
+    swap_temp_database(pg, temp_db="odoo_staging_incoming", target_db="odoo_staging", target_env_name="staging")
+    assert "odoo_staging" in pg.databases

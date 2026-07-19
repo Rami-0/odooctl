@@ -13,3 +13,5 @@ backups/
 .odooctl/
 
 docs/research/
+site/
+docs/index.md

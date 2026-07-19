@@ -71,6 +71,10 @@
   font-weight: 600;
   line-height: 1;
 }
+.md-header__title > .md-header__ellipsis {
+  align-items: center;
+  display: flex;
+}
 [dir='ltr'] .md-header__title { margin-left: 10px; }
 [dir='rtl'] .md-header__title { margin-right: 10px; }
 .md-header__topic { line-height: 1.2; }

@@ -62,9 +62,12 @@ the user to review/merge (merge-without-review is outside my authorization).
 - RUNNING: README full-rewrite agent (verifies every command against --help before documenting).
 - TODO: screenshots (needs a running UI; placeholder comments in README), first-run measurement, error-message polish (deferred — good state already).
 
-### Phase 5 — Launch prep + cross-model review: NOT STARTED
-- Planned: issue/PR templates, CODEOWNERS, dependabot, release.yml (tag → build → PyPI trusted publishing), version 0.2.0, SECURITY.md contact (needs user input: real email), adversarial re-scan via fresh Opus agent + GPT via `codex exec`, THEN ask user to flip repo public + create PyPI project.
+### Phase 5 — Launch prep + cross-model review: IN PROGRESS
+- DONE: .github/workflows/release.yml (tag → test → build → PyPI trusted publishing → GH release), dependabot.yml, ISSUE_TEMPLATE/{bug,feature}.yml, PULL_REQUEST_TEMPLATE.md, CODEOWNERS. Version bumped to 0.2.0 (pyproject + __init__ + changelog heading). SECURITY.md placeholder email removed → GitHub private advisory is the sole channel.
+- RUNNING: cross-model adversarial re-scan — GPT via `codex exec -s read-only` (scratchpad/codex-review.md) AND an Opus subagent — both verifying the 13 remediations hold + hunting new bugs.
+- TODO after reviews return: triage findings, fix any real HIGH/MED, re-run suite, commit. THEN (needs user confirmation, do not do autonomously): flip repo public, set up PyPI trusted-publisher + tag v0.2.0 to publish.
 - PyPI name `odooctl` verified free 2026-07-19; repo currently private.
+- NOTE: dependabot opened PRs #1-#5 (actions bumps) — left for user to merge (merge-without-review blocked for me).
 
 ## Key facts for a fresh session
 

@@ -13,4 +13,4 @@
 - **Security vulnerabilities** — never open a public issue; report privately
   per [SECURITY.md](SECURITY.md).
 - **Commercial licensing** — see [LICENSING.md](LICENSING.md);
-  contact addtech.us@gmail.com.
+  contact hi@ramishalabi.xyz.

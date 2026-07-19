@@ -117,6 +117,7 @@ Exit criteria: a stranger can succeed from README alone; screenshots/docs publis
 - **5.2 Release pipeline**: tag-driven GitHub Actions release — build, integration smoke, publish to PyPI via **trusted publishing** (no long-lived token), GitHub Release with changelog section. Claim the `odooctl` PyPI name with the first alpha immediately (it is free today; names get squatted).
 - **5.3 Versioning policy**: 0.2.0 = post-hardening alpha (end of Phase 2), 0.9.x = public beta at launch (end of Phase 4), 1.0.0 = GA when §1 criteria all hold. Semver + `CHANGELOG.md` discipline; config-schema compatibility policy documented.
 - **5.4 Go public**: make the repo public after Phase 1 (security fixes) lands — publishing known command-injection sinks before fixing them is the wrong order. Prepare launch posts (Odoo community forum, r/odoo, Hacker News "Show HN") for the beta.
+  - Immediately after going public, enable branch protection on `master` (blocked on private repos without GitHub Pro — attempted 2026-07-19, HTTP 403): require PRs + CI checks (`lint`, `build`, `test (3.11/3.12/3.13)`), `enforce_admins`, no force pushes/deletions, required conversation resolution.
 - **5.5 Adoption funnel**: "good first issue" seeding, roadmap.md public (post-v1: SSH/multi-host runners, Nginx/Caddy adapters, PITR via WAL archiving, org-scoped multi-tenancy — currently modeled but unenforced).
 
 Exit criteria: v0.9.0 on PyPI from a public repo through the automated pipeline.

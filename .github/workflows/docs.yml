@@ -27,7 +27,7 @@ jobs:
           # index.md is generated from README.md at build time. README uses
           # GitHub-relative links (docs/foo.md, CONTRIBUTING.md); rewrite them
           # to the in-site paths and stage the root governance files.
-          cp CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md docs/ 2>/dev/null || true
+          cp CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md LICENSING.md SUPPORT.md docs/ 2>/dev/null || true
           sed -E 's#\]\(docs/#](#g' README.md > docs/index.md
           mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3

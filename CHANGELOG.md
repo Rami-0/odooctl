@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **License changed from MIT to AGPL-3.0-or-later** with a commercial
+  license available for proprietary embedding/resale — see `LICENSING.md`.
+  (No prior release was distributed under MIT.)
+- Contributions now require a Developer Certificate of Origin sign-off
+  (`git commit -s`) plus a commercial-relicensing grant; see
+  `CONTRIBUTING.md`.
+
+### Added
+
+- Open-source contribution infrastructure: label taxonomy
+  (`.github/labels.yml`) with automated sync, path-based PR auto-labeling,
+  issue triage flow (`status/needs-triage`), a documentation issue
+  template, issue-form contact links, `SUPPORT.md`, and GitHub Discussions.
+
 ## [0.2.0] - 2026-07-19
 
 Production-hardening pass driven by the 2026-05-31 security audits

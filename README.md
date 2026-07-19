@@ -1,5 +1,10 @@
 # odooctl
 
+[![CI](https://github.com/Rami-0/odooctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Rami-0/odooctl/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://github.com/Rami-0/odooctl/blob/master/pyproject.toml)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 `odooctl` is a CLI-first, Odoo-aware control plane for self-hosted Odoo on Docker Compose — think open-source Odoo.sh for your own server. It handles the operational lifecycle generic deploy tools miss: verified backups, sanitized staging clones, module updates, rollback, environment promotion, upgrade rehearsal, and health checks, all Odoo- and PostgreSQL-aware. It runs against the compose stack you already have; you keep your server, your data, and your compose files.
 
 ## Why odooctl
@@ -138,4 +143,6 @@ See [docs/security.md](docs/security.md) for the trust model.
 
 ## Contributing, security, license
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately per [SECURITY.md](SECURITY.md). Licensed under the [MIT License](LICENSE).
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Good entry points are issues labeled [`good first issue`](https://github.com/Rami-0/odooctl/labels/good%20first%20issue) and [`help wanted`](https://github.com/Rami-0/odooctl/labels/help%20wanted). Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
+
+odooctl is free software, dual-licensed: [AGPL-3.0-or-later](LICENSE) for open use — including running it commercially for yourself or your clients — with a commercial license available for embedding or reselling it in proprietary products. See [LICENSING.md](LICENSING.md).

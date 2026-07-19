@@ -1,0 +1,109 @@
+# Label taxonomy — source of truth.
+# Synced to GitHub by .github/workflows/labels.yml (crazy-max/ghaction-github-labeler).
+# Groups: type (what kind), area/* (which subsystem), priority/* (how urgent),
+# status/* (where in the triage flow), odoo/* (affected Odoo version).
+
+# --- Type -------------------------------------------------------------------
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or improvement
+- name: documentation
+  color: "0075ca"
+  description: Improvements or additions to docs
+- name: question
+  color: "d876e3"
+  description: Usage question — prefer GitHub Discussions
+- name: security
+  color: "ee0701"
+  description: Security-relevant (non-vulnerability; vulnerabilities go via SECURITY.md)
+- name: breaking-change
+  color: "b60205"
+  description: Changes behavior in a backward-incompatible way
+
+# --- Contribution funnel ----------------------------------------------------
+- name: good first issue
+  color: "7057ff"
+  description: Small, well-scoped — good entry point for new contributors
+- name: help wanted
+  color: "008672"
+  description: Maintainer would welcome a PR for this
+
+# --- Area -------------------------------------------------------------------
+- name: area/cli
+  color: "1d76db"
+  description: Typer CLI commands and UX
+- name: area/api
+  color: "1d76db"
+  description: REST API server (odooctl serve)
+- name: area/web-ui
+  color: "1d76db"
+  description: Web UI
+- name: area/backup-restore
+  color: "1d76db"
+  description: Backup, verify, restore, disaster recovery
+- name: area/clone-sanitize
+  color: "1d76db"
+  description: Environment cloning and staging sanitization
+- name: area/deploy
+  color: "1d76db"
+  description: Deploy, rollback, module updates, health checks
+- name: area/migrate
+  color: "1d76db"
+  description: Version migration and upgrade rehearsal
+- name: area/docker
+  color: "1d76db"
+  description: Docker/Compose adapters and execution modes
+- name: area/config
+  color: "1d76db"
+  description: odooctl.yml, validation, secrets referencing
+- name: area/ci
+  color: "1d76db"
+  description: GitHub Actions, packaging, release tooling
+
+# --- Priority ---------------------------------------------------------------
+- name: priority/critical
+  color: "b60205"
+  description: Data loss, corruption, or production breakage — drop everything
+- name: priority/high
+  color: "d93f0b"
+  description: Should be in the next release
+- name: priority/medium
+  color: "fbca04"
+  description: Normal queue
+- name: priority/low
+  color: "c2e0c6"
+  description: Nice to have
+
+# --- Status -----------------------------------------------------------------
+- name: status/needs-triage
+  color: "ededed"
+  description: New — not yet reviewed by a maintainer
+- name: status/needs-info
+  color: "d4c5f9"
+  description: Waiting on reporter for reproduction or details
+- name: status/confirmed
+  color: "0e8a16"
+  description: Reproduced / accepted by a maintainer
+- name: status/blocked
+  color: "9e9e9e"
+  description: Blocked on another issue or external dependency
+- name: duplicate
+  color: "cfd3d7"
+  description: Already tracked elsewhere
+- name: wontfix
+  color: "ffffff"
+  description: Deliberately out of scope
+
+# --- Odoo version -----------------------------------------------------------
+- name: odoo/17
+  color: "006b75"
+  description: Affects Odoo 17
+- name: odoo/18
+  color: "006b75"
+  description: Affects Odoo 18
+- name: odoo/19
+  color: "006b75"
+  description: Affects Odoo 19

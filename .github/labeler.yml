@@ -1,0 +1,72 @@
+# Path → area label mapping for PRs. Applied by .github/workflows/pr-labeler.yml
+# (actions/labeler v5 syntax).
+
+area/cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/commands/**
+          - odooctl/main.py
+          - odooctl/cli_selector.py
+
+area/api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/api/**
+          - odooctl/runner/**
+
+area/web-ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/web/**
+
+area/backup-restore:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/services/backup.py
+          - odooctl/services/restore.py
+          - odooctl/services/restore_points.py
+          - odooctl/services/dr.py
+
+area/clone-sanitize:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/services/clone.py
+
+area/deploy:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/services/deploy.py
+          - odooctl/services/promote.py
+          - odooctl/services/branch.py
+
+area/migrate:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/migration/**
+
+area/docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/adapters/**
+
+area/config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - odooctl/config.py
+          - odooctl/context.py
+          - odooctl/registry.py
+          - examples/**
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - mkdocs.yml
+          - README.md
+          - CONTRIBUTING.md
+
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - pyproject.toml

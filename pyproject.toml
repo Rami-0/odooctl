@@ -4,7 +4,8 @@ version = "0.2.0"
 description = "CLI-first Odoo-aware deployment platform for self-hosted Odoo projects"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [
   { name = "odooctl maintainers" },
 ]
@@ -14,7 +15,6 @@ classifiers = [
   "Environment :: Console",
   "Framework :: Pydantic :: 2",
   "Intended Audience :: System Administrators",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
@@ -65,6 +65,7 @@ include = [
   "/odooctl",
   "/tests",
   "/LICENSE",
+  "/LICENSING.md",
   "/README.md",
   "/pyproject.toml",
 ]

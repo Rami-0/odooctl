@@ -1,0 +1,21 @@
+name: Documentation issue
+description: Something in the docs is wrong, unclear, or missing
+labels: [documentation, status/needs-triage]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Which page?
+      description: URL or path (e.g. docs/backup-restore.md)
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording (optional)

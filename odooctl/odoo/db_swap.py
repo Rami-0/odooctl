@@ -44,13 +44,20 @@ def swap_temp_database(
     is_protected_fn: Callable[[str], bool] | None = None,
     maintenance_db: str = "postgres",
 ) -> None:
-    """Atomically promote a prepared temp DB into the target DB name.
+    """Promote a prepared temp DB into the target DB name, crash/failure-safe.
 
     ``is_protected_fn`` (typically ``OdooCtlConfig.is_protected``) guards
     against accidental promotion over a protected environment such as
     production; callers that omit it must enforce that policy themselves
     before invoking this function. Callers are expected to restore and
     sanitize ``temp_db`` before invoking this function.
+
+    When the adapter exposes ``database_exists`` (the real Postgres adapters),
+    the swap moves the live target aside, promotes the temp DB, and only drops
+    the aside copy once the new DB is live — restoring the original if the
+    promotion rename fails. The target name is therefore never left without a
+    database (Opus M3 / codex re-scan #3). Adapters without ``database_exists``
+    fall back to the drop-then-rename path.
     """
     if is_protected_fn is not None and is_protected_fn(target_env_name):
         raise RuntimeError(
@@ -58,6 +65,33 @@ def swap_temp_database(
         )
     if temp_db == target_db:
         raise RuntimeError("Temporary database name must differ from target database name")
-    terminate_connections(pg, target_db, maintenance_db=maintenance_db)
-    drop_database(pg, target_db, maintenance_db=maintenance_db)
-    rename_database(pg, temp_db, target_db, maintenance_db=maintenance_db)
+
+    exists_fn = getattr(pg, "database_exists", None)
+    if not callable(exists_fn):
+        # Legacy path for adapters that cannot query database existence. On a
+        # crash between drop and rename the target name is briefly absent, but
+        # the data survives under ``temp_db`` and is recoverable.
+        terminate_connections(pg, target_db, maintenance_db=maintenance_db)
+        drop_database(pg, target_db, maintenance_db=maintenance_db)
+        rename_database(pg, temp_db, target_db, maintenance_db=maintenance_db)
+        return
+
+    aside_db = f"{target_db}__old_swap"
+    if exists_fn(aside_db):
+        terminate_connections(pg, aside_db, maintenance_db=maintenance_db)
+        drop_database(pg, aside_db, maintenance_db=maintenance_db)
+
+    target_existed = bool(exists_fn(target_db))
+    if target_existed:
+        terminate_connections(pg, target_db, maintenance_db=maintenance_db)
+        rename_database(pg, target_db, aside_db, maintenance_db=maintenance_db)
+    try:
+        rename_database(pg, temp_db, target_db, maintenance_db=maintenance_db)
+    except Exception:
+        # Promotion failed: restore the original so the target is never absent.
+        if target_existed and exists_fn(aside_db):
+            rename_database(pg, aside_db, target_db, maintenance_db=maintenance_db)
+        raise
+    if target_existed and exists_fn(aside_db):
+        terminate_connections(pg, aside_db, maintenance_db=maintenance_db)
+        drop_database(pg, aside_db, maintenance_db=maintenance_db)

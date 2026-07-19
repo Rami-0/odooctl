@@ -140,6 +140,19 @@ def use_project(name: str) -> RegisteredProject:
     return project
 
 
+def context_from_registered(registered: "RegisteredProject") -> ProjectContext:
+    """Build a ProjectContext from a registry entry with path containment.
+
+    Codex re-scan finding #6: the CLI resolver enforced ``_contained_config_path``
+    but the API loaders and the privileged runner called
+    ``ProjectContext.from_config_path`` directly, so a hand-edited registry entry
+    with ``config="../../attacker/odooctl.yml"`` could load a config outside the
+    registered root. All registry-to-context resolution must go through here.
+    """
+    resolved_config = _contained_config_path(registered.name, registered.path, registered.config)
+    return ProjectContext.from_config_path(resolved_config, root=registered.path)
+
+
 def resolve_project_context(
     *,
     project: str | None = None,
@@ -155,8 +168,7 @@ def resolve_project_context(
             raise click.ClickException(f"Unknown project: {project}")
         # Containment check (audit F10): reject registry entries whose config
         # resolves outside the registered project root.
-        resolved_config = _contained_config_path(registered.name, registered.path, registered.config)
-        return ProjectContext.from_config_path(resolved_config, root=registered.path)
+        return context_from_registered(registered)
     if project_dir is not None:
         return ProjectContext.from_config_path(config, root=project_dir)
     return ProjectContext.from_config_path(config)

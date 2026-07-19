@@ -74,12 +74,18 @@ def test_host_filestore_uses_plain_tar_archive(tmp_path: Path, monkeypatch):
     target = tmp_path / "restored" / "odoo_staging"
     archive.parent.mkdir()
     target.parent.mkdir()
-    archive.write_bytes(b"tar")
+    # A real (safe) tar so member validation passes.
+    import tarfile
+    (source / "file.txt").write_text("x")
+    with tarfile.open(archive, "w") as tf:
+        tf.add(source, arcname="odoo_staging")
     calls = []
 
     def fake_run(args, *, stream=True):
         calls.append((args, stream))
-        if args[:2] == ["tar", "-xf"]:
+        if args[:2] == ["tar", "-cf"]:
+            return
+        if "-xf" in args:
             extracted = Path(args[-1]) / "odoo_staging"
             extracted.mkdir()
 
@@ -90,11 +96,12 @@ def test_host_filestore_uses_plain_tar_archive(tmp_path: Path, monkeypatch):
     adapter.restore_archive(archive, str(target))
 
     assert calls[0] == (["tar", "-cf", str(archive), "-C", str(source.parent), source.name], True)
-    assert calls[1][0][:3] == ["tar", "-xf", str(archive)]
-    assert calls[1][0][3] == "-C"
+    extract_args = calls[1][0]
+    assert extract_args[0] == "tar" and "-xf" in extract_args
+    assert "--no-same-owner" in extract_args and "--no-same-permissions" in extract_args
     assert calls[1][1] is True
     assert "--zstd" not in calls[0][0]
-    assert "--zstd" not in calls[1][0]
+    assert "--zstd" not in extract_args
 
 
 def test_docker_volume_filestore_streams_archive_restore_and_copy(tmp_path: Path, monkeypatch):
@@ -147,3 +154,35 @@ def test_docker_volume_filestore_streams_archive_restore_and_copy(tmp_path: Path
     assert not any(
         call[2][:2] == ["sh", "-lc"] for call in compose.calls if call[0] == "exec"
     )
+
+
+def test_restore_archive_rejects_traversal_member(tmp_path: Path):
+    """Re-scan #1: a filestore archive with a '..' member is rejected."""
+    import tarfile
+
+    from odooctl.adapters.filestore import FilestoreAdapter
+
+    archive = tmp_path / "evil.tar"
+    payload = tmp_path / "payload"
+    payload.write_text("pwned")
+    with tarfile.open(archive, "w") as tf:
+        tf.add(payload, arcname="../escape/odoo_staging")
+
+    with __import__("pytest").raises(RuntimeError, match="traversal|absolute"):
+        FilestoreAdapter().restore_archive(archive, str(tmp_path / "restored" / "odoo_staging"))
+
+
+def test_restore_archive_rejects_symlink_member(tmp_path: Path):
+    import tarfile
+
+    from odooctl.adapters.filestore import FilestoreAdapter
+
+    archive = tmp_path / "evil.tar"
+    with tarfile.open(archive, "w") as tf:
+        info = tarfile.TarInfo("odoo_staging/link")
+        info.type = tarfile.SYMTYPE
+        info.linkname = "/etc/passwd"
+        tf.addfile(info)
+
+    with __import__("pytest").raises(RuntimeError, match="link"):
+        FilestoreAdapter().restore_archive(archive, str(tmp_path / "restored" / "odoo_staging"))

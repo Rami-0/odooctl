@@ -97,7 +97,7 @@
         var sub = (payload && payload.sub) ? esc(payload.sub) : '';
         var roles = esc(getRoles().join(', '));
         return '<header class="top-bar">' +
-            '<a class="logo" href="#/">odooctl</a>' +
+            '<a class="logo" href="#/"><span class="logo-mark"></span>odooctl</a>' +
             (title ? '<span>' + esc(title) + '</span>' : '') +
             '<span class="user-info">' + (sub ? sub + ' &middot; ' : '') + roles + '</span>' +
             '<button class="btn btn-sm" id="logout-btn">Sign out</button>' +
@@ -153,7 +153,7 @@
     // -------------------------------------------------------------------------
     function renderLogin(el) {
         el.innerHTML = '<div class="login-wrap"><div class="login-box">' +
-            '<h1>odooctl Dashboard</h1>' +
+            '<h1><span class="logo-mark logo-mark-lg"></span>odooctl Dashboard</h1>' +
             '<form id="login-form">' +
             '<label>API Token<input type="password" id="token-input" placeholder="Paste your bearer token" required></label>' +
             '<label>API Base URL<input type="text" id="base-input" value="' + esc(state.apiBase) + '"></label>' +

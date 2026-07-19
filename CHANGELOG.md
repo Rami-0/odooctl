@@ -145,6 +145,6 @@ secret redaction, optional real S3 uploads, documentation, and tests.
 - `odooctl doctor` warns when referenced secrets are shorter than the
   configured minimum or fall on the redaction ignore list.
 
-[Unreleased]: https://github.com/Rami-0/odooctl/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/Rami-0/odooctl/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Rami-0/odooctl/releases/tag/v0.1.0
+[Unreleased]: https://github.com/odooctl/odooctl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/odooctl/odooctl/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/odooctl/odooctl/releases/tag/v0.1.0

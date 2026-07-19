@@ -1,6 +1,6 @@
 name: Bug report
 description: Something in odooctl misbehaved
-labels: [bug]
+labels: [bug, status/needs-triage]
 body:
   - type: input
     id: version

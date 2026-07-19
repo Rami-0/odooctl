@@ -34,7 +34,7 @@ If the AGPL does not fit your use case — typically because you want to
 service without releasing your source code** — a commercial license is
 available.
 
-Contact **addtech.us@gmail.com** with a short description of your intended
+Contact **hi@ramishalabi.xyz** with a short description of your intended
 use to discuss terms.
 
 ## Contributions

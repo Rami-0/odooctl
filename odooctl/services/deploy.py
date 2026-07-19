@@ -68,6 +68,7 @@ def run_deploy(ctx: ServiceContext, environment: str, branch: str | None = None)
     backup_id = None
     status = "failed"
     message = None
+    db_mutation_possible = False
     try:
         if cfg.is_protected(environment):
             print("[deploy] backup")
@@ -79,6 +80,7 @@ def run_deploy(ctx: ServiceContext, environment: str, branch: str | None = None)
         run(["git", "pull", "--ff-only"], stream=True, cwd=str(ctx.project.root))
         compose.pull(cfg.odoo.service)
         compose.up(cfg.odoo.service)
+        db_mutation_possible = True
         update_modules_compose(
             compose,
             cfg.odoo.service,
@@ -101,10 +103,24 @@ def run_deploy(ctx: ServiceContext, environment: str, branch: str | None = None)
     except Exception as exc:
         message = str(exc)
         if cfg.is_protected(environment):
+            recovery_notes = []
+            if backup_id is not None and db_mutation_possible:
+                try:
+                    from odooctl.services.restore import run_restore
+
+                    run_restore(ctx, environment, backup=backup_id)
+                    recovery_notes.append(f"database restored from pre-deploy backup {backup_id}")
+                except Exception as restore_exc:
+                    recovery_notes.append(
+                        f"pre-deploy backup restore FAILED ({restore_exc}); "
+                        f"restore manually from backup {backup_id}"
+                    )
             try:
                 compose.restart(cfg.odoo.service)
             except Exception as recovery_exc:
-                message = f"{message}; recovery restart failed: {recovery_exc}"
+                recovery_notes.append(f"recovery restart failed: {recovery_exc}")
+            if recovery_notes:
+                message = f"{message}; " + "; ".join(recovery_notes)
         raise
     finally:
         MetadataStore(ctx.project.state_dir).save_deployment(

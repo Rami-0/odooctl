@@ -117,6 +117,9 @@ def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, mo
         def restore(self, db_name, dump_path):
             events.append(("restore", (db_name, Path(dump_path).name)))
 
+        def psql(self, db_name, sql):
+            events.append(("psql", (db_name, sql.split()[0])))
+
     class DummyFilestore:
         def restore_archive(self, archive_path, target_path):
             events.append(("filestore_restore", (Path(archive_path).name, target_path)))
@@ -128,6 +131,9 @@ def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, mo
 
     assert execute("staging", backup.name, str(config)) == backup.name
     assert events[0] == ("postgres_init", ("localhost", 5432, "odoo"))
-    assert events[1] == ("restore", ("odoo_staging", "db.dump"))
+    # Verify-before-destroy: restore lands in a temp DB, then swap replaces the live DB
+    assert events[1] == ("restore", ("odoo_staging_incoming", "db.dump"))
     assert events[2] == ("filestore_restore", ("filestore.tar", "/var/lib/odoo/filestore/odoo_staging"))
-    assert events[3][0] == "healthcheck"
+    swap_sql = [e for e in events if e[0] == "psql"]
+    assert [s[1][1] for s in swap_sql] == ["SELECT", "DROP", "ALTER"]
+    assert events[-1][0] == "healthcheck"

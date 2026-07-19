@@ -1,0 +1,323 @@
+/* ==========================================================================
+   Newsprint design system for MkDocs Material
+   Ink #111111 on paper #F9F9F7 · Odoo purple #714B67 as the sole accent ·
+   sharp corners, visible structure, flat design, permanent light mode.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&display=block');
+
+:root {
+  --np-paper: #F9F9F7;
+  --np-ink: #111111;
+  --np-muted: #E5E5E0;
+  --np-accent: #714B67;
+  --np-accent-deep: #5c3c54;
+  --np-n100: #F5F5F5;
+  --np-n400: #A3A3A3;
+  --np-n500: #737373;
+  --np-n600: #525252;
+  --np-serif: 'Playfair Display', 'Times New Roman', serif;
+  --np-sans: 'Inter', 'Helvetica Neue', sans-serif;
+  --np-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* Material token overrides */
+  --md-primary-fg-color: var(--np-accent);
+  --md-primary-fg-color--light: #875A7B;
+  --md-primary-fg-color--dark: var(--np-accent-deep);
+  --md-accent-fg-color: var(--np-accent-deep);
+  --md-default-bg-color: var(--np-paper);
+  --md-default-fg-color: var(--np-ink);
+  --md-default-fg-color--light: var(--np-n600);
+  --md-default-fg-color--lighter: var(--np-n500);
+  --md-default-fg-color--lightest: var(--np-muted);
+  --md-typeset-a-color: var(--np-ink);
+  --md-code-bg-color: var(--np-n100);
+  --md-code-fg-color: var(--np-ink);
+}
+
+/* --- Sharp corners everywhere. No exceptions. --- */
+body * { border-radius: 0 !important; }
+
+/* --- Paper texture (dot grid) --- */
+body {
+  background-color: var(--np-paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23111111' fill-opacity='0.04' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+/* ==========================================================================
+   Header — a masthead, not an app bar
+   ========================================================================== */
+.md-header {
+  background: var(--np-paper);
+  color: var(--np-ink);
+  border-bottom: 2px solid var(--np-ink);
+  box-shadow: none !important;
+}
+.md-header[data-md-state='shadow'] { box-shadow: none !important; }
+.md-header__title {
+  font-family: var(--np-serif);
+  font-weight: 900;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+.md-header__button { color: var(--np-ink); }
+.md-header__button:hover { color: var(--np-accent); opacity: 1; }
+.md-header__source { color: var(--np-ink); }
+.md-source { font-family: var(--np-mono); font-size: 0.6rem; }
+.md-source__repository { color: var(--np-n600); }
+
+/* Search — bottom-border input, mono */
+.md-search__form {
+  background: transparent !important;
+  border-bottom: 2px solid var(--np-ink);
+  box-shadow: none !important;
+}
+.md-search__form:hover { background: var(--np-n100) !important; }
+.md-search__input {
+  font-family: var(--np-mono); font-size: 0.7rem; color: var(--np-ink);
+}
+.md-search__input::placeholder { color: var(--np-n500); }
+.md-search__input ~ .md-search__icon { color: var(--np-ink); }
+[data-md-toggle='search']:checked ~ .md-header .md-search__form {
+  background: var(--np-paper) !important;
+  border: 1px solid var(--np-ink);
+  border-bottom-width: 2px;
+}
+.md-search__output {
+  border: 1px solid var(--np-ink); border-top: none;
+  box-shadow: 4px 4px 0 0 var(--np-ink) !important;
+}
+.md-search-result__meta {
+  background: var(--np-n100); font-family: var(--np-mono);
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.14em;
+}
+.md-search-result__article { font-family: var(--np-sans); }
+
+/* ==========================================================================
+   Sidebars — uppercase mono rubrics, hairline structure
+   ========================================================================== */
+.md-nav { font-family: var(--np-sans); }
+.md-nav__title,
+.md-nav__item--section > .md-nav__link {
+  font-family: var(--np-mono) !important;
+  font-size: 0.58rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700 !important;
+  color: var(--np-ink) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.md-nav__item--section { margin-top: 1.2em; }
+.md-nav__item--section > .md-nav__link {
+  border-bottom: 1px solid var(--np-ink);
+  padding-bottom: 0.4em;
+}
+.md-nav__link { color: var(--np-n600); transition: color 0.2s ease-out; }
+.md-nav__link:hover { color: var(--np-accent); }
+.md-nav__link--active,
+.md-nav__link--active code {
+  color: var(--np-ink) !important;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--np-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+[dir='ltr'] .md-sidebar--primary .md-nav { border-right: none; }
+
+/* Table of contents */
+.md-nav--secondary .md-nav__title {
+  border-bottom: 1px solid var(--np-ink);
+  padding-bottom: 0.4em;
+}
+
+/* ==========================================================================
+   Typography — Playfair headlines over Lora body
+   ========================================================================== */
+.md-typeset { font-size: 0.78rem; line-height: 1.65; color: var(--np-ink); }
+.md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4 {
+  font-family: var(--np-serif);
+  color: var(--np-ink);
+  letter-spacing: -0.015em;
+}
+.md-typeset h1 {
+  font-weight: 900;
+  font-size: 2.6em;
+  line-height: 1.05;
+  border-bottom: 4px solid var(--np-ink);
+  padding-bottom: 0.35em;
+  margin-bottom: 0.8em;
+}
+.md-typeset h2 {
+  font-weight: 700;
+  font-size: 1.7em;
+  border-bottom: 1px solid var(--np-ink);
+  padding-bottom: 0.3em;
+}
+.md-typeset h3 { font-weight: 700; font-size: 1.25em; }
+.md-typeset h4 {
+  font-family: var(--np-mono);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+.md-typeset a {
+  color: var(--np-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--np-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease-out;
+}
+.md-typeset a:hover { color: var(--np-accent); }
+.md-content__button { color: var(--np-ink); }
+
+/* Permalink anchors */
+.md-typeset .headerlink { color: var(--np-n400); }
+.md-typeset .headerlink:hover,
+.md-typeset :target > .headerlink { color: var(--np-accent); }
+
+/* ==========================================================================
+   Code — bordered mono blocks on light grey
+   ========================================================================== */
+.md-typeset code {
+  font-family: var(--np-mono);
+  background: var(--np-n100);
+  border: 1px solid var(--np-muted);
+  padding: 0.05em 0.4em;
+  font-size: 0.85em;
+}
+.md-typeset pre > code {
+  border: none;
+  padding: 0.8em 1em;
+  font-size: 0.78em;
+  line-height: 1.8;
+}
+.md-typeset pre {
+  border: 1px solid var(--np-ink);
+  box-shadow: none;
+}
+.md-typeset .highlight { background: transparent; }
+.md-clipboard { color: var(--np-n500); }
+.md-clipboard:hover { color: var(--np-accent); }
+
+/* Syntax palette — restrained, ink-first with purple keywords */
+.highlight .k, .highlight .kd, .highlight .kn { color: var(--np-accent); font-weight: 700; }
+.highlight .s, .highlight .s1, .highlight .s2 { color: var(--np-n600); }
+.highlight .c, .highlight .c1, .highlight .cm { color: var(--np-n500); font-style: italic; }
+.highlight .nb, .highlight .nf { color: var(--np-ink); font-weight: 700; }
+
+/* ==========================================================================
+   Admonitions — filed notices, not floating cards
+   ========================================================================== */
+.md-typeset .admonition, .md-typeset details {
+  border: 1px solid var(--np-ink);
+  border-left: 4px solid var(--np-accent);
+  box-shadow: none;
+  background: var(--np-paper);
+  font-size: 0.72rem;
+}
+.md-typeset .admonition-title, .md-typeset summary {
+  background: var(--np-n100) !important;
+  color: var(--np-ink) !important;
+  font-family: var(--np-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  border-bottom: 1px solid var(--np-muted);
+}
+.md-typeset .admonition-title::before, .md-typeset summary::before {
+  background-color: var(--np-accent) !important;
+}
+.md-typeset .admonition.warning, .md-typeset .admonition.danger {
+  border-left-color: var(--np-ink);
+}
+
+/* ==========================================================================
+   Tables — collapsed ink borders, inverted header row
+   ========================================================================== */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--np-ink);
+  box-shadow: none;
+  font-size: 0.72rem;
+  font-family: var(--np-sans);
+}
+.md-typeset table:not([class]) th {
+  background: var(--np-ink);
+  color: var(--np-paper);
+  font-family: var(--np-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 500;
+}
+.md-typeset table:not([class]) td { border-top: 1px solid var(--np-muted); }
+.md-typeset table:not([class]) tbody tr:hover { background: var(--np-n100); box-shadow: none; }
+
+/* Horizontal rules as section dividers */
+.md-typeset hr { border-bottom: 2px solid var(--np-ink); }
+
+/* Blockquotes — pull quotes */
+.md-typeset blockquote {
+  border-left: 4px solid var(--np-ink);
+  color: var(--np-n600);
+  font-style: italic;
+}
+
+/* Buttons */
+.md-typeset .md-button {
+  background: var(--np-ink);
+  color: var(--np-paper);
+  border: 1px solid var(--np-ink);
+  font-family: var(--np-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  transition: all 0.2s ease-out;
+}
+.md-typeset .md-button:hover {
+  background: var(--np-paper);
+  color: var(--np-ink);
+  border-color: var(--np-ink);
+}
+
+/* ==========================================================================
+   Footer — the black colophon
+   ========================================================================== */
+.md-footer { background: var(--np-ink); }
+.md-footer-meta { background: var(--np-ink); border-top: 1px solid var(--np-n600); }
+.md-footer__link { font-family: var(--np-sans); }
+.md-footer__title { font-family: var(--np-serif); }
+.md-footer__direction {
+  font-family: var(--np-mono);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 1;
+  color: var(--np-n400);
+}
+html .md-footer-meta.md-typeset a { color: var(--np-n400); }
+html .md-footer-meta.md-typeset a:hover { color: var(--np-paper); }
+.md-copyright { font-family: var(--np-mono); font-size: 0.55rem; letter-spacing: 0.1em; }
+
+/* Back-to-top pill → stamp */
+.md-top {
+  background: var(--np-paper);
+  color: var(--np-ink);
+  border: 1px solid var(--np-ink);
+  box-shadow: 4px 4px 0 0 var(--np-ink);
+  font-family: var(--np-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.md-top:hover { background: var(--np-ink); color: var(--np-paper) !important; }
+
+/* Keyboard-visible focus */
+.md-typeset a:focus-visible, .md-nav__link:focus-visible, .md-header__button:focus-visible {
+  outline: 2px solid var(--np-ink);
+  outline-offset: 2px;
+}

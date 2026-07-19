@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose an improvement or new capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What operational problem are you solving?
+      description: Describe the workflow, not the solution — e.g. "I need staging clones that keep one specific cron running".
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds you use today

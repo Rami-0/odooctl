@@ -204,3 +204,144 @@ def test_generated_config_password_field_is_env_reference_only(tmp_path: Path) -
 
     assert cfg["postgres"]["password_env"] == "ODOO_DB_PASSWORD"
     assert "password" not in cfg["postgres"]  # no literal password key at all
+
+
+# --------------------------------------------------------------------------
+# Group 3: --output path containment (audit finding F20)
+# --------------------------------------------------------------------------
+
+def _prepare_import_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    """Create a compose project dir and a separate cwd; chdir into the cwd."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    _write(proj, LITERAL_PASSWORD_COMPOSE)
+    workdir = tmp_path / "work"
+    workdir.mkdir()
+    monkeypatch.chdir(workdir)
+    return proj, workdir
+
+
+def test_import_output_outside_cwd_and_project_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import typer
+
+    from odooctl.commands import import_cmd
+
+    proj, _workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    outside = tmp_path / "elsewhere" / "hijacked.yml"
+    outside.parent.mkdir()
+
+    with pytest.raises(typer.BadParameter, match="Refusing to write"):
+        import_cmd.run(
+            proj, yes=True, name="escape-test", output=outside,
+            skip_doctor=True, skip_backup=True,
+        )
+    assert not outside.exists()
+
+
+def test_import_output_escape_refused_even_with_force(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--force must not bypass path containment; only --allow-outside may."""
+    import typer
+
+    from odooctl.commands import import_cmd
+
+    proj, _workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    victim = tmp_path / "elsewhere" / "victim.yml"
+    victim.parent.mkdir()
+    victim.write_text("precious")
+
+    with pytest.raises(typer.BadParameter, match="allow-outside"):
+        import_cmd.run(
+            proj, yes=True, name="escape-test", output=victim, force=True,
+            skip_doctor=True, skip_backup=True,
+        )
+    assert victim.read_text() == "precious"
+
+
+def test_import_output_traversal_via_dotdot_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import typer
+
+    from odooctl.commands import import_cmd
+
+    proj, _workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    sneaky = proj / ".." / "escaped.yml"
+
+    with pytest.raises(typer.BadParameter, match="Refusing to write"):
+        import_cmd.run(
+            proj, yes=True, name="escape-test", output=sneaky,
+            skip_doctor=True, skip_backup=True,
+        )
+    assert not (tmp_path / "escaped.yml").exists()
+
+
+def test_import_output_allow_outside_permits_escape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from odooctl.commands import import_cmd
+
+    proj, _workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    outside = tmp_path / "elsewhere" / "explicit.yml"
+    outside.parent.mkdir()
+
+    import_cmd.run(
+        proj, yes=True, name="allow-test", output=outside,
+        skip_doctor=True, skip_backup=True, allow_outside=True,
+    )
+    assert outside.exists()
+
+
+def test_import_output_inside_project_dir_still_works(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Writing next to the imported compose file keeps working from any cwd."""
+    from odooctl.commands import import_cmd
+
+    proj, _workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    output = proj / "odooctl.yml"
+
+    import_cmd.run(
+        proj, yes=True, name="inproj-test", output=output,
+        skip_doctor=True, skip_backup=True,
+    )
+    assert output.exists()
+
+
+def test_import_output_inside_cwd_still_works(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from odooctl.commands import import_cmd
+
+    proj, workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    output = workdir / "odooctl.yml"
+
+    import_cmd.run(
+        proj, yes=True, name="incwd-test", output=output,
+        skip_doctor=True, skip_backup=True,
+    )
+    assert output.exists()
+
+
+def test_import_still_refuses_overwrite_without_force(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Overwrite protection is independent of containment: --force still required."""
+    import typer
+
+    from odooctl.commands import import_cmd
+
+    proj, _workdir = _prepare_import_dirs(tmp_path, monkeypatch)
+    output = proj / "odooctl.yml"
+    output.write_text("existing")
+
+    with pytest.raises(typer.BadParameter, match="already exists"):
+        import_cmd.run(
+            proj, yes=True, name="ow-test", output=output,
+            skip_doctor=True, skip_backup=True,
+        )
+    assert output.read_text() == "existing"

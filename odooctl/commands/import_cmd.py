@@ -65,6 +65,27 @@ def _infer_project_name(compose_path: Path) -> str:
     return compose_path.parent.name or "imported-odoo"
 
 
+def _check_output_containment(output: Path, compose_path: Path, *, allow_outside: bool) -> None:
+    """Refuse to write the generated config outside the working/project dir.
+
+    Path containment (audit finding F20): ``--output`` combined with
+    ``--force`` could otherwise overwrite arbitrary files. The resolved output
+    must live under the current working directory or the imported project's
+    directory (the compose file's parent) unless *allow_outside* is explicitly
+    set (CLI flag ``--allow-outside``, default off).
+    """
+    if allow_outside:
+        return
+    resolved = output.expanduser().resolve()
+    allowed_roots = (Path.cwd().resolve(), compose_path.parent.resolve())
+    if not any(resolved.is_relative_to(root) for root in allowed_roots):
+        raise typer.BadParameter(
+            f"Refusing to write {resolved}: it is outside the current working "
+            f"directory and the imported project directory. "
+            "Pass --allow-outside to permit writing elsewhere."
+        )
+
+
 def run(
     path: Path | None = None,
     *,
@@ -75,6 +96,7 @@ def run(
     output: Path = Path("odooctl.yml"),
     skip_doctor: bool = False,
     skip_backup: bool = False,
+    allow_outside: bool = False,
 ) -> None:
     """Import an existing Odoo Docker Compose deployment.
 
@@ -84,6 +106,11 @@ def run(
     After writing the config, the project is registered in the registry,
     the config is validated, doctor preflight checks run (unless
     --skip-doctor), and a safety backup is created (unless --skip-backup).
+
+    Path containment (audit finding F20): --output must resolve inside the
+    current working directory or the imported project directory; pass
+    --allow-outside (allow_outside=True) to write elsewhere. --force is still
+    required to overwrite an existing file, regardless of --allow-outside.
     """
     compose_path = _find_compose(path)
     info(f"Detecting deployment from {compose_path} …")
@@ -101,6 +128,8 @@ def run(
             "SAFETY: no files have been written and no containers were touched."
         )
         return
+
+    _check_output_containment(output, compose_path, allow_outside=allow_outside)
 
     try:
         adopt(report, output_path=output, force=force)

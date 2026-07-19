@@ -3,7 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from odooctl.commands.restore import execute, resolve_backup_dir, sha256_file, validate_backup_dir
+from odooctl.commands.restore import (
+    execute,
+    resolve_backup_dir,
+    run_restore,
+    sha256_file,
+    validate_backup_dir,
+)
 
 
 def write_manifest(path: Path, *, project: str = "p", environment: str = "staging") -> None:
@@ -99,6 +105,78 @@ def test_restore_preflight_rejects_checksum_mismatch(tmp_path: Path):
     (backup / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises(RuntimeError, match="checksum mismatch"):
         validate_backup_dir(backup, expected_project="p")
+
+
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        "../../etc",
+        "..",
+        "../staging_2026-01-02_000000",
+        "staging/../../../etc",
+        "a/b",
+        "/etc/passwd",
+        "..\\..\\etc",
+        ".",
+        "",
+    ],
+)
+def test_resolve_backup_dir_rejects_path_traversal(tmp_path: Path, hostile: str):
+    """F10: client-suppliable backup ids must not escape the backups root."""
+    with pytest.raises(ValueError, match="backup id"):
+        resolve_backup_dir("staging", hostile, tmp_path / "backups")
+
+
+def test_resolve_backup_dir_accepts_plain_backup_name(tmp_path: Path):
+    backup = make_backup(tmp_path, "staging_2026-01-02_000000")
+    resolved = resolve_backup_dir("staging", backup.name, tmp_path)
+    assert resolved == backup.resolve()
+    assert resolved.name == "staging_2026-01-02_000000"
+
+
+def test_resolve_backup_dir_rejects_symlink_escape(tmp_path: Path):
+    """F10 defense-in-depth: a backup dir symlinked outside the root is rejected."""
+    root = tmp_path / "backups"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "staging_evil").symlink_to(outside)
+    with pytest.raises(ValueError, match="escapes the backups root"):
+        resolve_backup_dir("staging", "staging_evil", root)
+
+
+def _write_service_config(tmp_path: Path) -> Path:
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nbackups:\n  local_path: backups\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nenvironments:\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /var/lib/odoo/filestore/odoo_staging\nodoo:\n  image: registry/odoo:latest\n"""
+    )
+    return config
+
+
+def test_run_restore_rejects_backup_id_escape_via_service_layer(tmp_path: Path):
+    """F10: a hostile backup id through the service layer never touches the DB."""
+    from odooctl.services.context import ServiceContext
+
+    config = _write_service_config(tmp_path)
+    ctx = ServiceContext.from_config_path(str(config))
+    with pytest.raises(ValueError, match="backup id"):
+        run_restore(ctx, "staging", "../../etc")
+
+
+def test_restore_to_env_rejects_backup_id_escape_via_service_layer(tmp_path: Path):
+    """F10: cross-env restore rejects hostile backup ids before any DB work."""
+    from odooctl.services.context import ServiceContext
+    from odooctl.services.restore import restore_to_env
+
+    config = _write_service_config(tmp_path)
+    ctx = ServiceContext.from_config_path(str(config))
+    with pytest.raises(ValueError, match="backup id"):
+        restore_to_env(
+            source_environment="staging",
+            target_environment="staging",
+            backup="../../../etc",
+            ctx=ctx,
+        )
 
 
 def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, monkeypatch):

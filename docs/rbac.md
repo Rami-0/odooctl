@@ -70,6 +70,7 @@ CLI renders it with `odooctl security rbac`.
 | deploy | · | ✓ | ✓ | ✓ |
 | clone | · | ✓ | ✓ | ✓ |
 | restore | · | ✓ | ✓ | ✓ |
+| cancel (operation) | · | ✓ | ✓ | ✓ |
 | promote | · | · | ✓ | ✓ |
 | env (manage) | · | · | ✓ | ✓ |
 | secrets (manage) | · | · | ✓ | ✓ |
@@ -164,10 +165,37 @@ Verification rejects:
 Tokens are **signed, not encrypted** — the payload is readable, so no secret
 value is ever placed inside one. They are also replayable within their TTL for
 the same scope unless the runner records consumed nonces and rejects repeats;
-keep TTLs short and add nonce-consumption in the runner queue implementation.
+the runner does exactly that (`consumed_nonces.json`), and the default mint
+TTL is 300 seconds to keep the replay window small.
+
+Cancelling an operation is a **write action** (`cancel`): it requires
+operator-or-higher, never a viewer/read token.
 
 ```console
 $ export ODOOCTL_RUNNER_KEY=...     # signing key, never on argv
 $ odooctl security token mint --action backup --env production --project acme --ttl 300
 $ odooctl security token verify --stdin --action backup --env production --project acme < token.txt
+```
+
+### Which signing key?
+
+`odooctl security token mint` / `token verify` read the signing key from the
+env var named by `--key-env`, which **defaults to `ODOOCTL_RUNNER_KEY`**. The
+example above therefore only round-trips within the CLI.
+
+The running services use a different env var: both the API server
+(`odooctl serve`) and the runner (`odooctl runner`) load their verification
+key from **`ODOOCTL_API_KEY`** — the API verifies session bearer tokens with
+it, and the runner verifies queued capability tokens with it (those are minted
+internally by the API with the same key). A token minted with the CLI default
+key env will **not** be accepted by the API or runner unless
+`ODOOCTL_RUNNER_KEY` and `ODOOCTL_API_KEY` hold the same key material.
+
+To mint a session token the API will accept, pass the key env explicitly:
+
+```console
+$ odooctl security token mint \
+    --action api --env "*" --project "*" \
+    --key-env ODOOCTL_API_KEY \
+    --role operator
 ```

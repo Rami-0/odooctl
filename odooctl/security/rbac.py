@@ -43,6 +43,7 @@ class Action(str, Enum):
     PROMOTE = "promote"
     ENV = "env"                  # create/destroy environments
     SECRETS = "secrets"          # manage secret store
+    CANCEL = "cancel"            # cancel a queued/running operation
 
 
 READ_ACTIONS: frozenset[Action] = frozenset(
@@ -50,7 +51,16 @@ READ_ACTIONS: frozenset[Action] = frozenset(
 )
 
 WRITE_ACTIONS: frozenset[Action] = frozenset(
-    {Action.BACKUP, Action.DEPLOY, Action.CLONE, Action.RESTORE, Action.PROMOTE, Action.ENV, Action.SECRETS}
+    {
+        Action.BACKUP,
+        Action.DEPLOY,
+        Action.CLONE,
+        Action.RESTORE,
+        Action.PROMOTE,
+        Action.ENV,
+        Action.SECRETS,
+        Action.CANCEL,
+    }
 )
 
 # Destructive actions that, when aimed at a protected/production environment,
@@ -67,7 +77,7 @@ _PROTECTED_FLOOR: Role = Role.ADMIN
 ROLE_ACTIONS: dict[Role, frozenset[Action]] = {
     Role.VIEWER: READ_ACTIONS,
     Role.OPERATOR: READ_ACTIONS
-    | frozenset({Action.BACKUP, Action.DEPLOY, Action.CLONE, Action.RESTORE}),
+    | frozenset({Action.BACKUP, Action.DEPLOY, Action.CLONE, Action.RESTORE, Action.CANCEL}),
     Role.ADMIN: READ_ACTIONS | WRITE_ACTIONS,
     Role.OWNER: READ_ACTIONS | WRITE_ACTIONS,
 }

@@ -47,6 +47,31 @@ class OperationRequest(BaseModel):
     params: dict[str, Any] = {}
 
 
+# Server-side ceiling for the events endpoint's ``max_polls`` query parameter
+# (600 × 0.5 s = 5 minutes). Prevents a client from pinning a worker on an
+# effectively unbounded poll loop.
+MAX_POLLS_CEILING = 600
+
+
+def _clamp_max_polls(value: int) -> int:
+    """Clamp a client-supplied poll count into [1, MAX_POLLS_CEILING]."""
+    return max(1, min(int(value), MAX_POLLS_CEILING))
+
+
+def _require_op_in_token_scope(request: Request, op) -> None:
+    """Enforce the token's project claim on non-project-scoped op routes.
+
+    ``/operations/{op_id}`` routes carry no ``{project}`` path segment, so the
+    op is located by searching all projects. A token minted with a concrete
+    ``proj`` claim (not ``"*"``) must not read or cancel operations belonging
+    to another project. Responds 404 (not 403) so op IDs in other projects are
+    not disclosed as existing.
+    """
+    claim = str(getattr(request.state, "token_project", "*") or "*")
+    if claim != "*" and op.project != claim:
+        raise HTTPException(status_code=404, detail=f"Operation {op.id!r} not found")
+
+
 def _load_ctx(request: Request, project: str):
     from odooctl.context import ProjectContext
 
@@ -132,13 +157,14 @@ def enqueue_operation(
     store = OperationStore(ctx.state_dir)
     store.save(op)
 
-    # Mint a short-lived capability token scoped to this exact operation
+    # Mint a short-lived capability token scoped to this exact operation.
+    # The default TTL (300 s) bounds the replay window; see F12.
     cap_token = tokens.mint(
         api_key,
         action=body.kind,
         environment=body.environment,
         project=project,
-        ttl_seconds=3600,
+        ttl_seconds=tokens.DEFAULT_TTL_SECONDS,
         subject=principal.id,
         roles=[role.value for role in principal.roles],
     )
@@ -172,6 +198,7 @@ def get_operation(
     principal=Depends(require_action(Action.OPERATIONS)),
 ):
     op, _ = _find_op_ctx(request, op_id)
+    _require_op_in_token_scope(request, op)
     return {
         "op_id": op.id,
         "kind": op.kind.value,
@@ -198,11 +225,14 @@ def stream_events(
 
     Polls until the operation reaches a terminal state or *max_polls* is
     exhausted (default 120 × 0.5 s = 60 s). Pass ``?max_polls=1`` in tests
-    to avoid blocking indefinitely on a queued operation.
+    to avoid blocking indefinitely on a queued operation. ``max_polls`` is
+    clamped server-side to :data:`MAX_POLLS_CEILING`.
     """
     from odooctl.operations.models import OperationStatus
 
     op, store = _find_op_ctx(request, op_id)
+    _require_op_in_token_scope(request, op)
+    max_polls = _clamp_max_polls(max_polls)
 
     async def _generate():
         seen = 0
@@ -231,13 +261,14 @@ def stream_events(
 def cancel_operation(
     op_id: str,
     request: Request,
-    principal=Depends(require_action(Action.OPERATIONS)),
+    principal=Depends(require_action(Action.CANCEL)),
 ):
     from odooctl.api.queue import OperationQueue
     from odooctl.context import ProjectContext
     from odooctl.operations.models import OperationStatus
 
     op, store = _find_op_ctx(request, op_id)
+    _require_op_in_token_scope(request, op)
     if op.status not in (OperationStatus.QUEUED,):
         raise HTTPException(
             status_code=409,

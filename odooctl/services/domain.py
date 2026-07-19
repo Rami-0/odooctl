@@ -51,8 +51,21 @@ class DomainService:
         # Persist the new domain in the config file if a config path is available
         config_path = self._ctx.project.config_path
         if config_path and config_path.exists():
-            raw = yaml.safe_load(config_path.read_text())
-            raw.setdefault("environments", {})[environment]["domain"] = domain
+            raw = yaml.safe_load(config_path.read_text()) or {}
+            envs = raw.setdefault("environments", {})
+            entry = envs.get(environment)
+            if isinstance(entry, dict):
+                # Copy before mutating: the entry may be a YAML alias into a
+                # shared defaults anchor; in-place mutation would rewrite the
+                # anchor (and every other environment referencing it).
+                entry = dict(entry)
+            else:
+                # The environment exists in the validated config but has no
+                # explicit mapping in the file (materialized via defaults):
+                # write an explicit entry built from the in-memory config.
+                entry = env.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+            entry["domain"] = domain
+            envs[environment] = entry
             config_path.write_text(yaml.dump(raw, default_flow_style=False, allow_unicode=True, sort_keys=False))
 
     def detach(self, environment: str, domain: str) -> None:

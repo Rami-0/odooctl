@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -61,35 +62,65 @@ _KIND_ACTION: dict[str, rbac.Action] = {
 }
 
 
+# Consumed nonces are retained for twice the maximum capability-token TTL, so
+# a nonce always outlives every token that could carry it (replay within the
+# token validity window stays blocked) while the store cannot grow unbounded.
+NONCE_RETENTION_SECONDS = 7200  # 2 h = 2 × max token TTL
+
+
 class NonceStore:
     """Tracks consumed capability token nonces to prevent replay attacks.
 
-    Nonces are stored in ``{state_dir}/consumed_nonces.json``.
-    The set grows unbounded for now — a TTL-based purge can be added later.
+    Nonces are stored in ``{state_dir}/consumed_nonces.json`` as a mapping of
+    ``{nonce: consumed_at_iso}``. Entries older than
+    :data:`NONCE_RETENTION_SECONDS` are purged on each :meth:`mark_consumed`.
+    The legacy format (``{"nonces": [nonce, ...]}``) is still accepted on
+    read; legacy entries are migrated to a now-timestamp on first write (they
+    remain consumed until they age out).
     """
 
     def __init__(self, state_dir: Path) -> None:
         self._path = state_dir / "consumed_nonces.json"
         state_dir.mkdir(parents=True, exist_ok=True)
 
-    def is_consumed(self, nonce: str) -> bool:
+    def _load(self) -> dict[str, str]:
+        """Return ``{nonce: consumed_at_iso}``, migrating the legacy list form."""
         if not self._path.exists():
-            return False
+            return {}
         try:
-            return nonce in json.loads(self._path.read_text()).get("nonces", [])
+            raw = json.loads(self._path.read_text()).get("nonces", {})
         except Exception:
-            return False
+            return {}
+        if isinstance(raw, dict):
+            return {str(n): str(ts) for n, ts in raw.items()}
+        if isinstance(raw, list):
+            # Legacy format: consumption time unknown — treat as consumed now
+            # so replay stays blocked; the entry ages out on the normal purge.
+            now_iso = datetime.now(timezone.utc).isoformat()
+            return {str(n): now_iso for n in raw}
+        return {}
+
+    def is_consumed(self, nonce: str) -> bool:
+        return nonce in self._load()
 
     def mark_consumed(self, nonce: str) -> None:
-        nonces: list[str] = []
-        if self._path.exists():
+        nonces = self._load()
+        now = datetime.now(timezone.utc)
+        nonces[nonce] = now.isoformat()
+        cutoff = now - timedelta(seconds=NONCE_RETENTION_SECONDS)
+        kept: dict[str, str] = {}
+        for name, ts in nonces.items():
             try:
-                nonces = json.loads(self._path.read_text()).get("nonces", [])
-            except Exception:
-                pass
-        if nonce not in nonces:
-            nonces.append(nonce)
-        self._path.write_text(json.dumps({"nonces": nonces}))
+                consumed_at = datetime.fromisoformat(ts)
+            except (TypeError, ValueError):
+                # Unparseable timestamp: keep the nonce blocked, reset its clock.
+                kept[name] = now.isoformat()
+                continue
+            if consumed_at.tzinfo is None:
+                consumed_at = consumed_at.replace(tzinfo=timezone.utc)
+            if consumed_at >= cutoff:
+                kept[name] = ts
+        self._path.write_text(json.dumps({"nonces": kept}))
 
 
 class RunnerWorker:

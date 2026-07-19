@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import click
+import pytest
 from typer.testing import CliRunner
 
 from odooctl.main import app
@@ -84,3 +86,93 @@ def test_project_dir_option_resolves_config_from_non_project_cwd(tmp_path: Path)
 
     assert result.exit_code == 0, result.output
     assert "Config valid: local (production)" in result.output
+
+
+# ---- Path containment (audit finding F10) ----
+
+
+def test_hostile_registry_entry_config_escape_is_rejected(tmp_path: Path, monkeypatch):
+    """A hand-edited registry entry whose config escapes the project root must be rejected."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo, "acme")
+    # A valid config file sitting OUTSIDE the registered project root.
+    outside = tmp_path / "outside.yml"
+    outside.write_text(_write_config(tmp_path, "evil").read_text())
+
+    registry_file = tmp_path / "xdg" / "odooctl" / "config.toml"
+    registry_file.parent.mkdir(parents=True)
+    registry_file.write_text(
+        'active = "evil"\n\n[projects]\n'
+        f'"evil" = {{ path = "{repo}", config = "../outside.yml" }}\n'
+    )
+
+    with pytest.raises(click.ClickException, match="escapes the project root"):
+        resolve_project_context(project="evil")
+
+
+def test_hostile_registry_entry_absolute_config_escape_is_rejected(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo, "acme")
+
+    registry_file = tmp_path / "xdg" / "odooctl" / "config.toml"
+    registry_file.parent.mkdir(parents=True)
+    registry_file.write_text(
+        'active = "evil"\n\n[projects]\n'
+        f'"evil" = {{ path = "{repo}", config = "/etc/passwd" }}\n'
+    )
+
+    with pytest.raises(click.ClickException, match="escapes the project root"):
+        resolve_project_context(project="evil")
+
+
+def test_add_project_rejects_config_escaping_root(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo, "acme")
+
+    with pytest.raises(click.ClickException, match="escapes the project root"):
+        add_project("acme", repo, config="../secrets.yml")
+
+
+def test_absolute_config_inside_root_still_works(tmp_path: Path, monkeypatch):
+    """Legitimate absolute config paths inside the project root keep working."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    config = _write_config(repo, "acme")
+
+    add_project("acme", repo, config=str(config))
+    resolved = resolve_project_context(project="acme")
+    assert resolved.root == repo.resolve()
+    assert resolved.config.project.name == "acme"
+
+
+def test_add_project_rejects_hostile_project_name(tmp_path: Path, monkeypatch):
+    """F10: project names must satisfy the identifier rule (no path components)."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo, "acme")
+
+    for hostile in ("../evil", "a/b", "..", ".hidden", "a b"):
+        with pytest.raises(click.ClickException, match="invalid"):
+            add_project(hostile, repo)
+    assert load_registry().projects == {}
+
+
+def test_project_add_cli_rejects_hostile_project_name(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_config(repo, "acme")
+
+    result = runner.invoke(app, ["project", "add", "../evil", "--path", str(repo)])
+
+    assert result.exit_code != 0
+    assert "invalid" in result.output.lower()
+    assert load_registry().projects == {}

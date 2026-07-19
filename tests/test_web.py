@@ -259,6 +259,68 @@ def test_spa_returns_index_html_for_unknown_path(spa_client):
 
 
 # ---------------------------------------------------------------------------
+# 4a. index.html is cached at startup (serve is long-running; rebuild → restart)
+# ---------------------------------------------------------------------------
+
+def test_spa_index_html_cached_at_startup(fake_registry, tmp_path):
+    """The SPA fallback serves index.html bytes cached at app creation.
+
+    Rewriting index.html on disk after startup must not change the fallback
+    response — a rebuilt SPA dist requires a server restart to be picked up.
+    """
+    from fastapi.testclient import TestClient
+    from odooctl.api.app import create_app
+
+    static_dir = tmp_path / "dist"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<html>original index</html>")
+
+    app = create_app(
+        api_key=TEST_KEY,
+        registry_loader=lambda: fake_registry,
+        allowed_hosts=["*"],
+        static_dir=static_dir,
+    )
+    client = TestClient(app, raise_server_exceptions=False)
+
+    resp = client.get("/some/client-side/route")
+    assert resp.status_code == 200
+    assert "original index" in resp.text
+
+    # Simulate a rebuild after startup: the cached bytes must still be served.
+    (static_dir / "index.html").write_text("<html>rebuilt index</html>")
+
+    resp = client.get("/some/client-side/route")
+    assert resp.status_code == 200
+    assert "original index" in resp.text
+    assert "rebuilt index" not in resp.text
+
+
+def test_spa_fallback_does_not_reread_index_per_request(fake_registry, tmp_path):
+    """The fallback keeps serving from memory even if index.html is deleted."""
+    from fastapi.testclient import TestClient
+    from odooctl.api.app import create_app
+
+    static_dir = tmp_path / "dist"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<html>cached copy</html>")
+
+    app = create_app(
+        api_key=TEST_KEY,
+        registry_loader=lambda: fake_registry,
+        allowed_hosts=["*"],
+        static_dir=static_dir,
+    )
+    client = TestClient(app, raise_server_exceptions=False)
+
+    (static_dir / "index.html").unlink()
+
+    resp = client.get("/spa-route-after-delete")
+    assert resp.status_code == 200
+    assert "cached copy" in resp.text
+
+
+# ---------------------------------------------------------------------------
 # 4b. Path traversal guard
 # ---------------------------------------------------------------------------
 

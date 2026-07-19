@@ -70,4 +70,4 @@ pytest -q
 
 ## Status
 
-M5 has productized the MVP foundation: Docker-native PostgreSQL/filestore operations, project/env management, scheduled operation generation, PyPI/pipx install metadata, precise secret redaction, optional real S3 uploads, docs, metadata, examples, and tests.
+Control-plane milestones M6–M15 are complete: service layer, operation engine, import/takeover, promote, catalog, RBAC/secrets, local API + runner, web UI, domains/SSL, DR drills, and the migration assistant, on top of the M5 MVP foundation (Docker-native PostgreSQL/filestore operations, project/env management, secret redaction, optional S3 uploads, docs, examples, and tests). A security-hardening pass (2026-07) is in progress.

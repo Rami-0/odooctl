@@ -598,3 +598,132 @@ def test_domain_service_attach_persists_normalized_domain(tmp_path):
     assert call_arg.domain == "new.example.com"
     data = yaml.safe_load((tmp_path / "odooctl.yml").read_text())
     assert data["environments"]["production"]["domain"] == "new.example.com"
+
+
+# ---------------------------------------------------------------------------
+# DomainService.attach — envs materialized via defaults (not explicit mapping)
+# ---------------------------------------------------------------------------
+
+DEFAULTS_ALIAS_CONFIG = """\
+project:
+  name: domain-defaults-test
+  odoo_version: "19.0"
+runtime:
+  compose_file: docker-compose.yml
+postgres:
+  password_env: ODOO_DB_PASSWORD
+odoo:
+  image: odoo:19.0
+env_defaults: &env_defaults
+  branch: main
+  domain: odoo.example.com
+  db_name: odoo_prod
+  filestore_path: ./filestore/prod
+environments:
+  production: *env_defaults
+"""
+
+
+def test_domain_service_attach_env_defined_via_defaults_alias(tmp_path):
+    """attach() must work when the env is a YAML alias into a defaults anchor.
+
+    The env has no explicit mapping of its own — it is materialized entirely
+    from the shared defaults block. attach() must persist the new domain as an
+    explicit env mapping without mutating the shared defaults anchor.
+    """
+    from odooctl.domains.base import RouteStatus
+    from odooctl.services.context import ServiceContext
+    from odooctl.services.domain import DomainService
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(DEFAULTS_ALIAS_CONFIG)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    mock_adapter = MagicMock()
+    mock_adapter.get_route_status.return_value = RouteStatus(active=True, config_path=str(tmp_path / "r.yml"))
+
+    svc = DomainService(ctx, adapter=mock_adapter)
+    svc.attach("production", "new.example.com")
+
+    mock_adapter.attach_route.assert_called_once()
+    data = yaml.safe_load(cfg_path.read_text())
+    assert data["environments"]["production"]["domain"] == "new.example.com"
+    # The shared defaults anchor must not have been rewritten.
+    assert data["env_defaults"]["domain"] == "odoo.example.com"
+    # The persisted file must still load and validate.
+    from odooctl.config import load_config
+    reloaded = load_config(cfg_path)
+    assert reloaded.env("production").domain == "new.example.com"
+
+
+def test_domain_service_attach_env_missing_from_raw_config_mapping(tmp_path):
+    """attach() must work when the env exists only in the in-memory config.
+
+    A defaults-materialized env (present in the validated config, minimal
+    fields, no explicit entry in the YAML file) must be written out as an
+    explicit mapping rather than raising KeyError.
+    """
+    import copy
+
+    from odooctl.config import OdooCtlConfig, load_config
+    from odooctl.context import ProjectContext
+    from odooctl.domains.base import RouteStatus
+    from odooctl.services.context import ServiceContext
+    from odooctl.services.domain import DomainService
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(MINIMAL_CONFIG)
+
+    # Build an in-memory config containing an extra env (minimal fields) that
+    # has no explicit mapping in the file on disk.
+    raw = yaml.safe_load(cfg_path.read_text())
+    augmented = copy.deepcopy(raw)
+    augmented["environments"]["qa"] = {
+        "branch": "qa",
+        "domain": "qa.example.com",
+        "db_name": "odoo_qa",
+        "filestore_path": "./filestore/qa",
+    }
+    cfg = OdooCtlConfig.model_validate(augmented)
+    project = ProjectContext(root=tmp_path, config_path=cfg_path, config=cfg)
+    ctx = ServiceContext(project=project)
+
+    mock_adapter = MagicMock()
+    mock_adapter.get_route_status.return_value = RouteStatus(active=True, config_path=str(tmp_path / "r.yml"))
+
+    svc = DomainService(ctx, adapter=mock_adapter)
+    svc.attach("qa", "qa-new.example.com")
+
+    mock_adapter.attach_route.assert_called_once()
+    call_arg = mock_adapter.attach_route.call_args[0][0]
+    assert call_arg.domain == "qa-new.example.com"
+    assert call_arg.environment == "qa"
+
+    data = yaml.safe_load(cfg_path.read_text())
+    assert data["environments"]["qa"]["domain"] == "qa-new.example.com"
+    # Required fields must have been materialized so the file still validates.
+    reloaded = load_config(cfg_path)
+    assert reloaded.env("qa").domain == "qa-new.example.com"
+    assert reloaded.env("qa").db_name == "odoo_qa"
+    # Pre-existing explicit envs are untouched.
+    assert data["environments"]["production"]["domain"] == "odoo.example.com"
+
+
+def test_domain_service_attach_defaults_env_still_validates_hostname(tmp_path):
+    """The hostname validation must still apply on the defaults-alias path."""
+    from odooctl.services.context import ServiceContext
+    from odooctl.services.domain import DomainService
+
+    cfg_path = tmp_path / "odooctl.yml"
+    cfg_path.write_text(DEFAULTS_ALIAS_CONFIG)
+    ctx = ServiceContext.from_config_path(cfg_path)
+
+    mock_adapter = MagicMock()
+    svc = DomainService(ctx, adapter=mock_adapter)
+
+    with pytest.raises(ValueError):
+        svc.attach("production", "evil`whoami`.example.com")
+
+    mock_adapter.attach_route.assert_not_called()
+    data = yaml.safe_load(cfg_path.read_text())
+    assert data["env_defaults"]["domain"] == "odoo.example.com"

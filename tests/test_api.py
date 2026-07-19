@@ -39,7 +39,8 @@ environments:
     sanitize: true
 """
 
-TEST_KEY = "test-api-secret-key-123"
+# Must satisfy the F24 key-strength floor (>= 32 characters).
+TEST_KEY = "test-api-secret-key-123-0123456789abcdef"
 
 
 def _mint_viewer(now=None):
@@ -383,6 +384,143 @@ def test_operator_cannot_enqueue_dr_drill_on_protected_env(client):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 403
+
+
+def _enqueue_backup(client, token):
+    resp = client.post(
+        "/projects/test-project/operations",
+        json={"kind": "backup", "environment": "production", "params": {}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 202
+    return resp.json()["op_id"]
+
+
+def test_viewer_cannot_cancel_operation(client, project_dir):
+    """C5/F6: cancel is a write action — viewer tokens must get 403."""
+    op_id = _enqueue_backup(client, _mint_operator())
+
+    viewer = _mint_viewer()
+    resp = client.post(f"/operations/{op_id}/cancel", headers={"Authorization": f"Bearer {viewer}"})
+    assert resp.status_code == 403
+
+    # The queue entry must still be pending (cancel did not go through).
+    assert (project_dir / ".odooctl" / "queue" / f"{op_id}.json").exists()
+
+
+def test_operator_can_cancel_operation(client):
+    op_id = _enqueue_backup(client, _mint_operator())
+    resp = client.post(
+        f"/operations/{op_id}/cancel",
+        headers={"Authorization": f"Bearer {_mint_operator()}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "cancelled"
+
+
+def test_project_scoped_token_cannot_read_other_projects_operation(client):
+    """C5: a token with a concrete proj claim must not see other projects' ops."""
+    op_id = _enqueue_backup(client, _mint_operator())
+
+    scoped = tokens.mint(
+        TEST_KEY,
+        action="api",
+        environment="*",
+        project="other-project",
+        ttl_seconds=300,
+        roles=["operator"],
+    )
+    resp = client.get(f"/operations/{op_id}", headers={"Authorization": f"Bearer {scoped}"})
+    assert resp.status_code == 404
+    resp = client.get(
+        f"/operations/{op_id}/events?max_polls=1",
+        headers={"Authorization": f"Bearer {scoped}"},
+    )
+    assert resp.status_code == 404
+
+
+def test_project_scoped_token_cannot_cancel_other_projects_operation(client, project_dir):
+    op_id = _enqueue_backup(client, _mint_operator())
+
+    scoped = tokens.mint(
+        TEST_KEY,
+        action="api",
+        environment="*",
+        project="other-project",
+        ttl_seconds=300,
+        roles=["operator"],
+    )
+    resp = client.post(f"/operations/{op_id}/cancel", headers={"Authorization": f"Bearer {scoped}"})
+    assert resp.status_code == 404
+    assert (project_dir / ".odooctl" / "queue" / f"{op_id}.json").exists()
+
+
+def test_project_scoped_token_matching_project_can_operate(client):
+    """A proj claim naming the op's own project still reads and cancels it."""
+    op_id = _enqueue_backup(client, _mint_operator())
+
+    scoped = tokens.mint(
+        TEST_KEY,
+        action="api",
+        environment="*",
+        project="test-project",
+        ttl_seconds=300,
+        roles=["operator"],
+    )
+    resp = client.get(f"/operations/{op_id}", headers={"Authorization": f"Bearer {scoped}"})
+    assert resp.status_code == 200
+    resp = client.post(f"/operations/{op_id}/cancel", headers={"Authorization": f"Bearer {scoped}"})
+    assert resp.status_code == 200
+
+
+def test_capability_token_minted_with_default_300s_ttl(client, project_dir):
+    """F12: enqueued capability tokens carry the short default TTL (300 s)."""
+    op_id = _enqueue_backup(client, _mint_operator())
+    entry = json.loads((project_dir / ".odooctl" / "queue" / f"{op_id}.json").read_text())
+    payload = tokens.decode_unverified(entry["token"])
+    assert payload["exp"] - payload["iat"] == 300
+
+
+def test_create_app_rejects_short_env_sourced_key(monkeypatch, fake_registry):
+    """F24: a weak ODOOCTL_API_KEY is rejected at app startup."""
+    from odooctl.api.app import create_app
+
+    monkeypatch.setenv("ODOOCTL_API_KEY", "short-key")
+    with pytest.raises(ValueError, match="at least 32"):
+        create_app(api_key="short-key", registry_loader=lambda: fake_registry)
+
+
+def test_create_app_warns_on_short_programmatic_key(fake_registry):
+    from odooctl.api.app import create_app
+
+    with pytest.warns(UserWarning, match="32"):
+        create_app(api_key="short-key", registry_loader=lambda: fake_registry)
+
+
+def test_max_polls_clamped_to_ceiling():
+    from odooctl.api.routes_operations import MAX_POLLS_CEILING, _clamp_max_polls
+
+    assert MAX_POLLS_CEILING == 600
+    assert _clamp_max_polls(999_999) == 600
+    assert _clamp_max_polls(600) == 600
+    assert _clamp_max_polls(120) == 120
+    assert _clamp_max_polls(0) == 1
+    assert _clamp_max_polls(-5) == 1
+
+
+def test_events_endpoint_accepts_huge_max_polls(client):
+    """A huge max_polls must not 500/hang: clamp applies, terminal op ends stream."""
+    token = _mint_operator()
+    op_id = _enqueue_backup(client, token)
+    resp = client.post(f"/operations/{op_id}/cancel", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+
+    resp = client.get(
+        f"/operations/{op_id}/events?max_polls=999999",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers.get("content-type", "")
 
 
 def test_cancel_operation_removes_queue_file(client, project_dir):

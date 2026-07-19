@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in odooctl misbehaved
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: odooctl version
+      description: Output of `odooctl --version`
+    validations:
+      required: true
+  - type: input
+    id: odoo-version
+    attributes:
+      label: Odoo version
+      placeholder: "17.0 / 18.0 / 19.0"
+  - type: dropdown
+    id: execution-mode
+    attributes:
+      label: Execution mode
+      options:
+        - docker (default)
+        - host
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the command you ran and the full output. Redact secrets — odooctl redacts most, but check.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant odooctl.yml excerpt (redacted)
+      render: yaml

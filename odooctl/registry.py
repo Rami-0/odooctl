@@ -70,11 +70,45 @@ def save_registry(registry: Registry) -> None:
     registry.path.write_text("\n".join(lines).rstrip() + "\n")
 
 
+def _validate_project_name(name: str) -> str:
+    """Reject project names that could inject path components (audit finding F10).
+
+    Project names flow into registry keys and state paths, so they follow the
+    same identifier rule as config environment names.
+    """
+    from odooctl.config import validate_identifier
+
+    try:
+        return validate_identifier(name, "project name")
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _contained_config_path(name: str, root: Path, config: str | Path) -> Path:
+    """Resolve a project's config path and require it to stay inside *root*.
+
+    Path containment (audit finding F10): a registry entry's ``config`` value
+    is attacker-influenceable (hand-edited config.toml), so a value like
+    ``../../etc/passwd`` must not read files outside the registered project
+    root. The project root itself may be any absolute path; absolute config
+    paths keep working as long as they resolve inside the root.
+    """
+    root_resolved = Path(root).expanduser().resolve()
+    config_path = Path(config).expanduser()
+    resolved = (config_path if config_path.is_absolute() else root_resolved / config_path).resolve()
+    if not resolved.is_relative_to(root_resolved):
+        raise click.ClickException(
+            f"Config path for project {name!r} escapes the project root: "
+            f"{resolved} is not inside {root_resolved}"
+        )
+    return resolved
+
+
 def add_project(name: str, path: str | Path, config: str = "odooctl.yml", *, make_active: bool = True) -> RegisteredProject:
+    _validate_project_name(name)
     registry = load_registry()
     root = Path(path).expanduser().resolve()
-    config_path = Path(config).expanduser()
-    resolved_config = config_path if config_path.is_absolute() else root / config_path
+    resolved_config = _contained_config_path(name, root, config)
     if not resolved_config.exists():
         raise click.ClickException(f"Config file not found for project {name!r}: {resolved_config}")
     project = RegisteredProject(name=name, path=root, config=str(config))
@@ -119,7 +153,10 @@ def resolve_project_context(
         registered = registry.projects.get(project)
         if registered is None:
             raise click.ClickException(f"Unknown project: {project}")
-        return ProjectContext.from_config_path(registered.config, root=registered.path)
+        # Containment check (audit F10): reject registry entries whose config
+        # resolves outside the registered project root.
+        resolved_config = _contained_config_path(registered.name, registered.path, registered.config)
+        return ProjectContext.from_config_path(resolved_config, root=registered.path)
     if project_dir is not None:
         return ProjectContext.from_config_path(config, root=project_dir)
     return ProjectContext.from_config_path(config)

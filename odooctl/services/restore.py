@@ -29,8 +29,36 @@ def sha256_file(path: Path) -> str:
 
 
 def resolve_backup_dir(environment: str, backup: str, backups_root: Path) -> Path:
+    """Resolve a backup id to a directory strictly inside *backups_root*.
+
+    Path containment (audit finding F10): *backup* is client-suppliable (CLI
+    argument, API/runner params), so a hostile id like ``../../etc`` must never
+    escape the backups root. Backup ids are plain directory names (e.g.
+    ``staging_2026-01-02_000000``); anything containing a path separator or
+    ``..`` is rejected outright, and the joined path is resolved and required
+    to remain inside ``backups_root.resolve()`` (defense-in-depth against
+    symlink tricks).
+    """
     if backup != "latest":
-        return backups_root / backup
+        if (
+            not backup
+            or "/" in backup
+            or "\\" in backup
+            or ".." in backup
+            or backup == "."
+        ):
+            raise ValueError(
+                f"Invalid backup id {backup!r}: backup ids are plain directory names "
+                "and must not contain path separators or '..'"
+            )
+        root = backups_root.resolve()
+        candidate = (root / backup).resolve()
+        if candidate == root or not candidate.is_relative_to(root):
+            raise ValueError(
+                f"Invalid backup id {backup!r}: resolved path {candidate} "
+                f"escapes the backups root {root}"
+            )
+        return candidate
     candidates = sorted(backups_root.glob(f"{environment}_*"))
     if not candidates:
         raise RuntimeError(f"No backups found for environment: {environment}")

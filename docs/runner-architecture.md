@@ -64,23 +64,52 @@ from odooctl.security.runner_contract import (
 assert_api_does_not_import_privileged()   # raises RunnerContractViolation if dirty
 ```
 
-There is no API package yet, so `find_violations()` returns an empty list today.
-The check is written so that the moment an `odooctl/api/` or `odooctl/web/`
-module lands with a forbidden import, the test in `tests/test_security.py`
-fails. Run it manually with:
+The API and web packages (`odooctl/api/`, `odooctl/web/`) exist and are
+scanned; `find_violations()` returns an empty list only while they stay clean.
+The moment a module in either package gains a forbidden import, the test in
+`tests/test_security.py` fails. Run the check manually with:
 
 ```console
 $ odooctl security runner-check
 ```
+
+## Operation kinds the runner executes
+
+The API enqueue endpoint accepts every operation kind in its whitelist
+(`odooctl/api/routes_operations.py`), but the runner's dispatcher
+(`odooctl/runner/worker.py::_dispatch`) only executes a subset. The remaining
+kinds are CLI-only by design — they involve interactive confirmation and
+host-level judgment — and the runner marks them `failed` at dispatch time
+(`Unsupported operation kind in runner`):
+
+| Operation kind      | Runner-supported | How to run it otherwise        |
+|---------------------|------------------|--------------------------------|
+| `backup`            | yes              | —                              |
+| `clone`             | yes              | —                              |
+| `dr_drill`          | yes              | —                              |
+| `migrate_rehearsal` | yes              | —                              |
+| `restore`           | no (CLI-only)    | `odooctl restore`              |
+| `deploy`            | no (CLI-only)    | `odooctl deploy`               |
+| `promote`           | no (CLI-only)    | `odooctl promote`              |
+| `env_create`        | no (CLI-only)    | `odooctl env create`           |
+| `env_destroy`       | no (CLI-only)    | `odooctl env destroy`          |
+| `update_modules`    | no (CLI-only)    | `odooctl update-modules`       |
+| `rollback`          | no (CLI-only)    | `odooctl rollback`             |
 
 ## Capability tokens across the boundary
 
 Because the API cannot act directly, it authorizes the runner per operation
 with a signed [capability token](rbac.md#capability-tokens). The token binds the
 work to a single action, environment, and project, with a short TTL. A leaked
-token cannot be used against a different target or after expiry, but it can be
-replayed for the same scope while still valid unless the runner tracks consumed
-nonces and rejects repeats.
+token cannot be used against a different target or after expiry, and the
+runner records consumed token nonces (`consumed_nonces.json`) and rejects
+repeats, so a token cannot be replayed for the same scope either.
+
+Signing-key note: the runner verifies capability tokens with the key from
+`ODOOCTL_API_KEY` — the same key the API server uses to mint them. The
+`odooctl security token mint` CLI defaults its `--key-env` to
+`ODOOCTL_RUNNER_KEY`; pass `--key-env ODOOCTL_API_KEY` when hand-minting a
+token that the API or runner must accept (see `docs/rbac.md`).
 
 ## Why a stdlib-only crypto core
 

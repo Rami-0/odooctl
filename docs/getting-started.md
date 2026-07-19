@@ -110,5 +110,5 @@ odooctl schedule doctor --env production --systemd --on-calendar daily -p acme
 
 - Confirm `odooctl doctor` passes.
 - Run a real `backup`, a restore into a safe target, and a `clone --sanitize` rehearsal.
-- Confirm `/web/login` or your configured health path responds; Odoo `302` login redirects are acceptable.
+- Confirm `/web/health` (or your configured health path) returns HTTP 200. Redirects are treated as unhealthy: point the healthcheck at a 2xx endpoint (`/web/health` exists on Odoo 15+).
 - Store real secrets outside the repo and reference them through environment variables.

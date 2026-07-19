@@ -77,6 +77,7 @@ EXPECTED = {
         Action.READ, Action.STATUS, Action.LOGS, Action.BACKUPS,
         Action.OPERATIONS, Action.AUDIT,
         Action.BACKUP, Action.DEPLOY, Action.CLONE, Action.RESTORE,
+        Action.CANCEL,
     },
     Role.ADMIN: set(Action),
     Role.OWNER: set(Action),
@@ -113,6 +114,18 @@ def test_rbac_admin_and_owner_allowed_on_protected():
     for role in (Role.ADMIN, Role.OWNER):
         assert rbac.is_allowed(_p(role), Action.PROMOTE, protected=True)
         rbac.require(_p(role), Action.DEPLOY, protected=True)
+
+
+def test_rbac_cancel_is_write_action_gated_at_operator():
+    """C5/F6: cancelling an operation is a write action, never viewer-level."""
+    assert Action.CANCEL in rbac.WRITE_ACTIONS
+    assert Action.CANCEL not in rbac.READ_ACTIONS
+    viewer = _p(Role.VIEWER)
+    assert not rbac.is_allowed(viewer, Action.CANCEL)
+    with pytest.raises(AccessDenied):
+        rbac.require(viewer, Action.CANCEL)
+    for role in (Role.OPERATOR, Role.ADMIN, Role.OWNER):
+        rbac.require(_p(role), Action.CANCEL)
 
 
 def test_rbac_operator_cannot_manage_secrets_or_promote():
@@ -458,6 +471,35 @@ def test_token_ttl_must_be_positive():
         tokens.mint(RKEY, action="backup", environment="production", project="acme", ttl_seconds=0)
 
 
+def test_token_default_ttl_is_300_seconds():
+    """F12: tokens minted without an explicit TTL expire after 300 s."""
+    assert tokens.DEFAULT_TTL_SECONDS == 300
+    tok = tokens.mint(RKEY, action="backup", environment="production", project="acme", now=1000)
+    payload = tokens.decode_unverified(tok)
+    assert payload["exp"] - payload["iat"] == 300
+    # valid just before expiry, rejected at expiry
+    assert tokens.verify(RKEY, tok, now=1299)["act"] == "backup"
+    with pytest.raises(tokens.TokenExpired):
+        tokens.verify(RKEY, tok, now=1300)
+
+
+def test_token_ttl_still_overridable():
+    tok = tokens.mint(RKEY, action="backup", environment="production", project="acme", ttl_seconds=60, now=1000)
+    payload = tokens.decode_unverified(tok)
+    assert payload["exp"] - payload["iat"] == 60
+
+
+def test_enforce_key_strength_rejects_short_key():
+    """F24: keys shorter than 32 characters are rejected with a clear error."""
+    with pytest.raises(ValueError, match="at least 32"):
+        tokens.enforce_key_strength("short-key")
+    with pytest.raises(ValueError, match="ODOOCTL_API_KEY"):
+        tokens.enforce_key_strength("x" * 31)
+    # exactly at / above the floor passes
+    tokens.enforce_key_strength("x" * 32)
+    tokens.enforce_key_strength(b"y" * 40)
+
+
 def test_token_mint_with_roles_extra_claim():
     tok = tokens.mint(RKEY, action="api", environment="*", project="*", roles=["operator"])
     payload = tokens.verify(RKEY, tok)
@@ -497,7 +539,7 @@ def test_token_mint_cli_single_role(monkeypatch):
     from typer.testing import CliRunner
     from odooctl.commands.security import token_app
 
-    monkeypatch.setenv("ODOOCTL_RUNNER_KEY", RKEY)
+    monkeypatch.setenv("ODOOCTL_API_KEY", RKEY)
     runner = CliRunner()
     result = runner.invoke(
         token_app,
@@ -513,7 +555,7 @@ def test_token_mint_cli_multiple_roles(monkeypatch):
     from typer.testing import CliRunner
     from odooctl.commands.security import token_app
 
-    monkeypatch.setenv("ODOOCTL_RUNNER_KEY", RKEY)
+    monkeypatch.setenv("ODOOCTL_API_KEY", RKEY)
     runner = CliRunner()
     result = runner.invoke(
         token_app,
@@ -530,7 +572,7 @@ def test_token_mint_cli_no_role_backwards_compatible(monkeypatch):
     from typer.testing import CliRunner
     from odooctl.commands.security import token_app
 
-    monkeypatch.setenv("ODOOCTL_RUNNER_KEY", RKEY)
+    monkeypatch.setenv("ODOOCTL_API_KEY", RKEY)
     runner = CliRunner()
     result = runner.invoke(
         token_app,

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from odooctl.commands.backup import redact_config_snapshot
-from odooctl.config import example_config, load_config
+from odooctl.config import OdooCtlConfig, example_config, load_config
 
 
 EXAMPLE_PATH = Path(__file__).resolve().parents[1] / "examples" / "odooctl.yml"
@@ -199,3 +199,120 @@ def test_environments_cannot_share_branch(tmp_path: Path):
 
     message = str(exc_info.value)
     assert "Environments 'production' and 'staging' cannot share branch 'main'" in message
+
+
+# ---------------------------------------------------------------------------
+# C3/F8 — config-boundary input validation (identifiers and hostnames)
+# ---------------------------------------------------------------------------
+
+INJECTION_NAMES = [
+    "foo; rm -rf /",
+    "foo$(x)",
+    "foo|bar",
+    "foo bar",
+    "foo/../bar",
+    "foo`x`",
+    "foo\nbar",
+    "a" * 300,
+]
+
+
+def _base_config(env_name: str = "production", **env_overrides) -> dict:
+    env = {
+        "branch": "main",
+        "domain": "odoo.example.com",
+        "db_name": "odoo_prod",
+        "filestore_path": "/srv/filestore/prod",
+    }
+    env.update(env_overrides)
+    return {
+        "project": {"name": "demo", "odoo_version": "19.0"},
+        "odoo": {"image": "registry/odoo:latest"},
+        "environments": {env_name: env},
+    }
+
+
+def test_valid_identifier_and_hostname_values_pass():
+    cfg = OdooCtlConfig.model_validate(
+        _base_config(
+            env_name="pr-123.hotfix_2",
+            db_name="odoo_prod-1.2",
+            filestore_volume="qa-data",
+            domain="staging-1.odoo.example.com",
+        )
+    )
+    env = cfg.env("pr-123.hotfix_2")
+    assert env.db_name == "odoo_prod-1.2"
+    assert env.filestore_volume == "qa-data"
+    assert env.domain == "staging-1.odoo.example.com"
+
+
+@pytest.mark.parametrize("bad", INJECTION_NAMES)
+def test_environment_name_rejects_injection(bad: str):
+    with pytest.raises(ValueError) as exc_info:
+        OdooCtlConfig.model_validate(_base_config(env_name=bad))
+    message = str(exc_info.value)
+    assert "environment name" in message
+    assert repr(bad[:32]) in message
+    if len(bad) > 32:
+        assert repr(bad) not in message
+
+
+@pytest.mark.parametrize("bad", INJECTION_NAMES)
+def test_db_name_rejects_injection(bad: str):
+    with pytest.raises(ValueError) as exc_info:
+        OdooCtlConfig.model_validate(_base_config(db_name=bad))
+    assert "db_name" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("bad", INJECTION_NAMES)
+def test_filestore_volume_rejects_injection(bad: str):
+    with pytest.raises(ValueError) as exc_info:
+        OdooCtlConfig.model_validate(_base_config(filestore_volume=bad))
+    assert "filestore_volume" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("bad", INJECTION_NAMES + ["*.example.com", "foo_bar.example.com", '{"a"}', "'quoted'"])
+def test_domain_rejects_injection_and_invalid_hostnames(bad: str):
+    with pytest.raises(ValueError) as exc_info:
+        OdooCtlConfig.model_validate(_base_config(domain=bad))
+    assert "domain" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("bad", INJECTION_NAMES)
+def test_compose_service_names_reject_injection(bad: str):
+    data = _base_config()
+    data["odoo"]["service"] = bad
+    with pytest.raises(ValueError):
+        OdooCtlConfig.model_validate(data)
+
+    data = _base_config()
+    data["postgres"] = {"service": bad}
+    with pytest.raises(ValueError):
+        OdooCtlConfig.model_validate(data)
+
+
+def test_identifier_rejects_dot_dot_without_slash():
+    with pytest.raises(ValueError):
+        OdooCtlConfig.model_validate(_base_config(db_name="foo..bar"))
+
+
+def test_domain_normalized_to_lowercase():
+    cfg = OdooCtlConfig.model_validate(_base_config(domain="ODOO.Example.COM"))
+    assert cfg.env("production").domain == "odoo.example.com"
+
+
+def test_invalid_value_is_redacted_to_32_chars_in_error():
+    bad = "x" * 300
+    with pytest.raises(ValueError) as exc_info:
+        OdooCtlConfig.model_validate(_base_config(db_name=bad))
+    message = str(exc_info.value)
+    assert "x" * 32 in message
+    assert "x" * 33 not in message
+
+
+def test_example_configs_still_validate():
+    load_config(EXAMPLE_PATH)
+    multidb = EXAMPLE_PATH.parent / "multidb" / "odooctl.yml"
+    if multidb.exists():
+        load_config(multidb)

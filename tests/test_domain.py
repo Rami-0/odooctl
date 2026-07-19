@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
 import yaml
 
 
@@ -487,3 +488,113 @@ def test_domain_service_detach_removes_route_if_domain_matches(tmp_path):
     svc.detach("production", "odoo.example.com")  # matches env domain exactly
 
     mock_adapter.remove_route.assert_called_once_with("production")
+
+
+# ---------------------------------------------------------------------------
+# C3/F8 — Traefik rules are only ever built from validated hostnames
+# ---------------------------------------------------------------------------
+
+BAD_DOMAINS = [
+    "foo; rm -rf /",
+    "foo$(x)",
+    "foo|bar",
+    "foo bar",
+    "foo/../bar",
+    "foo`x`",
+    "foo\nbar",
+    "evil`whoami`.example.com",
+    "*.example.com",
+    "a" * 300,
+]
+
+BAD_ENVIRONMENTS = [
+    "foo; rm -rf /",
+    "foo$(x)",
+    "foo|bar",
+    "foo bar",
+    "foo/../bar",
+    "../escape",
+    "foo`x`",
+    "foo\nbar",
+    "a" * 300,
+]
+
+
+@pytest.mark.parametrize("bad_domain", BAD_DOMAINS)
+def test_traefik_adapter_rejects_unvalidated_domain(tmp_path, bad_domain):
+    from odooctl.domains.base import RouteSpec
+    from odooctl.domains.traefik import TraefikAdapter
+
+    adapter = TraefikAdapter(dynamic_dir=tmp_path)
+    spec = RouteSpec(domain=bad_domain, environment="production", scheme="https", port=None)
+    with pytest.raises(ValueError):
+        adapter.attach_route(spec)
+    assert not (tmp_path / "odooctl-production.yml").exists()
+
+
+@pytest.mark.parametrize("bad_env", BAD_ENVIRONMENTS)
+def test_traefik_adapter_rejects_unvalidated_environment(tmp_path, bad_env):
+    from odooctl.domains.base import RouteSpec
+    from odooctl.domains.traefik import TraefikAdapter
+
+    adapter = TraefikAdapter(dynamic_dir=tmp_path)
+    spec = RouteSpec(domain="odoo.example.com", environment=bad_env, scheme="https", port=None)
+    with pytest.raises(ValueError):
+        adapter.attach_route(spec)
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("bad_env", BAD_ENVIRONMENTS)
+def test_traefik_adapter_remove_route_rejects_unvalidated_environment(tmp_path, bad_env):
+    from odooctl.domains.traefik import TraefikAdapter
+
+    adapter = TraefikAdapter(dynamic_dir=tmp_path)
+    with pytest.raises(ValueError):
+        adapter.remove_route(bad_env)
+
+
+def test_traefik_adapter_normalizes_domain_to_lowercase(tmp_path):
+    from odooctl.domains.base import RouteSpec
+    from odooctl.domains.traefik import TraefikAdapter
+
+    adapter = TraefikAdapter(dynamic_dir=tmp_path)
+    spec = RouteSpec(domain="ODOO.Example.COM", environment="production", scheme="https", port=None)
+    adapter.attach_route(spec)
+
+    data = yaml.safe_load((tmp_path / "odooctl-production.yml").read_text())
+    router = next(iter(data["http"]["routers"].values()))
+    assert router["rule"] == "Host(`odoo.example.com`)"
+
+
+@pytest.mark.parametrize("bad_domain", BAD_DOMAINS)
+def test_domain_service_attach_rejects_unvalidated_domain(tmp_path, bad_domain):
+    from odooctl.services.domain import DomainService
+
+    mock_adapter = MagicMock()
+    ctx = _make_ctx(tmp_path)
+    svc = DomainService(ctx, adapter=mock_adapter)
+
+    with pytest.raises(ValueError):
+        svc.attach("production", bad_domain)
+
+    mock_adapter.attach_route.assert_not_called()
+    # Config file must be untouched
+    data = yaml.safe_load((tmp_path / "odooctl.yml").read_text())
+    assert data["environments"]["production"]["domain"] == "odoo.example.com"
+
+
+def test_domain_service_attach_persists_normalized_domain(tmp_path):
+    from odooctl.domains.base import RouteStatus
+    from odooctl.services.domain import DomainService
+
+    mock_adapter = MagicMock()
+    mock_adapter.get_route_status.return_value = RouteStatus(active=True, config_path=str(tmp_path / "r.yml"))
+
+    ctx = _make_ctx(tmp_path)
+    svc = DomainService(ctx, adapter=mock_adapter)
+    svc.attach("production", "NEW.Example.COM")
+
+    call_arg = mock_adapter.attach_route.call_args[0][0]
+    assert call_arg.domain == "new.example.com"
+    data = yaml.safe_load((tmp_path / "odooctl.yml").read_text())
+    assert data["environments"]["production"]["domain"] == "new.example.com"

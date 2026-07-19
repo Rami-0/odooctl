@@ -10,6 +10,26 @@ from odooctl.main import app
 runner = CliRunner()
 
 
+def _all_output(result) -> str:
+    """Full CLI error surface across click versions.
+
+    click >= 8.2 splits stderr out of ``result.output`` and newer runners keep
+    unrendered ``ClickException``s on ``result.exception`` instead of printing
+    them, so an error message may live in any of the three places.
+    """
+    import click
+
+    out = result.output
+    try:
+        err = result.stderr
+    except (ValueError, AttributeError):
+        err = ""
+    exc_msg = ""
+    if isinstance(result.exception, click.ClickException):
+        exc_msg = result.exception.format_message()
+    return out + (err or "") + exc_msg
+
+
 def _write_config(root: Path) -> Path:
     config = root / "odooctl.yml"
     config.write_text(
@@ -147,11 +167,60 @@ def test_env_destroy_refuses_production_and_removes_non_production(tmp_path: Pat
 
     prod = runner.invoke(app, ["--project-dir", str(repo), "env", "destroy", "production", "--yes"])
     assert prod.exit_code != 0
-    assert "Refusing to destroy the production" in prod.output
+    assert "Refusing to destroy protected environment 'production'" in _all_output(prod)
 
     result = runner.invoke(app, ["--project-dir", str(repo), "env", "destroy", "qa", "--yes"])
     assert result.exit_code == 0, result.output
     assert "qa" not in yaml.safe_load(config.read_text())["environments"]
+
+
+def test_env_destroy_refuses_protected_tier_env_with_non_production_name(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    config = _write_config(repo)
+    data = yaml.safe_load(config.read_text())
+    data["environments"]["prod-eu"] = {
+        "tier": "production",
+        "branch": "main-eu",
+        "domain": "eu.example.com",
+        "db_name": "acme_prod_eu",
+        "filestore_path": "/var/lib/odoo/filestore/acme_prod_eu",
+    }
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+
+    result = runner.invoke(app, ["--project-dir", str(repo), "env", "destroy", "prod-eu", "--yes"])
+    assert result.exit_code != 0
+    assert "Refusing to destroy protected environment 'prod-eu'" in _all_output(result)
+    assert "prod-eu" in yaml.safe_load(config.read_text())["environments"]
+
+
+def test_env_create_refuses_replacing_protected_envs(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    config = _write_config(repo)
+    data = yaml.safe_load(config.read_text())
+    data["environments"]["prod-eu"] = {
+        "tier": "production",
+        "branch": "main-eu",
+        "domain": "eu.example.com",
+        "db_name": "acme_prod_eu",
+        "filestore_path": "/var/lib/odoo/filestore/acme_prod_eu",
+    }
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+
+    by_name = runner.invoke(
+        app,
+        ["--project-dir", str(repo), "env", "create", "production", "--clone-from", "production"],
+    )
+    assert by_name.exit_code != 0
+    assert "Refusing to create or replace protected environment 'production'" in _all_output(by_name)
+
+    by_tier = runner.invoke(
+        app,
+        ["--project-dir", str(repo), "env", "create", "prod-eu", "--clone-from", "production"],
+    )
+    assert by_tier.exit_code != 0
+    assert "Refusing to create or replace protected environment 'prod-eu'" in _all_output(by_tier)
 
 
 def test_env_destroy_purge_drops_db_and_filestore_before_removing_config(tmp_path: Path, monkeypatch):
@@ -198,7 +267,7 @@ def test_env_open_refuses_reserved_name_production(tmp_path: Path):
         app, ["--project-dir", str(repo), "env", "open", "production", "--from", "main"]
     )
     assert result.exit_code != 0
-    assert "reserved" in result.output.lower()
+    assert "reserved" in _all_output(result).lower()
 
 
 def test_env_open_refuses_reserved_name_staging(tmp_path: Path):
@@ -210,7 +279,7 @@ def test_env_open_refuses_reserved_name_staging(tmp_path: Path):
         app, ["--project-dir", str(repo), "env", "open", "staging", "--from", "staging"]
     )
     assert result.exit_code != 0
-    assert "reserved" in result.output.lower()
+    assert "reserved" in _all_output(result).lower()
 
 
 def test_env_open_refuses_duplicate_environment(tmp_path: Path):
@@ -230,7 +299,7 @@ def test_env_open_refuses_duplicate_environment(tmp_path: Path):
         app, ["--project-dir", str(repo), "env", "open", "existing", "--from", "feature/existing"]
     )
     assert result.exit_code != 0
-    assert "already exists" in result.output.lower()
+    assert "already exists" in _all_output(result).lower()
 
 
 def test_env_open_no_provision_writes_config_without_clone(tmp_path: Path, monkeypatch):

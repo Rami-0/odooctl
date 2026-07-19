@@ -15,6 +15,7 @@ from odooctl.operations.models import (
     _utcnow,
 )
 from odooctl.operations.store import OperationStore
+from odooctl.utils.shell import redact
 
 
 class OperationContext:
@@ -113,7 +114,9 @@ def run_operation(
         yield op_ctx
         outcome = "succeeded"
     except Exception as exc:
-        error_msg = str(exc)
+        # Second redaction layer: the message is persisted into the operation
+        # store and streamed to clients, so never trust it to be secret-free.
+        error_msg = redact(str(exc))
         raise
     finally:
         lock.__exit__(None, None, None)

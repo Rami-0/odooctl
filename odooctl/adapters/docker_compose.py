@@ -35,8 +35,29 @@ class DockerComposeAdapter:
     def ps(self) -> str:
         return run(self._cmd("ps"), cwd=self.project_dir, check=False).stdout
 
-    def exec(self, service: str, args: list[str], *, stream: bool = True) -> None:
-        run(self._cmd("exec", "-T", service, *args), cwd=self.project_dir, stream=stream)
+    def exec(
+        self,
+        service: str,
+        args: list[str],
+        *,
+        stream: bool = True,
+        extra_env: dict[str, str] | None = None,
+    ) -> None:
+        """Run a command inside a compose service.
+
+        ``extra_env`` values are injected into the container via name-only
+        ``-e NAME`` flags, with the actual values supplied through the
+        subprocess environment — so secrets never appear on argv.
+        """
+        env_flags: list[str] = []
+        for name in extra_env or {}:
+            env_flags.extend(["-e", name])
+        run(
+            self._cmd("exec", "-T", *env_flags, service, *args),
+            cwd=self.project_dir,
+            env=extra_env,
+            stream=stream,
+        )
 
     def exec_capture_bytes(self, service: str, args: list[str], *, stdout_path: str | Path) -> None:
         run_capture_bytes(self._cmd("exec", "-T", service, *args), cwd=self.project_dir, stdout_path=stdout_path)

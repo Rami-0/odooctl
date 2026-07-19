@@ -69,7 +69,7 @@ def run_deploy(ctx: ServiceContext, environment: str, branch: str | None = None)
     status = "failed"
     message = None
     try:
-        if environment == "production":
+        if cfg.is_protected(environment):
             print("[deploy] backup")
             backup_result = backup_execute(ctx, environment)
             backup_id = backup_result.backup_id
@@ -100,7 +100,7 @@ def run_deploy(ctx: ServiceContext, environment: str, branch: str | None = None)
         print("[deploy] done")
     except Exception as exc:
         message = str(exc)
-        if environment == "production":
+        if cfg.is_protected(environment):
             try:
                 compose.restart(cfg.odoo.service)
             except Exception as recovery_exc:

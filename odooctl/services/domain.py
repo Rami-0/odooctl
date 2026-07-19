@@ -5,6 +5,7 @@ from typing import Callable, TYPE_CHECKING
 
 import yaml
 
+from odooctl.config import validate_hostname
 from odooctl.domains.base import DomainStatus, RouteSpec, ReverseProxyAdapter, resolve_domain
 
 if TYPE_CHECKING:
@@ -34,6 +35,9 @@ class DomainService:
         self._expected_host_ips = expected_host_ips
 
     def attach(self, environment: str, domain: str) -> None:
+        # Validate before any route is built or persisted (raises ValueError);
+        # normalizes the hostname to lowercase.
+        domain = validate_hostname(domain, "domain")
         cfg = self._ctx.project.config
         env = cfg.env(environment)
         spec = RouteSpec(

@@ -557,3 +557,66 @@ def test_runner_command_exits_nonzero_on_failed_operation(project_dir, fake_regi
         with _pytest.raises(SystemExit) as excinfo:
             runner_cmd.run(once=True, api_key=TEST_KEY)
     assert excinfo.value.code == 1
+
+
+def test_runner_persists_redacted_operation_error(project_dir, fake_registry, monkeypatch):
+    """A failed operation whose error message contains a secret env value is stored redacted."""
+    from odooctl.operations.models import OperationStatus
+    from odooctl.operations.store import OperationStore
+    from odooctl.runner.worker import RunnerWorker
+
+    secret = "runner-db-secret-789"
+    monkeypatch.setenv("ODOO_DB_PASSWORD", secret)
+
+    op_id = "redact001"
+    _pre_create_op(project_dir, op_id)
+    OperationQueue(project_dir / ".odooctl").enqueue(_make_entry(op_id=op_id))
+
+    worker = RunnerWorker(registry=fake_registry, api_key=TEST_KEY)
+    boom = RuntimeError(f"connection to db failed: password={secret}")
+    with patch("odooctl.runner.worker.run_backup", side_effect=boom):
+        did_work = worker.claim_and_run()
+
+    assert did_work is True
+    assert worker.last_run_ok is False
+    store = OperationStore(project_dir / ".odooctl")
+    op = store.load(op_id)
+    assert op.status == OperationStatus.FAILED
+    assert secret not in (op.error or "")
+    assert "***REDACTED***" in (op.error or "")
+    # The streamed/persisted failure event must be redacted too.
+    for event in store.load_events(op_id):
+        assert secret not in event.message
+
+
+def test_engine_persists_redacted_operation_error(tmp_path, monkeypatch):
+    """run_operation stores a redacted error when the wrapped block leaks a secret."""
+    import pytest as _pytest
+
+    from odooctl.operations.audit import AuditStore
+    from odooctl.operations.engine import run_operation
+    from odooctl.operations.models import OperationKind, OperationStatus
+    from odooctl.operations.store import OperationStore
+
+    secret = "engine-db-secret-321"
+    monkeypatch.setenv("ODOO_DB_PASSWORD", secret)
+
+    store = OperationStore(tmp_path)
+    audit = AuditStore(tmp_path)
+    with _pytest.raises(RuntimeError):
+        with run_operation(
+            store,
+            audit,
+            kind=OperationKind.BACKUP,
+            project="test-project",
+            environment="production",
+            actor="cli",
+            params_redacted={},
+            state_dir=tmp_path,
+        ) as op_ctx:
+            raise RuntimeError(f"pg_dump: authentication failed: {secret}")
+
+    op = store.load(op_ctx.op.id)
+    assert op.status == OperationStatus.FAILED
+    assert secret not in (op.error or "")
+    assert "***REDACTED***" in (op.error or "")

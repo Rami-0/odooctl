@@ -11,7 +11,6 @@ def build_update_modules_args(
     *,
     db_host: str | None = None,
     db_user: str | None = None,
-    db_password_env: str | None = None,
     config_path: str | None = None,
 ) -> list[str]:
     args = ["odoo", "-d", db_name, "-u", join_csv(modules), "--stop-after-init"]
@@ -21,18 +20,47 @@ def build_update_modules_args(
         args.extend(["--db_host", db_host])
     if db_user:
         args.extend(["--db_user", db_user])
-    if db_password_env:
-        value = os.getenv(db_password_env)
-        if not value:
-            raise RuntimeError(f"Missing required environment variable: {db_password_env}")
-        args.extend(["--db_password", value])
     return args
 
 
-def update_modules_local(db_name: str, modules: list[str]) -> None:
+def _resolve_password_env(db_password_env: str | None) -> dict[str, str] | None:
+    """Resolve the configured password env var to a PGPASSWORD mapping.
+
+    The database password never appears on argv. It is handed to the Odoo
+    process through the PGPASSWORD environment variable, which psycopg2
+    honours natively.
+    """
+    if not db_password_env:
+        return None
+    value = os.getenv(db_password_env)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {db_password_env}")
+    return {"PGPASSWORD": value}
+
+
+def update_modules_local(
+    db_name: str,
+    modules: list[str],
+    *,
+    db_host: str | None = None,
+    db_user: str | None = None,
+    db_password_env: str | None = None,
+    config_path: str | None = None,
+) -> None:
     if not modules:
         return
-    run(build_update_modules_args(db_name, modules), stream=True)
+    env = _resolve_password_env(db_password_env)
+    run(
+        build_update_modules_args(
+            db_name,
+            modules,
+            db_host=db_host,
+            db_user=db_user,
+            config_path=config_path,
+        ),
+        stream=True,
+        env=env,
+    )
 
 
 def update_modules_compose(
@@ -48,6 +76,7 @@ def update_modules_compose(
 ) -> None:
     if not modules:
         return
+    extra_env = _resolve_password_env(db_password_env)
     compose.exec(
         service,
         build_update_modules_args(
@@ -55,8 +84,8 @@ def update_modules_compose(
             modules,
             db_host=db_host,
             db_user=db_user,
-            db_password_env=db_password_env,
             config_path=config_path,
         ),
         stream=True,
+        extra_env=extra_env,
     )

@@ -40,6 +40,7 @@ from odooctl.services.backup import run_backup
 from odooctl.services.clone import run_clone
 from odooctl.services.context import ServiceContext
 from odooctl.services.dr import run_dr_drill
+from odooctl.utils.shell import redact
 
 if TYPE_CHECKING:
     from odooctl.registry import Registry
@@ -148,7 +149,7 @@ class RunnerWorker:
                 project=entry.project,
             )
         except TokenError as exc:
-            store.update_status(entry.op_id, OperationStatus.FAILED, error=f"token error: {exc}")
+            store.update_status(entry.op_id, OperationStatus.FAILED, error=redact(f"token error: {exc}"))
             queue.fail(entry.op_id)
             return False
 
@@ -160,7 +161,7 @@ class RunnerWorker:
             protected = ctx.config.is_protected(entry.environment)
             rbac.require(_principal_from_payload(payload), action, protected=protected)
         except (KeyError, ValueError, rbac.AccessDenied) as exc:
-            store.update_status(entry.op_id, OperationStatus.FAILED, error=f"rbac error: {exc}")
+            store.update_status(entry.op_id, OperationStatus.FAILED, error=redact(f"rbac error: {exc}"))
             queue.fail(entry.op_id)
             return False
 
@@ -196,7 +197,9 @@ class RunnerWorker:
                 _dispatch(entry, svc_ctx, op_ctx)
                 outcome = "succeeded"
             except Exception as exc:
-                error_msg = str(exc)
+                # Second redaction layer: this string is persisted into the
+                # operation store and streamed to API clients.
+                error_msg = redact(str(exc))
             finally:
                 lock.__exit__(None, None, None)
         except LockAcquisitionError as exc:

@@ -19,7 +19,8 @@ class CommandResult:
 
 class CommandError(RuntimeError):
     def __init__(self, result: CommandResult):
-        super().__init__(f"Command failed ({result.returncode}): {' '.join(result.args)}\n{result.stderr}")
+        message = f"Command failed ({result.returncode}): {' '.join(result.args)}\n{result.stderr}"
+        super().__init__(redact(message))
         self.result = result
 
 def redact(

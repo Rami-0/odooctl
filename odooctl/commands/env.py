@@ -117,17 +117,16 @@ def create_env(
     provision: bool = typer.Option(True, "--provision/--no-provision", help="Run safe clone after writing config."),
     config: str = "odooctl.yml",
 ):
-    if name == "production":
-        raise click.ClickException("Refusing to create or replace the production environment")
     if scheme not in {"http", "https"}:
         raise click.ClickException("--scheme must be 'http' or 'https'")
 
     path = _config_path(ctx, config)
     data = _load_raw(path)
+    current = load_config(path)
+    if name in current.environments and current.is_protected(name):
+        raise click.ClickException(f"Refusing to create or replace protected environment '{name}'")
     if name in data["environments"]:
         raise click.ClickException(f"Environment already exists: {name}")
-
-    current = load_config(path)
     source = current.env(clone_from)
     project_name = current.project.name.replace("-", "_")
     new_db = db_name or f"{project_name}_{name}"
@@ -281,15 +280,15 @@ def destroy_env(
     yes: bool = typer.Option(False, "--yes", "-y", help="Confirm destructive config removal."),
     config: str = "odooctl.yml",
 ):
-    if name == "production":
-        raise click.ClickException("Refusing to destroy the production environment")
     path = _config_path(ctx, config)
     data = _load_raw(path)
     if name not in data["environments"]:
         raise click.ClickException(f"Unknown environment: {name}")
+    cfg = load_config(path)
+    if cfg.is_protected(name):
+        raise click.ClickException(f"Refusing to destroy protected environment '{name}'")
     if not yes:
         raise click.ClickException("Pass --yes to confirm environment removal")
-    cfg = load_config(path)
     env = cfg.env(name)
     if purge:
         project_ctx = ProjectContext(path.parent, path, cfg)

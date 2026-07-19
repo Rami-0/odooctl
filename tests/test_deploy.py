@@ -81,6 +81,89 @@ def test_deploy_production_runs_backup_pull_update_and_records_metadata(tmp_path
     assert store.saved[-1].message is None
 
 
+TIER_CONFIG = """project:\n  name: demo\n  odoo_version: \"19.0\"\nruntime:\n  compose_file: docker-compose.yml\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  prod-eu:\n    tier: production\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    update_modules: [sale, stock]\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    update_modules: [sale]\n    sanitize: true\n"""
+
+
+def _patch_happy_deploy(monkeypatch, events, store, compose):
+    monkeypatch.setattr(deploy_svc, "backup_execute", lambda ctx, environment: (events.append(("backup", (environment,))) or BackupResult(backup_id="backup_2026")))
+    monkeypatch.setattr(deploy_svc, "git_commit", lambda cwd=None: "feedbeef")
+    monkeypatch.setattr(deploy_svc, "run", lambda args, stream=True, cwd=None: events.append(("run", (tuple(args), stream))))
+    monkeypatch.setattr(deploy_svc, "PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr(deploy_svc, "DockerComposeAdapter", lambda compose_file, **kwargs: compose)
+    monkeypatch.setattr(deploy_svc, "update_modules_compose", lambda compose_obj, service, db_name, modules, **kwargs: events.append(("update", (service, db_name, tuple(modules)))))
+    monkeypatch.setattr(deploy_svc, "check_url", lambda url, **kwargs: events.append(("healthcheck", (url,))))
+    monkeypatch.setattr(deploy_svc, "MetadataStore", lambda root: store)
+    monkeypatch.setattr(deploy_svc, "_assert_clean_worktree", lambda *args, **kwargs: None)
+
+
+def test_deploy_protected_tier_env_runs_pre_deploy_backup(tmp_path: Path, monkeypatch):
+    """An env named something other than 'production' but with tier: production
+    must get the same pre-deploy backup protection."""
+    config = tmp_path / "odooctl.yml"
+    config.write_text(TIER_CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    events: list[tuple[str, tuple[object, ...]]] = []
+    store = DummyStore()
+    compose = DummyCompose("docker-compose.yml")
+    _patch_happy_deploy(monkeypatch, events, store, compose)
+
+    deploy_cmd.execute("prod-eu", "main", str(config))
+
+    assert events[0] == ("backup", ("prod-eu",))
+    assert store.saved[-1].status == "success"
+    assert store.saved[-1].backup == "backup_2026"
+
+
+def test_deploy_unprotected_env_skips_pre_deploy_backup(tmp_path: Path, monkeypatch):
+    config = tmp_path / "odooctl.yml"
+    config.write_text(TIER_CONFIG.replace("/srv/filestore/staging", str(tmp_path / "srv/filestore/staging")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/staging").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    events: list[tuple[str, tuple[object, ...]]] = []
+    store = DummyStore()
+    compose = DummyCompose("docker-compose.yml")
+    _patch_happy_deploy(monkeypatch, events, store, compose)
+
+    deploy_cmd.execute("staging", "staging", str(config))
+
+    assert not any(event == "backup" for event, _ in events)
+    assert store.saved[-1].backup is None
+    assert store.saved[-1].status == "success"
+
+
+def test_deploy_protected_tier_env_restarts_on_failure(tmp_path: Path, monkeypatch):
+    """The recovery restart guard must also be config-driven, not name-driven."""
+    config = tmp_path / "odooctl.yml"
+    config.write_text(TIER_CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n")
+    (tmp_path / "srv/filestore/prod").mkdir(parents=True)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    store = DummyStore()
+    compose = DummyCompose("docker-compose.yml")
+
+    monkeypatch.setattr(deploy_svc, "backup_execute", lambda ctx, environment: BackupResult(backup_id="backup_2026"))
+    monkeypatch.setattr(deploy_svc, "git_commit", lambda cwd=None: "feedbeef")
+    monkeypatch.setattr(deploy_svc, "run", lambda args, stream=True, cwd=None: None)
+    monkeypatch.setattr(deploy_svc, "PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr(deploy_svc, "DockerComposeAdapter", lambda compose_file, **kwargs: compose)
+    monkeypatch.setattr(deploy_svc, "update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr(deploy_svc, "check_url", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("healthcheck failed")))
+    monkeypatch.setattr(deploy_svc, "MetadataStore", lambda root: store)
+    monkeypatch.setattr(deploy_svc, "_assert_clean_worktree", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError):
+        deploy_cmd.execute("prod-eu", "main", str(config))
+
+    assert compose.calls[-1] == ("restart", ("odoo",))
+    assert store.saved[-1].status == "failed"
+
+
 def test_deploy_production_restarts_on_failure_and_records_message(tmp_path: Path, monkeypatch):
     config = tmp_path / "odooctl.yml"
     config.write_text(CONFIG.replace("/srv/filestore/prod", str(tmp_path / "srv/filestore/prod")))

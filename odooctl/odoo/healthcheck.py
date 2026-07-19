@@ -2,8 +2,26 @@ from __future__ import annotations
 import time
 from http.client import HTTPException
 from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.error import URLError, HTTPError
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Surface 3xx responses as HTTPError instead of silently following them.
+
+    A redirect is not proof of a healthy Odoo: it may point at an error page,
+    a login wall on another host, or a proxy default vhost.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_opener = build_opener(_NoRedirectHandler())
+
+
+def urlopen(request, *, timeout: int):
+    return _opener.open(request, timeout=timeout)
 
 
 def with_db_selector(url: str, db_name: str | None = None) -> str:
@@ -21,13 +39,14 @@ def check_url(url: str, *, timeout: int = 5, retries: int = 12, interval: int = 
         try:
             req = Request(url, headers={"User-Agent": "odooctl/0.1"})
             with urlopen(req, timeout=timeout) as response:
-                if 200 <= response.status < 400:
+                if 200 <= response.status < 300:
                     return True
                 last_error = f"unexpected HTTP status {response.status}"
         except HTTPError as exc:
             if 300 <= exc.code < 400:
-                return True
-            last_error = exc
+                last_error = f"redirect ({exc.code}) is not a healthy response; point the healthcheck at a 2xx endpoint such as /web/login"
+            else:
+                last_error = exc
         except (URLError, TimeoutError, ConnectionError, OSError, HTTPException) as exc:
             last_error = exc
         time.sleep(interval)

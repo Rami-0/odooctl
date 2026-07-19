@@ -88,6 +88,19 @@ def backup(
     backup_id = backup_cmd.execute(environment, _context_config(ctx, config), verify=verify)
     typer.echo(backup_id)
 
+def _confirm_destructive(action: str, target: str, *, yes: bool) -> None:
+    """Interactive gate for operations that overwrite a database.
+
+    ``--yes`` skips the prompt for non-interactive callers (CI, runner scripts).
+    """
+    if yes:
+        return
+    typer.echo(f"About to {action} — this OVERWRITES the current database of '{target}'.")
+    if not typer.confirm(f"Type y to continue with {action}"):
+        typer.echo("Aborted.")
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def restore(
     ctx: typer.Context,
@@ -95,11 +108,14 @@ def restore(
     backup: str = "latest",
     config: str = "odooctl.yml",
     to: str | None = typer.Option(None, "--to", help="Restore source environment backup into this target environment (e.g. --to staging)."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the interactive confirmation prompt."),
 ):
     if to is not None:
+        _confirm_destructive(f"restore {environment} backup '{backup}' into {to}", to, yes=yes)
         backup_id = restore_cmd.execute_to(environment, to, backup, _context_config(ctx, config))
         typer.echo(f"Restored {environment} backup {backup_id} into {to}")
     else:
+        _confirm_destructive(f"restore {environment} from backup '{backup}'", environment, yes=yes)
         backup_id = restore_cmd.execute(environment, backup, _context_config(ctx, config))
         typer.echo(f"Restored {environment} from backup {backup_id}")
 
@@ -122,7 +138,18 @@ def update_modules(ctx: typer.Context, environment: str, modules: str | None = N
     update_cmd.execute(environment, parsed, _context_config(ctx, config))
 
 @app.command()
-def rollback(ctx: typer.Context, environment: str, mode: str = "code", backup: str | None = None, config: str = "odooctl.yml"):
+def rollback(
+    ctx: typer.Context,
+    environment: str,
+    mode: str = "code",
+    backup: str | None = None,
+    config: str = "odooctl.yml",
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the interactive confirmation prompt (full mode only)."),
+):
+    if mode == "full":
+        _confirm_destructive(
+            f"rollback {environment} to backup '{backup or 'latest'}' (code + database)", environment, yes=yes
+        )
     rollback_cmd.execute(environment, mode, backup, _context_config(ctx, config))
 
 

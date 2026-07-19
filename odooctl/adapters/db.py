@@ -119,9 +119,15 @@ class DockerPostgresAdapter:
         run(self._cmd("psql", *self.base_args(), "-d", db_name, "-v", "ON_ERROR_STOP=1", "-c", sql), cwd=self.project_dir, env=self._password_env(), stream=True)
 
     def clone_db_in_container(self, src: str, dst: str) -> None:
+        from odooctl.utils.shell import run_pipe
+
         self.drop_create(dst)
-        script = f"pg_dump -Fc -h {self.config.internal_host} -U {self.config.service_user} -d {src} | pg_restore -h {self.config.internal_host} -U {self.config.service_user} -d {dst}"
-        run(self._cmd("sh", "-lc", script), cwd=self.project_dir, env=self._password_env(), stream=True)
+        run_pipe(
+            self._cmd("pg_dump", *self.base_args(), "-Fc", "-d", src),
+            self._cmd("pg_restore", *self.base_args(), "-d", dst),
+            cwd=self.project_dir,
+            env=self._password_env(),
+        )
 
 
 def make_db_adapter(ctx: ProjectContext) -> DbAdapter:

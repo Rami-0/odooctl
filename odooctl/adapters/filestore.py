@@ -94,11 +94,8 @@ class DockerVolumeFilestore:
     def restore_archive(self, archive_path: str | Path, target_path: str) -> None:
         name = self._relative_name(target_path)
         parent = f"{self.root}/filestore"
-        self.compose.exec(
-            self.service,
-            ["sh", "-lc", f"mkdir -p {parent!s} && rm -rf {parent}/{name}"],
-            stream=True,
-        )
+        self.compose.exec(self.service, ["mkdir", "-p", parent], stream=True)
+        self.compose.exec(self.service, ["rm", "-rf", f"{parent}/{name}"], stream=True)
         self.compose.exec_pipe_stdin(
             self.service,
             ["tar", "-xf", "-", "-C", parent],
@@ -108,11 +105,9 @@ class DockerVolumeFilestore:
     def copy(self, source: str, target: str) -> None:
         src = self._container_filestore_dir(source)
         dst = self._container_filestore_dir(target)
-        self.compose.exec(
-            self.service,
-            ["sh", "-lc", f"mkdir -p {self.root}/filestore && rm -rf {dst} && cp -a {src} {dst}"],
-            stream=True,
-        )
+        self.compose.exec(self.service, ["mkdir", "-p", f"{self.root}/filestore"], stream=True)
+        self.compose.exec(self.service, ["rm", "-rf", dst], stream=True)
+        self.compose.exec(self.service, ["cp", "-a", src, dst], stream=True)
 
     def delete(self, filestore_path: str) -> None:
         target = self._container_filestore_dir(filestore_path)

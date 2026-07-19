@@ -97,9 +97,14 @@ class RunnerWorker:
     def __init__(self, registry: "Registry", api_key: str) -> None:
         self._registry = registry
         self._api_key = api_key
+        self.last_run_ok: bool = True
 
     def claim_and_run(self) -> bool:
-        """Claim and execute one operation. Returns True if work was done."""
+        """Claim and execute one operation. Returns True if work was done.
+
+        The outcome of the most recent executed operation is recorded on
+        ``self.last_run_ok`` so callers (``run_loop``) can report failures.
+        """
         for proj_name, proj in self._registry.projects.items():
             from odooctl.context import ProjectContext
 
@@ -113,11 +118,12 @@ class RunnerWorker:
             if entry is None:
                 continue
 
-            self._execute_entry(entry, queue, ctx)
+            self.last_run_ok = self._execute_entry(entry, queue, ctx)
             return True
+        self.last_run_ok = True
         return False
 
-    def _execute_entry(self, entry: QueueEntry, queue: OperationQueue, ctx) -> None:
+    def _execute_entry(self, entry: QueueEntry, queue: OperationQueue, ctx) -> bool:
         store = OperationStore(ctx.state_dir)
         audit = AuditStore(ctx.state_dir)
         nonce_store = NonceStore(ctx.state_dir)
@@ -128,7 +134,7 @@ class RunnerWorker:
         try:
             if store.load(entry.op_id).status == OperationStatus.CANCELLED:
                 queue.complete(entry.op_id)
-                return
+                return True
         except KeyError:
             pass
 
@@ -144,7 +150,7 @@ class RunnerWorker:
         except TokenError as exc:
             store.update_status(entry.op_id, OperationStatus.FAILED, error=f"token error: {exc}")
             queue.fail(entry.op_id)
-            return
+            return False
 
         # Defensive RBAC floor: do not trust queue shape alone. Reconstruct the
         # token-derived principal and enforce the same protected-env floor that
@@ -156,7 +162,7 @@ class RunnerWorker:
         except (KeyError, ValueError, rbac.AccessDenied) as exc:
             store.update_status(entry.op_id, OperationStatus.FAILED, error=f"rbac error: {exc}")
             queue.fail(entry.op_id)
-            return
+            return False
 
         # Single-use nonce check
         nonce = payload.get("nonce", "")
@@ -167,7 +173,7 @@ class RunnerWorker:
                 error=f"token nonce already consumed: {nonce}",
             )
             queue.fail(entry.op_id)
-            return
+            return False
         nonce_store.mark_consumed(nonce)
 
         # Transition to RUNNING and emit start event
@@ -217,17 +223,24 @@ class RunnerWorker:
                 timestamp=_utcnow(),
             )
         )
+        return outcome == "succeeded"
 
-    def run_loop(self, *, once: bool = False) -> None:
+    def run_loop(self, *, once: bool = False, fail_fast: bool = False) -> bool:
         """Process the queue in a loop.
 
         :param once: If True, process at most one item and return (used by
             ``odooctl runner --once``).
+        :param fail_fast: If True, stop looping as soon as an operation fails.
+        :returns: True if every executed operation succeeded, False if the
+            last executed operation failed (``once``) or a failure stopped the
+            loop (``fail_fast``). ``odooctl runner`` exits non-zero on False.
         """
         while True:
             did_work = self.claim_and_run()
             if once:
-                return
+                return self.last_run_ok
+            if did_work and fail_fast and not self.last_run_ok:
+                return False
             if not did_work:
                 time.sleep(1)
 

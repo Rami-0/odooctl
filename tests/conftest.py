@@ -24,6 +24,8 @@ ISOLATED_ENV_VARS = (
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_SESSION_TOKEN",
+    "ODOOCTL_API_KEY",
+    "ODOOCTL_RUNNER_KEY",
 )
 ORIGINAL_ENV = {name: os.environ[name] for name in ISOLATED_ENV_VARS if name in os.environ}
 
@@ -39,6 +41,22 @@ def isolate_operator_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
     for name in ISOLATED_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def isolate_global_registry(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Point the global project registry at a per-test empty location.
+
+    The registry default is ``$XDG_CONFIG_HOME/odooctl/config.toml`` (falling
+    back to ``~/.config``). Without this fixture the suite's outcome depends on
+    whatever projects the operator has registered on the machine running the
+    tests — the suspected cause of historical environment-dependent failures.
+    Tests that need a populated registry write into the isolated location.
+    """
+
+    monkeypatch.setenv(
+        "XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("xdg-config"))
+    )
 
 
 @pytest.fixture

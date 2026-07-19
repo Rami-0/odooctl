@@ -3,8 +3,8 @@ from __future__ import annotations
 from importlib.metadata import version
 from pathlib import Path
 
-import click
 import typer
+from odooctl.cli_selector import resolve_config_path
 from odooctl.commands import (
     backup as backup_cmd,
     branch as branch_cmd,
@@ -34,7 +34,6 @@ from odooctl.commands import (
     update_modules as update_cmd,
     validate as validate_cmd,
 )
-from odooctl.registry import resolve_project_context
 
 app = typer.Typer(
     help="Odoo-aware deployment CLI for self-hosted Docker Compose projects.",
@@ -51,16 +50,8 @@ app.add_typer(dr_cmd.app, name="dr")
 app.add_typer(migrate_cmd.app, name="migrate")
 
 
-def _context_config(config: str) -> str:
-    ctx = click.get_current_context(silent=True)
-    root = ctx.find_root() if ctx is not None else None
-    obj = root.obj if root is not None and isinstance(root.obj, dict) else {}
-    project = obj.get("project")
-    project_dir = obj.get("project_dir")
-    if not project and project_dir is None:
-        return config
-    project_context = resolve_project_context(project=project, project_dir=project_dir, config=config)
-    return str(project_context.config_path)
+def _context_config(ctx: typer.Context, config: str) -> str:
+    return str(resolve_config_path(ctx, config, normalize=False))
 
 
 @app.callback(invoke_without_command=True)
@@ -84,34 +75,37 @@ def init(output: str = "odooctl.yml", dry_run: bool = False, force: bool = False
     init_cmd.run(output, dry_run, force)
 
 @app.command()
-def deploy(environment: str, branch: str | None = None, config: str = "odooctl.yml"):
-    deploy_cmd.execute(environment, branch, _context_config(config))
+def deploy(ctx: typer.Context, environment: str, branch: str | None = None, config: str = "odooctl.yml"):
+    deploy_cmd.execute(environment, branch, _context_config(ctx, config))
 
 @app.command()
 def backup(
+    ctx: typer.Context,
     environment: str,
     config: str = "odooctl.yml",
     verify: bool = typer.Option(False, "--verify", help="Verify the backup after creation."),
 ):
-    backup_id = backup_cmd.execute(environment, _context_config(config), verify=verify)
+    backup_id = backup_cmd.execute(environment, _context_config(ctx, config), verify=verify)
     typer.echo(backup_id)
 
 @app.command()
 def restore(
+    ctx: typer.Context,
     environment: str,
     backup: str = "latest",
     config: str = "odooctl.yml",
     to: str | None = typer.Option(None, "--to", help="Restore source environment backup into this target environment (e.g. --to staging)."),
 ):
     if to is not None:
-        backup_id = restore_cmd.execute_to(environment, to, backup, _context_config(config))
+        backup_id = restore_cmd.execute_to(environment, to, backup, _context_config(ctx, config))
         typer.echo(f"Restored {environment} backup {backup_id} into {to}")
     else:
-        backup_id = restore_cmd.execute(environment, backup, _context_config(config))
+        backup_id = restore_cmd.execute(environment, backup, _context_config(ctx, config))
         typer.echo(f"Restored {environment} from backup {backup_id}")
 
 @app.command(name="clone")
 def clone_env(
+    ctx: typer.Context,
     source: str,
     target: str,
     sanitize: bool = True,
@@ -119,57 +113,61 @@ def clone_env(
     sanitization_profile: str = typer.Option("normal", "--sanitization-profile", "--profile"),
     preview: bool = typer.Option(False, "--preview", "--dry-run"),
 ):
-    url = clone_cmd.execute(source, target, sanitize, _context_config(config), sanitization_profile, preview)
+    url = clone_cmd.execute(source, target, sanitize, _context_config(ctx, config), sanitization_profile, preview)
     typer.echo(f"Staging URL: {url}")
 
 @app.command("update-modules")
-def update_modules(environment: str, modules: str | None = None, config: str = "odooctl.yml"):
+def update_modules(ctx: typer.Context, environment: str, modules: str | None = None, config: str = "odooctl.yml"):
     parsed = [m.strip() for m in modules.split(",")] if modules else None
-    update_cmd.execute(environment, parsed, _context_config(config))
+    update_cmd.execute(environment, parsed, _context_config(ctx, config))
 
 @app.command()
-def rollback(environment: str, mode: str = "code", backup: str | None = None, config: str = "odooctl.yml"):
-    rollback_cmd.execute(environment, mode, backup, _context_config(config))
+def rollback(ctx: typer.Context, environment: str, mode: str = "code", backup: str | None = None, config: str = "odooctl.yml"):
+    rollback_cmd.execute(environment, mode, backup, _context_config(ctx, config))
 
 
 @app.command()
 def promote(
+    ctx: typer.Context,
     source: str,
     target: str,
     preview: bool = typer.Option(False, "--preview", "--dry-run", help="Show promote plan without side effects."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Confirm promote to a protected target."),
     config: str = "odooctl.yml",
 ):
-    promote_cmd.execute(source, target, _context_config(config), preview=preview, yes=yes)
+    promote_cmd.execute(source, target, _context_config(ctx, config), preview=preview, yes=yes)
 
 @app.command()
-def logs(environment: str, service: str | None = None, config: str = "odooctl.yml", follow: bool = True, tail: int | None = None):
-    logs_cmd.execute(environment, service, _context_config(config), follow=follow, tail=tail)
+def logs(ctx: typer.Context, environment: str, service: str | None = None, config: str = "odooctl.yml", follow: bool = True, tail: int | None = None):
+    logs_cmd.execute(environment, service, _context_config(ctx, config), follow=follow, tail=tail)
 
 @app.command()
 def status(
+    ctx: typer.Context,
     config: str = "odooctl.yml",
     environment: str | None = None,
     json_output: bool = typer.Option(False, "--json", "--json-output"),
 ):
-    status_cmd.execute(_context_config(config), environment, json_output=json_output)
+    status_cmd.execute(_context_config(ctx, config), environment, json_output=json_output)
 
 
 @app.command()
-def validate(config: str = "odooctl.yml"):
-    validate_cmd.run(_context_config(config))
+def validate(ctx: typer.Context, config: str = "odooctl.yml"):
+    validate_cmd.run(_context_config(ctx, config))
 
 
 @app.command()
 def doctor(
+    ctx: typer.Context,
     config: str = "odooctl.yml",
     json_output: bool = typer.Option(False, "--json", "--json-output"),
 ):
-    doctor_cmd.execute(_context_config(config), json_output=json_output)
+    doctor_cmd.execute(_context_config(ctx, config), json_output=json_output)
 
 
 @app.command()
 def schedule(
+    ctx: typer.Context,
     command: str = typer.Argument(..., help="odooctl command to schedule: backup or doctor."),
     environment: str = typer.Option(..., "--env", "--environment", help="Environment to target."),
     format: str = typer.Option("systemd", "--format", "-f", help="Output format: systemd or cron."),
@@ -189,7 +187,7 @@ def schedule(
         content = schedule_cmd.render(
             command,
             environment,
-            _context_config(config),
+            _context_config(ctx, config),
             format="cron" if cron_line else format,
             interval=interval,
             user=user,
@@ -201,8 +199,8 @@ def schedule(
 
 
 @app.command(name="github-actions")
-def github_actions(config: str = "odooctl.yml", output: str = ".github/workflows/odooctl-deploy.yml", dry_run: bool = False, force: bool = False):
-    content = gha_cmd.run(_context_config(config), output, dry_run, force)
+def github_actions(ctx: typer.Context, config: str = "odooctl.yml", output: str = ".github/workflows/odooctl-deploy.yml", dry_run: bool = False, force: bool = False):
+    content = gha_cmd.run(_context_config(ctx, config), output, dry_run, force)
     if dry_run:
         typer.echo(content)
 
@@ -283,15 +281,17 @@ def serve(
 @app.command()
 def runner(
     once: bool = typer.Option(False, "--once", help="Process one operation and exit."),
+    fail_fast: bool = typer.Option(False, "--fail-fast", help="In loop mode, exit non-zero as soon as an operation fails."),
     api_key: str | None = typer.Option(None, "--api-key", envvar="ODOOCTL_API_KEY", help="HMAC key for capability-token verification."),
 ) -> None:
     """Run the privileged operation runner.
 
     Claims and executes queued operations from all registered projects.
     Requires Docker, Postgres, and filestore access.
-    Use --once to process a single operation and exit (useful for testing).
+    Use --once to process a single operation and exit (useful for testing);
+    it exits non-zero if the processed operation failed.
     """
-    runner_cmd.run(once=once, api_key=api_key)
+    runner_cmd.run(once=once, fail_fast=fail_fast, api_key=api_key)
 
 
 if __name__ == "__main__":

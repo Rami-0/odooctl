@@ -116,20 +116,34 @@ def test_docker_volume_filestore_streams_archive_restore_and_copy(tmp_path: Path
     assert compose.calls[1][0:3] == (
         "exec",
         "odoo",
-        ["sh", "-lc", "mkdir -p /var/lib/odoo/filestore && rm -rf /var/lib/odoo/filestore/odoo_staging"],
+        ["mkdir", "-p", "/var/lib/odoo/filestore"],
     )
-    assert compose.calls[2] == (
+    assert compose.calls[2][0:3] == (
+        "exec",
+        "odoo",
+        ["rm", "-rf", "/var/lib/odoo/filestore/odoo_staging"],
+    )
+    assert compose.calls[3] == (
         "stdin",
         "odoo",
         ["tar", "-xf", "-", "-C", "/var/lib/odoo/filestore"],
         tmp_path / "filestore.tar",
     )
-    assert compose.calls[3][0:3] == (
+    assert compose.calls[4][0:3] == (
         "exec",
         "odoo",
-        [
-            "sh",
-            "-lc",
-            "mkdir -p /var/lib/odoo/filestore && rm -rf /var/lib/odoo/filestore/odoo_staging && cp -a /var/lib/odoo/filestore/odoo_prod /var/lib/odoo/filestore/odoo_staging",
-        ],
+        ["mkdir", "-p", "/var/lib/odoo/filestore"],
+    )
+    assert compose.calls[5][0:3] == (
+        "exec",
+        "odoo",
+        ["rm", "-rf", "/var/lib/odoo/filestore/odoo_staging"],
+    )
+    assert compose.calls[6][0:3] == (
+        "exec",
+        "odoo",
+        ["cp", "-a", "/var/lib/odoo/filestore/odoo_prod", "/var/lib/odoo/filestore/odoo_staging"],
+    )
+    assert not any(
+        call[2][:2] == ["sh", "-lc"] for call in compose.calls if call[0] == "exec"
     )

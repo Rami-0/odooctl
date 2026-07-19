@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 authors = [
-  { name = "odooctl maintainers" },
+  { name = "Rami Shalabi", email = "hi@ramishalabi.xyz" },
 ]
 keywords = ["odoo", "deployment", "docker-compose", "backup", "staging", "cli"]
 classifiers = [

@@ -51,6 +51,24 @@ code {
     font-weight: 700;
     font-size: 1.05rem;
     letter-spacing: -0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+.logo-mark {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 5px solid #a78bfa;
+    box-sizing: border-box;
+}
+.logo-mark-lg {
+    width: 24px;
+    height: 24px;
+    border-width: 7px;
+    vertical-align: -3px;
+    margin-right: 0.5rem;
 }
 .top-bar .user-info {
     margin-left: auto;

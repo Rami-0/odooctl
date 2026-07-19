@@ -1,4 +1,4 @@
-# odooctl
+# <img src="https://raw.githubusercontent.com/Rami-0/odooctl/master/docs/assets/logo.svg" width="26" alt=""> odooctl
 
 [![CI](https://github.com/Rami-0/odooctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Rami-0/odooctl/actions/workflows/ci.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)

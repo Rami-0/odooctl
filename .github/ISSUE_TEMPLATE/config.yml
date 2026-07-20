@@ -1,11 +1,11 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/Rami-0/odooctl/security/advisories/new
+    url: https://github.com/odooctl/odooctl/security/advisories/new
     about: Report privately via GitHub security advisories — never in a public issue.
   - name: Question / discussion
-    url: https://github.com/Rami-0/odooctl/discussions
+    url: https://github.com/odooctl/odooctl/discussions
     about: Ask usage questions and discuss ideas before they become issues.
   - name: Documentation
-    url: https://rami-0.github.io/odooctl/docs/
+    url: https://odooctl.github.io/docs/
     about: Guides for install, backup/restore, cloning, deploys, migration, and the API.

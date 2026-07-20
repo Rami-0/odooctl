@@ -1,8 +1,8 @@
 site_name: odooctl
 site_description: CLI-first, Odoo-aware control plane for self-hosted Odoo on Docker Compose
-site_url: https://rami-0.github.io/odooctl/docs/
-repo_url: https://github.com/Rami-0/odooctl
-repo_name: Rami-0/odooctl
+site_url: https://odooctl.github.io/docs/
+repo_url: https://github.com/odooctl/odooctl
+repo_name: odooctl/odooctl
 edit_uri: edit/master/docs/
 
 # Vercel-style dark theme: near-black, hairline borders, Geist type.
@@ -27,7 +27,7 @@ extra_css:
   - stylesheets/vercel.css
 
 extra:
-  homepage: https://rami-0.github.io/odooctl/
+  homepage: https://odooctl.github.io/
 
 markdown_extensions:
   - admonition

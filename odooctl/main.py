@@ -297,13 +297,34 @@ def serve(
     api_key: str | None = typer.Option(None, "--api-key", envvar="ODOOCTL_API_KEY", help="HMAC key for bearer tokens."),
     static_dir: Path | None = typer.Option(None, "--static-dir", help="Directory of pre-built SPA assets to serve at /."),
     reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev only)."),
+    allowed_host: list[str] = typer.Option(
+        [],
+        "--allowed-host",
+        "--trusted-host",
+        help=(
+            "Extra Host header(s) to trust in addition to localhost, for remote "
+            "access without a reverse proxy (repeatable). Use '*' to allow any host. "
+            "The localhost-only default is never removed."
+        ),
+    ),
 ) -> None:
     """Start the local API server (requires odooctl[api] extras).
 
     Binds to 127.0.0.1 by default. Pass --api-key or set ODOOCTL_API_KEY.
-    Optionally serve a static SPA from --static-dir at /.
+    The packaged web UI is served at / automatically; override with --static-dir.
+
+    The API trusts only localhost Host headers by default. To reach it by IP or
+    hostname (e.g. over a LAN or Tailscale) without a reverse proxy, add those
+    hosts with --allowed-host (repeatable) or ODOOCTL_ALLOWED_HOSTS=host1,host2.
     """
-    serve_cmd.run(host=host, port=port, api_key=api_key, static_dir=static_dir, reload=reload)
+    serve_cmd.run(
+        host=host,
+        port=port,
+        api_key=api_key,
+        static_dir=static_dir,
+        reload=reload,
+        allowed_hosts=list(allowed_host),
+    )
 
 
 @app.command()

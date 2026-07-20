@@ -7,7 +7,7 @@ This guide takes a globally installed `odooctl` from zero to a first verified Do
 PyPI publication is coming soon; until then, install from a source checkout:
 
 ```bash
-git clone https://github.com/Rami-0/odooctl && cd odooctl
+git clone https://github.com/odooctl/odooctl && cd odooctl
 pipx install .
 # or
 uv tool install .

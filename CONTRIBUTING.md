@@ -42,7 +42,7 @@ make sure you have permission to contribute under these terms.
 management.
 
 ```bash
-git clone https://github.com/Rami-0/odooctl.git
+git clone https://github.com/odooctl/odooctl.git
 cd odooctl
 uv venv
 uv pip install -e '.[dev]'
@@ -138,7 +138,7 @@ Each pull request should:
 - File a GitHub issue with a clear reproduction, your `odooctl` version,
   Python version, host OS, and execution mode (`host` or `docker`).
 - Usage questions belong in
-  [GitHub Discussions](https://github.com/Rami-0/odooctl/discussions), not
+  [GitHub Discussions](https://github.com/odooctl/odooctl/discussions), not
   issues.
 - For security issues, follow `SECURITY.md` instead of opening a public
   issue.
@@ -146,14 +146,14 @@ Each pull request should:
 ## Issue labels and triage
 
 Labels are defined in
-[`.github/labels.yml`](https://github.com/Rami-0/odooctl/blob/master/.github/labels.yml)
+[`.github/labels.yml`](https://github.com/odooctl/odooctl/blob/master/.github/labels.yml)
 and synced automatically; edit that file to change them. The taxonomy:
 
 - **Type** — `bug`, `enhancement`, `documentation`, `question`, `security`,
   `breaking-change`.
 - **`area/*`** — the affected subsystem (`area/cli`, `area/backup-restore`,
   `area/clone-sanitize`, …). PRs get these automatically from changed paths
-  via [`.github/labeler.yml`](https://github.com/Rami-0/odooctl/blob/master/.github/labeler.yml).
+  via [`.github/labeler.yml`](https://github.com/odooctl/odooctl/blob/master/.github/labeler.yml).
 - **`priority/*`** — `critical` (data loss / production breakage) through
   `low`.
 - **`status/*`** — triage flow: new issues start at `status/needs-triage`,
@@ -161,8 +161,8 @@ and synced automatically; edit that file to change them. The taxonomy:
 - **`odoo/*`** — which Odoo version(s) the issue affects.
 
 Looking for something to work on? Start with
-[`good first issue`](https://github.com/Rami-0/odooctl/labels/good%20first%20issue)
-or [`help wanted`](https://github.com/Rami-0/odooctl/labels/help%20wanted),
+[`good first issue`](https://github.com/odooctl/odooctl/labels/good%20first%20issue)
+or [`help wanted`](https://github.com/odooctl/odooctl/labels/help%20wanted),
 and comment on the issue before starting so it can be assigned to you.
 
 ## Code of Conduct

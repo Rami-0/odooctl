@@ -69,6 +69,24 @@ DESTRUCTIVE_ON_PROTECTED: frozenset[Action] = frozenset(
     {Action.DEPLOY, Action.CLONE, Action.RESTORE, Action.PROMOTE, Action.ENV, Action.SECRETS}
 )
 
+# Operation kinds whose blast radius is the whole compose project rather than
+# the target environment alone: environments share containers in the single
+# compose-file model, so e.g. restarting the odoo service for "staging" also
+# disrupts production. For these kinds, protection of ANY environment in the
+# project applies.
+PROJECT_WIDE_DISRUPTION_KINDS: frozenset[str] = frozenset({"service_restart"})
+
+
+def kind_protected(cfg, kind: str, environment: str) -> bool:
+    """Effective protected flag for an operation *kind* on *environment*.
+
+    ``cfg`` is duck-typed (needs ``is_protected`` and ``environments``) so this
+    stays importable from the unprivileged API layer.
+    """
+    if kind in PROJECT_WIDE_DISRUPTION_KINDS:
+        return any(cfg.is_protected(name) for name in cfg.environments)
+    return bool(cfg.is_protected(environment))
+
 # Minimum role required to act on a protected/production environment for a
 # destructive action.
 _PROTECTED_FLOOR: Role = Role.ADMIN

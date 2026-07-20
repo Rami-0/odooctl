@@ -25,15 +25,28 @@ odooctl serve --host 127.0.0.1 --port 8080 --static-dir ./spa/dist
 ```
 
 The server binds to `127.0.0.1` by default, and `TrustedHostMiddleware`
-restricts accepted `Host` headers to `127.0.0.1` / `localhost`. Keep it that
-way: the API is designed for localhost-only operation.
+restricts accepted `Host` headers to `127.0.0.1` / `localhost`. Requests by IP
+or hostname are otherwise rejected with `Invalid host header`.
 
-> **Warning:** do not bind the API to a non-loopback address (e.g.
-> `--host 0.0.0.0`) without an authenticating reverse proxy, TLS, and firewall
-> rules in front of it. The API speaks plain HTTP, so bearer tokens would
-> cross the network unencrypted, and anyone who obtains one can enqueue
-> privileged operations. If remote access is needed, prefer an SSH tunnel to
-> `127.0.0.1:8787`.
+To reach the API remotely without a reverse proxy, *append* the host(s) clients
+connect to — the localhost default is never removed:
+
+```bash
+# --allowed-host is repeatable; --trusted-host is an alias. '*' trusts any host.
+odooctl serve --host 0.0.0.0 --allowed-host 192.168.1.50 --allowed-host box.tailnet.ts.net
+
+# Or via env var (comma/space separated):
+ODOOCTL_ALLOWED_HOSTS="192.168.1.50,box.tailnet.ts.net" odooctl serve --host 0.0.0.0
+```
+
+Binding to a non-loopback host with no `--allowed-host` prints a warning
+(otherwise every request would fail the host check).
+
+> **Warning:** the API speaks plain HTTP. `--allowed-host` only widens the Host
+> allowlist — it is not transport security. Bearer tokens cross the network
+> unencrypted, and anyone who obtains one can enqueue privileged operations.
+> Prefer an encrypted transport (Tailscale, an SSH tunnel to `127.0.0.1:8787`,
+> or an authenticating TLS reverse proxy) plus firewall rules.
 
 Rebuilding the SPA dist requires a server restart: `index.html` is read once
 at startup and served from memory for the lifetime of the process.
@@ -111,6 +124,30 @@ Token payload fields:
 | GET    | `/projects/{project}/status`            | viewer        | Metadata-derived status            |
 | GET    | `/projects/{project}/backups`           | viewer        | List backup manifests              |
 | GET    | `/projects/{project}/audit`             | viewer        | Read audit trail entries           |
+| GET    | `/projects/{project}/containers`        | viewer        | Live container status (snapshot)   |
+| GET    | `/runner/status`                        | viewer        | Runner liveness (from heartbeat)   |
+| GET    | `/rbac/matrix`                          | viewer        | Role → action matrix + policy      |
+| POST   | `/tokens`                               | admin         | Mint a scoped bearer token         |
+
+**Container status**: `GET /projects/{project}/containers` serves the snapshot
+the privileged runner writes every 10 s from `docker compose ps` — the API
+itself never touches Docker. The payload includes `available` (false until a
+runner has probed), `stale` (probe older than 30 s), normalized `containers`
+records (`service`, `state`, `health`, `status`, `image`), and the configured
+odoo/postgres service names.
+
+**Token minting**: `POST /tokens` (admin/owner) issues an `action="api"` bearer
+token: `{role, ttl_seconds, project, environment, subject}`. The minted role
+may not outrank the minter, TTL is clamped to `[60 s, 7 days]`, and the token
+is returned once — nothing is stored server-side. This backs the web UI's
+Access page so operators can be onboarded without shell access.
+
+**Runner status**: `GET /runner/status` reports whether a privileged runner is
+processing operations, derived from a heartbeat file the runner refreshes each
+loop. It returns `{online, last_seen, age_seconds, pid, started_at, hint}`;
+`online` is false when the heartbeat is missing or older than 15 s, and `hint`
+is `"odooctl runner"` when offline. The web UI uses it to show a runner
+online/offline pill so a stalled queue is never mistaken for a broken one.
 
 **Status note**: `GET /projects/{project}/status` returns metadata-store-derived
 state (last deployment commit, last backup timestamp). It does NOT run

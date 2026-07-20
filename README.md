@@ -15,7 +15,7 @@
 - **Adopt what you already run.** `odooctl import` detects an existing compose deployment read-only, previews the generated config, and only writes on `--yes` — then registers the project, runs preflight checks, and takes a safety backup.
 - **Protected environments.** Production-tier environments require elevated confirmation for destructive operations, in the CLI, API, and web UI alike.
 - **Secrets stay secret.** Config references secrets by env-var name only; logs, errors, and streamed operation events are redacted.
-- **A local API and web UI, RBAC'd.** `odooctl serve` runs a localhost-only REST API plus a no-build web UI with viewer/operator/admin/owner roles, HMAC bearer tokens, and a privileged runner kept in a separate process.
+- **A local API and web UI, RBAC'd.** `odooctl serve` runs a localhost-first REST API plus a no-build web UI with viewer/operator/admin/owner roles, HMAC bearer tokens, live container status/logs/restart, in-browser token minting, and a privileged runner kept in a separate process.
 - **Upgrade rehearsal, not upgrade roulette.** `odooctl migrate rehearse` clones production into a throwaway DB, runs the (OpenUpgrade-backed) upgrade there, health-checks, and writes a report. Production is never touched.
 
 ## Quickstart
@@ -89,6 +89,7 @@ The optional web UI is a no-build vanilla-JS SPA served by the local API:
 pip install 'odooctl[api]'
 export ODOOCTL_API_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 odooctl serve            # binds 127.0.0.1:8787 by default
+odooctl runner           # processes queued operations (separate process)
 ```
 
 Open `http://localhost:8787/` and paste a token minted with:
@@ -99,11 +100,13 @@ odooctl security token mint --action api --env "*" --project "*" --role operator
 
 <!-- TODO: screenshot -->
 
-The server is localhost-only by design and speaks plain HTTP — do not bind it to a public address; use an SSH tunnel for remote access. The API process never touches Docker or PostgreSQL directly: privileged work is delegated to `odooctl runner` through a durable queue with short-lived, single-use capability tokens. See [docs/web-ui.md](docs/web-ui.md) and [docs/api.md](docs/api.md).
+The dashboard shows environments, live container status (state, health, uptime) with per-service logs and restart, operation history with SSE log streaming, a runner online/offline indicator, and an Access page where admins view the RBAC matrix and mint scoped tokens for teammates.
+
+The server trusts only localhost by default and speaks plain HTTP. For remote access without a reverse proxy, append trusted hosts with `--allowed-host <ip-or-hostname>` (or `ODOOCTL_ALLOWED_HOSTS`) — token auth still applies, but prefer an encrypted transport (Tailscale, SSH tunnel, or TLS proxy). The API process never touches Docker or PostgreSQL directly: privileged work is delegated to `odooctl runner` through a durable queue with short-lived, single-use capability tokens. See [docs/web-ui.md](docs/web-ui.md) and [docs/api.md](docs/api.md).
 
 ## How it compares
 
-Compared to **Odoo.sh**, odooctl is self-hosted and free: your server, your data, no per-worker pricing — with the same core workflow of environments, backups, staging builds, and upgrade testing. Compared to **doodba**, odooctl is not a project scaffolding framework; it manages the operational lifecycle (backup, clone, restore, promote, rehearse) of whatever compose project you already have — including one built with doodba. Compared to **hand-rolled compose scripts**, every destructive path here ships with tested safety rails: pre-deploy backups, restore-into-temp-then-swap, sanitization that is on by default, protected-environment confirmation, and secret redaction, backed by 700+ unit tests plus a real-Odoo integration suite.
+Compared to **Odoo.sh**, odooctl is self-hosted and free: your server, your data, no per-worker pricing — with the same core workflow of environments, backups, staging builds, and upgrade testing. Compared to **doodba**, odooctl is not a project scaffolding framework; it manages the operational lifecycle (backup, clone, restore, promote, rehearse) of whatever compose project you already have — including one built with doodba. Compared to **hand-rolled compose scripts**, every destructive path here ships with tested safety rails: pre-deploy backups, restore-into-temp-then-swap, sanitization that is on by default, protected-environment confirmation, and secret redaction, backed by 1,000+ unit tests plus a real-Odoo integration suite.
 
 ## Supported Odoo versions
 

@@ -23,6 +23,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   issue triage flow (`status/needs-triage`), a documentation issue
   template, issue-form contact links, `SUPPORT.md`, and GitHub Discussions.
 
+## [0.3.0] - 2026-07-20
+
+Reliability and usability pass from a live local install/test run
+(`experiments/2026-07-20-pypi-install-test-suite/`).
+
+### Fixed
+
+- **`clone`/`restore` no longer fail on the final database swap when
+  `db_selector: true`.** Odoo's database-selector auto-connects to every
+  visible database, including the transient `<db>_incoming` one, which made
+  `ALTER DATABASE … RENAME` fail with "database is being accessed by other
+  users". The swap now terminates sessions on the incoming database
+  immediately before promoting it (both the rename-aside and legacy paths).
+
+### Added
+
+- **`odooctl serve --allowed-host` / `--trusted-host` (and
+  `ODOOCTL_ALLOWED_HOSTS`)** to reach the API by IP or hostname (LAN,
+  Tailscale, …) without a reverse proxy. The API stays localhost-only by
+  default; these values are *appended*, never replacing the lockdown. Binding
+  to a non-loopback host without any allowed host now prints a clear warning
+  instead of silently rejecting every request with "Invalid host header".
+- **Runner liveness in the web UI and API.** The privileged runner now writes
+  a heartbeat; a new `GET /runner/status` endpoint reports whether operations
+  are actually being processed. The dashboard shows a runner online/offline
+  pill and, when offline, explains that queued work will not run until you
+  start `odooctl runner` — instead of leaving the queue looking broken.
+- **Web UI: cancel queued operations, a refresh control, and token-expiry
+  display.** Queued operations gain a Cancel action (wired to
+  `POST /operations/{id}/cancel`).
+- **Live container visibility and control from the web UI.** The runner
+  probes `docker compose ps` every 10 s and writes a per-project snapshot;
+  `GET /projects/{p}/containers` serves it (the API never touches Docker).
+  The dashboard gains a Containers panel (project page + a per-environment
+  tab) showing service state/health/uptime/image with staleness detection,
+  plus per-service **Logs** (new `service_logs` operation kind, viewer-
+  allowed, redacted tail streamed over SSE) and **Restart** (new
+  `service_restart` kind, operator+; requires admin when *any* environment in
+  the project is protected, since compose services are shared across
+  environments — a new project-wide protection rule, `rbac.kind_protected`).
+  Service names are validated against the configured odoo/postgres services.
+- **Access management page in the web UI.** `#/access` renders the full
+  role → action RBAC matrix (`GET /rbac/matrix`) with the caller's roles
+  highlighted and the protected-environment floor explained, and lets admins
+  issue scoped bearer tokens from the browser (`POST /tokens`): role capped
+  at the minter's own rank, TTL capped at 7 days, token shown once and never
+  stored.
+
 ## [0.2.0] - 2026-07-19
 
 Production-hardening pass driven by the 2026-05-31 security audits

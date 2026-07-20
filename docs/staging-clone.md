@@ -4,6 +4,13 @@
 
 Sanitization is enabled by default because staging must not send real emails, call live payment APIs, or trigger production webhooks.
 
+The clone restores into a transient `<db_name>_incoming` database and then
+atomically renames it into place. Sessions on the incoming database are severed
+immediately before that rename, so the swap succeeds even when `db_selector:
+true` and the running Odoo has auto-connected to every visible database
+(otherwise the rename would fail with *"database is being accessed by other
+users"*). The same guard applies to `odooctl restore`.
+
 ## Built-in sanitization coverage
 
 All built-in statements are guarded (`to_regclass` / `information_schema.columns`) so they no-op on Odoo versions where a table or column does not exist.

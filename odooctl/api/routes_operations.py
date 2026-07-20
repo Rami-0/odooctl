@@ -38,6 +38,11 @@ _KIND_ACTION: dict[str, Action] = {
     "rollback": Action.RESTORE,
     "dr_drill": Action.RESTORE,
     "migrate_rehearsal": Action.RESTORE,
+    # Read-family container introspection (viewer-allowed): fetch a log tail.
+    "service_logs": Action.LOGS,
+    # Restart is a service disruption — gate like deploy (operator; admin on
+    # protected environments via DESTRUCTIVE_ON_PROTECTED).
+    "service_restart": Action.DEPLOY,
 }
 
 
@@ -123,9 +128,12 @@ def enqueue_operation(
     ctx = _load_ctx(request, project)
 
     # Resolve the target environment before authorization so protected-env
-    # policy is applied to the actual enqueue target.
+    # policy is applied to the actual enqueue target. Kinds with project-wide
+    # blast radius (shared containers) inherit protection from any environment.
     try:
-        protected = ctx.config.is_protected(body.environment)
+        if body.environment not in ctx.config.environments:
+            raise KeyError(f"Unknown environment: {body.environment!r}")
+        protected = rbac.kind_protected(ctx.config, body.kind, body.environment)
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -20,6 +20,8 @@ class OperationKind(str, Enum):
     PROMOTE = "promote"
     DR_DRILL = "dr_drill"
     MIGRATE_REHEARSAL = "migrate_rehearsal"
+    SERVICE_LOGS = "service_logs"
+    SERVICE_RESTART = "service_restart"
 
 
 class OperationStatus(str, Enum):

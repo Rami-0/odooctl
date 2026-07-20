@@ -61,13 +61,36 @@ ODOOCTL_API_KEY=mysecret odooctl serve --static-dir path/to/custom/dist
 ODOOCTL_API_KEY=mysecret odooctl serve --host 127.0.0.1 --port 9000
 ```
 
-> **Warning:** do not bind to a non-loopback address (e.g. `--host 0.0.0.0`).
-> The server speaks plain HTTP and is designed for localhost-only operation;
-> exposing it puts bearer tokens on the wire unencrypted and lets anyone with
-> a token enqueue privileged operations. Use an SSH tunnel (or an
-> authenticating TLS reverse proxy plus firewall rules) for remote access.
+### Reaching the UI from another machine
 
-Open `http://localhost:8787/` and paste an API token. Generate one with:
+By default the API binds to `127.0.0.1` **and** `TrustedHostMiddleware` only
+accepts `Host: localhost` / `127.0.0.1`, so requests by IP or hostname are
+rejected with `Invalid host header`. This localhost lockdown is never removed —
+but you can *append* trusted hosts to reach it over a LAN or Tailscale without a
+reverse proxy:
+
+```bash
+# Bind to all interfaces AND trust the host(s) clients connect to.
+ODOOCTL_API_KEY=mysecret odooctl serve \
+  --host 0.0.0.0 \
+  --allowed-host 192.168.1.50 --allowed-host my-box.tailnet.ts.net
+
+# Equivalent via env var (comma/space separated); '*' trusts any host.
+ODOOCTL_ALLOWED_HOSTS="192.168.1.50,my-box.tailnet.ts.net" \
+  ODOOCTL_API_KEY=mysecret odooctl serve --host 0.0.0.0
+```
+
+If you bind to a non-loopback address **without** any `--allowed-host`, `serve`
+prints a warning explaining that remote requests will be rejected.
+
+> **Security:** the server speaks plain HTTP. Token auth still applies to every
+> request, but exposing it puts bearer tokens on the wire unencrypted. Prefer an
+> encrypted transport (Tailscale, an SSH tunnel, or an authenticating TLS
+> reverse proxy) and firewall the port. `--allowed-host` widens the Host
+> allowlist; it is not a substitute for transport security.
+
+Open `http://localhost:8787/` (or `http://<allowed-host>:8787/`) and paste an
+API token. Generate one with:
 
 ```bash
 odooctl security token mint \
@@ -85,8 +108,57 @@ API server verifies with, so the explicit `--key-env` above is optional. See
 | Hash route | Description |
 |---|---|
 | `#/` | Dashboard — list all registered projects |
-| `#/project/:name` | Project detail — environment grid + recent operations |
-| `#/project/:name/env/:env` | Environment detail — Overview, Doctor, Operations, Backups, Clone, Promote tabs |
+| `#/access` | Access — RBAC role matrix + admin token minting |
+| `#/project/:name` | Project detail — environment grid, live Containers panel, recent operations |
+| `#/project/:name/env/:env` | Environment detail — Overview, Containers, Doctor, Operations, Backups, Restore Points, Clone, Promote, Migrate tabs |
+
+The header shows a **runner status pill** (online/offline), an **Access** link,
+and a refresh control, plus the signed-in principal's roles and token expiry.
+
+## Containers panel
+
+The project page (and a per-environment tab) shows live container state for
+the project's compose stack — service, state/health, uptime, image — refreshed
+every 10 s from the runner's snapshot (`GET /projects/{p}/containers`). If no
+runner has probed yet, or the snapshot is stale, the panel says so instead of
+showing dead data.
+
+Per service:
+
+- **Logs** (viewer+) enqueues a `service_logs` operation; the runner captures a
+  redacted `docker compose logs --tail 200` and streams it into the standard
+  log viewer.
+- **Restart** (operator+) enqueues `service_restart` behind a typed
+  confirmation. Because one compose stack serves every environment of a
+  project, restart requires the **admin** role whenever any environment in the
+  project is protected — the UI explains this instead of failing server-side.
+
+## Access page (`#/access`)
+
+Shows the full role → action matrix from `GET /rbac/matrix`, with your token's
+roles highlighted and protected-only actions marked. Admins additionally get a
+**mint token** form (`POST /tokens`): choose role (capped at your own), TTL
+(max 7 days), project scope, and a subject label; the token is displayed once
+with a copy button and never stored. This is the intended way to hand
+teammates viewer/operator access without server shell access.
+
+## Runner status
+
+Enqueuing an operation only writes a queue entry — a separate privileged
+[runner](runner-architecture.md) executes it. If no runner is running, queued
+operations stay `queued` indefinitely.
+
+To make that legible, the header polls `GET /runner/status` (backed by a
+heartbeat the runner writes) and shows a green **Runner online** or red
+**Runner offline** pill. When offline, the ops table shows a banner and the log
+viewer explains that work will not run until you start one:
+
+```bash
+ODOOCTL_API_KEY=mysecret odooctl runner
+```
+
+Queued operations can be cancelled from the Operations view (a Cancel action
+appears on `queued` rows), which calls `POST /operations/{id}/cancel`.
 
 ## RBAC in the UI
 

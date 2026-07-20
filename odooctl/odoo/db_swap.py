@@ -73,6 +73,10 @@ def swap_temp_database(
         # the data survives under ``temp_db`` and is recoverable.
         terminate_connections(pg, target_db, maintenance_db=maintenance_db)
         drop_database(pg, target_db, maintenance_db=maintenance_db)
+        # Sever any sessions on ``temp_db`` (e.g. Odoo's db-selector auto-connects
+        # to every visible database) before renaming it, or the ALTER DATABASE
+        # would fail with "database is being accessed by other users".
+        terminate_connections(pg, temp_db, maintenance_db=maintenance_db)
         rename_database(pg, temp_db, target_db, maintenance_db=maintenance_db)
         return
 
@@ -85,6 +89,11 @@ def swap_temp_database(
     if target_existed:
         terminate_connections(pg, target_db, maintenance_db=maintenance_db)
         rename_database(pg, target_db, aside_db, maintenance_db=maintenance_db)
+    # Sever any sessions on ``temp_db`` before promoting it. Odoo's db-selector
+    # auto-connects to every visible database, including this transient incoming
+    # one, and an open connection makes ALTER DATABASE ... RENAME fail with
+    # "database is being accessed by other users".
+    terminate_connections(pg, temp_db, maintenance_db=maintenance_db)
     try:
         rename_database(pg, temp_db, target_db, maintenance_db=maintenance_db)
     except Exception:

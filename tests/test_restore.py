@@ -213,5 +213,8 @@ def test_restore_reports_backup_name_after_successful_restore(tmp_path: Path, mo
     assert events[1] == ("restore", ("odoo_staging_incoming", "db.dump"))
     assert events[2] == ("filestore_restore", ("filestore.tar", "/var/lib/odoo/filestore/odoo_staging"))
     swap_sql = [e for e in events if e[0] == "psql"]
-    assert [s[1][1] for s in swap_sql] == ["SELECT", "DROP", "ALTER"]
+    # terminate(target), drop(target), terminate(incoming), rename(incoming).
+    # The second SELECT severs any sessions on the incoming DB (e.g. Odoo's
+    # db-selector) before the rename, which would otherwise fail.
+    assert [s[1][1] for s in swap_sql] == ["SELECT", "DROP", "SELECT", "ALTER"]
     assert events[-1][0] == "healthcheck"

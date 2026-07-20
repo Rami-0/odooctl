@@ -24,6 +24,10 @@ def test_swap_temp_database_terminates_drops_and_renames_target():
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'odoo_staging' AND pid <> pg_backend_pid();",
         ),
         ("postgres", 'DROP DATABASE IF EXISTS "odoo_staging";'),
+        (
+            "postgres",
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'odoo_staging_incoming' AND pid <> pg_backend_pid();",
+        ),
         ("postgres", 'ALTER DATABASE "odoo_staging_incoming" RENAME TO "odoo_staging";'),
     ]
 
@@ -63,7 +67,8 @@ def test_swap_allows_unprotected_target_per_config_policy():
         target_env_name="staging",
         is_protected_fn=lambda name: name == "production",
     )
-    assert len(pg.calls) == 3
+    # terminate(target), drop(target), terminate(temp), rename(temp -> target)
+    assert len(pg.calls) == 4
 
 
 def test_database_quoting_handles_special_characters():
@@ -81,12 +86,20 @@ class ExistsAwarePostgres:
         self.databases = set(existing)
         self.renames: list[tuple[str, str]] = []
         self.drops: list[str] = []
+        self.terminated: list[str] = []
+        self.ops: list[str] = []
         self.fail_promote = False
 
     def database_exists(self, name):
         return name in self.databases
 
     def psql(self, db_name, sql):
+        if "pg_terminate_backend" in sql:
+            import re
+            name = re.search(r"datname = '(.+?)'", sql).group(1)
+            self.terminated.append(name)
+            self.ops.append(f"terminate:{name}")
+            return
         if "RENAME TO" in sql:
             # ALTER DATABASE "old" RENAME TO "new";
             import re
@@ -95,12 +108,14 @@ class ExistsAwarePostgres:
             if self.fail_promote and old.endswith("_incoming"):
                 raise RuntimeError("rename failed")
             self.renames.append((old, new))
+            self.ops.append(f"rename:{old}->{new}")
             self.databases.discard(old)
             self.databases.add(new)
         elif "DROP DATABASE IF EXISTS" in sql:
             import re
             name = re.search(r'DROP DATABASE IF EXISTS "(.+?)"', sql).group(1)
             self.drops.append(name)
+            self.ops.append(f"drop:{name}")
             self.databases.discard(name)
 
 
@@ -126,3 +141,24 @@ def test_swap_into_fresh_target_that_does_not_exist():
     pg = ExistsAwarePostgres(existing={"odoo_staging_incoming"})  # no live target yet
     swap_temp_database(pg, temp_db="odoo_staging_incoming", target_db="odoo_staging", target_env_name="staging")
     assert "odoo_staging" in pg.databases
+
+
+def test_swap_terminates_incoming_connections_before_promotion():
+    """Regression: Odoo's db-selector holds connections to the incoming DB, which
+    made ALTER DATABASE ... RENAME fail. The swap must terminate them first."""
+    pg = ExistsAwarePostgres(existing={"odoo_staging", "odoo_staging_incoming"})
+    swap_temp_database(pg, temp_db="odoo_staging_incoming", target_db="odoo_staging", target_env_name="staging")
+
+    assert "odoo_staging_incoming" in pg.terminated, "incoming DB connections were not severed"
+    # The incoming DB must be terminated *before* it is promoted (renamed).
+    term_idx = pg.ops.index("terminate:odoo_staging_incoming")
+    promote_idx = pg.ops.index("rename:odoo_staging_incoming->odoo_staging")
+    assert term_idx < promote_idx, f"terminate must precede promotion: {pg.ops}"
+
+
+def test_fresh_target_still_terminates_incoming_before_promotion():
+    pg = ExistsAwarePostgres(existing={"odoo_staging_incoming"})  # no live target yet
+    swap_temp_database(pg, temp_db="odoo_staging_incoming", target_db="odoo_staging", target_env_name="staging")
+    assert pg.ops.index("terminate:odoo_staging_incoming") < pg.ops.index(
+        "rename:odoo_staging_incoming->odoo_staging"
+    )

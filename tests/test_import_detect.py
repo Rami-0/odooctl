@@ -12,11 +12,12 @@ import pytest
 from odooctl.importer.detect import detect_from_compose
 from odooctl.importer.models import DetectedCompose
 
+# Vendored copy of the odoo19-community-staging experiment's compose file —
+# experiments/ is untracked, so the suite must not depend on it.
 STAGING_COMPOSE = (
-    Path(__file__).resolve().parents[1]
-    / "experiments"
-    / "odoo19-community-staging"
-    / "docker-compose.yml"
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "odoo19-community-staging-compose.yml"
 )
 
 MINIMAL_COMPOSE = """\

@@ -37,7 +37,7 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
         def __init__(self, compose_file, **kwargs):
             events.append(("compose_init", (compose_file,)))
 
-        def exec(self, service, args, *, stream=True):
+        def exec(self, service, args, *, stream=True, extra_env=None):
             events.append(("exec", (service, tuple(args), stream)))
 
         def restart(self, service):
@@ -62,12 +62,17 @@ def test_clone_orchestrates_dump_restore_sanitize_update_and_healthcheck(tmp_pat
     assert events[1][0] == "dump" and events[1][1][0] == "odoo_prod" and str(events[1][1][1]).endswith(".dump")
     assert events[2][0] == "restore" and events[2][1][0] == "odoo_staging_incoming" and str(events[2][1][1]).endswith(".dump")
     assert events[3] == ("copy", ("/srv/filestore/prod", "/srv/filestore/staging"))
-    assert events[4][0] == "psql"
-    assert events[4][1][0] == "odoo_staging_incoming"
-    assert "ir_mail_server" in str(events[4][1][1])
-    assert events[5][0] == "psql" and "fetchmail_server" in str(events[5][1][1])
-    assert events[6][0] == "psql" and "ir_cron" in str(events[6][1][1])
-    assert events[7][0] == "psql" and "payment_provider" in str(events[7][1][1])
+    # Odoo >= 16: upstream neutralize runs first, on the temp DB, before any SQL.
+    assert events[4] == ("compose_init", ("docker-compose.yml",))
+    assert events[5][0] == "exec"
+    assert events[5][1][0] == "odoo"
+    assert events[5][1][1][:4] == ("odoo", "neutralize", "-d", "odoo_staging_incoming")
+    assert events[6][0] == "psql"
+    assert events[6][1][0] == "odoo_staging_incoming"
+    assert "ir_mail_server" in str(events[6][1][1])
+    assert events[7][0] == "psql" and "fetchmail_server" in str(events[7][1][1])
+    assert events[8][0] == "psql" and "ir_cron" in str(events[8][1][1])
+    assert events[9][0] == "psql" and "payment_provider" in str(events[9][1][1])
     psql_sql = [str(args[1]) for event, args in events if event == "psql" and args[0] == "odoo_staging_incoming"]
     assert "UPDATE ir_config_parameter SET value = 'https://staging.example.com' WHERE key = 'web.base.url';" in psql_sql
     assert any("webhook" in sql and "callback" in sql for sql in psql_sql)
@@ -109,7 +114,7 @@ def test_clone_supports_explicit_sanitization_profiles(tmp_path: Path, monkeypat
         def __init__(self, compose_file, **kwargs):
             pass
 
-        def exec(self, service, args, *, stream=True):
+        def exec(self, service, args, *, stream=True, extra_env=None):
             pass
 
         def restart(self, service):
@@ -170,7 +175,7 @@ def test_clone_applies_configured_sanitization_sql_files(tmp_path: Path, monkeyp
         def __init__(self, compose_file, **kwargs):
             pass
 
-        def exec(self, service, args, *, stream=True):
+        def exec(self, service, args, *, stream=True, extra_env=None):
             pass
 
         def restart(self, service):
@@ -252,6 +257,9 @@ def test_clone_verification_fails_when_target_service_is_not_running(tmp_path: P
 
     class DummyCompose:
         def __init__(self, compose_file, **kwargs):
+            pass
+
+        def exec(self, service, args, *, stream=True, extra_env=None):
             pass
 
         def restart(self, service):
@@ -432,3 +440,117 @@ def test_clone_rejects_production_clone_when_target_config_disables_sanitization
 
     with pytest.raises(RuntimeError, match="without sanitization enabled"):
         execute("production", "staging", None, str(config), preview=True)
+
+
+def _neutralize_test_config(tmp_path: Path, odoo_version: str) -> Path:
+    config = tmp_path / "odooctl.yml"
+    config.write_text(
+        f"""project:\n  name: demo\n  odoo_version: \"{odoo_version}\"\nruntime:\n  compose_file: docker-compose.yml\npostgres:\n  host: localhost\n  port: 5432\n  user: odoo\n  password_env: ODOO_DB_PASSWORD\nbackups:\n  local_path: backups\nhealthcheck:\n  path: /web/health\n  timeout_seconds: 10\n  retries: 3\n  interval_seconds: 1\nodoo:\n  image: registry/odoo:latest\n  service: odoo\nenvironments:\n  production:\n    branch: main\n    domain: odoo.example.com\n    db_name: odoo_prod\n    filestore_path: /srv/filestore/prod\n    sanitize: true\n  staging:\n    branch: staging\n    domain: staging.example.com\n    db_name: odoo_staging\n    filestore_path: /srv/filestore/staging\n    clone_from: production\n    sanitize: true\n"""
+    )
+    (tmp_path / "docker-compose.yml").touch()
+    return config
+
+
+def _patch_clone_collaborators(monkeypatch, events):
+    class DummyPostgres:
+        def __init__(self, config):
+            pass
+
+        def dump(self, db_name, output):
+            pass
+
+        def restore(self, db_name, dump_path):
+            pass
+
+        def psql(self, db_name, sql):
+            events.append(("psql", (db_name, sql)))
+
+    class DummyFilestore:
+        def copy(self, source, target):
+            pass
+
+    class DummyCompose:
+        def __init__(self, compose_file, **kwargs):
+            pass
+
+        def exec(self, service, args, *, stream=True, extra_env=None):
+            events.append(("exec", (service, tuple(args))))
+
+        def restart(self, service):
+            pass
+
+        def ps(self):
+            return "odoo running"
+
+    monkeypatch.setattr("odooctl.services.clone.PostgresAdapter", DummyPostgres)
+    monkeypatch.setattr("odooctl.services.clone.FilestoreAdapter", DummyFilestore)
+    monkeypatch.setattr("odooctl.services.clone.DockerComposeAdapter", DummyCompose)
+    monkeypatch.setattr("odooctl.services.clone.update_modules_compose", lambda *args, **kwargs: None)
+    monkeypatch.setattr("odooctl.services.clone.check_url", lambda *args, **kwargs: None)
+
+
+def test_clone_skips_neutralize_on_pre16_odoo(tmp_path: Path, monkeypatch):
+    config = _neutralize_test_config(tmp_path, "15.0")
+    events: list[tuple[str, tuple[object, ...]]] = []
+    _patch_clone_collaborators(monkeypatch, events)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    execute("production", "staging", True, str(config))
+
+    # Pre-16 Odoo has no `odoo-bin neutralize`; SQL stays the sole mechanism.
+    assert not any(event == "exec" for event, _ in events)
+    assert any(event == "psql" for event, _ in events)
+
+
+def test_clone_skips_neutralize_when_disabled_in_config(tmp_path: Path, monkeypatch):
+    config = _neutralize_test_config(tmp_path, "19.0")
+    config.write_text(config.read_text() + "sanitization:\n  use_odoo_neutralize: false\n")
+    events: list[tuple[str, tuple[object, ...]]] = []
+    _patch_clone_collaborators(monkeypatch, events)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    execute("production", "staging", True, str(config))
+
+    assert not any(event == "exec" for event, _ in events)
+    assert any(event == "psql" for event, _ in events)
+
+
+def test_clone_writes_manifest_recording_mechanisms(tmp_path: Path, monkeypatch):
+    import json
+
+    config = _neutralize_test_config(tmp_path, "19.0")
+    events: list[tuple[str, tuple[object, ...]]] = []
+    _patch_clone_collaborators(monkeypatch, events)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    execute("production", "staging", True, str(config))
+
+    manifest_path = tmp_path / ".odooctl" / "clones" / "staging-latest.json"
+    assert manifest_path.exists()
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["project"] == "demo"
+    assert manifest["source"] == "production"
+    assert manifest["target"] == "staging"
+    assert manifest["db_name"] == "odoo_staging"
+    assert manifest["odoo_version"] == "19.0"
+    assert manifest["sanitized"] is True
+    assert manifest["sanitization_profile"] == "normal"
+    assert manifest["sanitization_mechanisms"] == ["odoo-neutralize", "odooctl-sql"]
+
+
+def test_clone_manifest_records_sql_only_on_pre16(tmp_path: Path, monkeypatch):
+    import json
+
+    config = _neutralize_test_config(tmp_path, "15.0")
+    events: list[tuple[str, tuple[object, ...]]] = []
+    _patch_clone_collaborators(monkeypatch, events)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ODOO_DB_PASSWORD", "secret")
+
+    execute("production", "staging", True, str(config))
+
+    manifest = json.loads((tmp_path / ".odooctl" / "clones" / "staging-latest.json").read_text())
+    assert manifest["sanitization_mechanisms"] == ["odooctl-sql"]

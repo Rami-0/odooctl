@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
+from odooctl.adapters.docker_compose import DockerComposeAdapter
 from odooctl.adapters.filestore import FilestoreAdapter, make_filestore_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.reverse_proxy import public_url
 from odooctl.odoo.healthcheck import check_url, with_db_selector
+from odooctl.odoo.neutralize import compose_neutralizer, supports_neutralize
 from odooctl.odoo.sanitize import sanitize_database
 from odooctl.services.models import RestoreResult
 
@@ -147,7 +149,24 @@ def restore_to_env(
 
     # Mirror clone safety contract: sanitize temp DB before swap when source is protected
     if source_is_protected:
-        sanitize_database(pg, temp_db, env, cfg, sql_files=ctx.project.sanitization_sql_files())
+        # Neutralize-first, as in the clone pipeline. The compose stack is only
+        # touched when its file exists — restore itself never manages services.
+        neutralize = None
+        if (
+            cfg.sanitization.use_odoo_neutralize
+            and supports_neutralize(cfg.project.odoo_version)
+            and ctx.project.compose_file.exists()
+        ):
+            compose = DockerComposeAdapter(cfg.runtime.compose_file, project_dir=str(ctx.project.root))
+            neutralize = compose_neutralizer(
+                compose,
+                cfg.odoo.service,
+                db_host=cfg.odoo.db_host,
+                db_user=cfg.odoo.db_user,
+                db_password_env=cfg.odoo.db_password_env,
+                config_path=cfg.odoo.config_path,
+            )
+        sanitize_database(pg, temp_db, env, cfg, sql_files=ctx.project.sanitization_sql_files(), neutralize=neutralize)
 
     # Atomically promote temp DB into the target DB name
     swap_temp_database(pg, temp_db=temp_db, target_db=env.db_name, target_env_name=target_environment)

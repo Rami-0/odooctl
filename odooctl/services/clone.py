@@ -10,9 +10,12 @@ from odooctl.adapters.db import make_db_adapter as make_context_db_adapter
 from odooctl.adapters.filestore import FilestoreAdapter, make_filestore_adapter
 from odooctl.adapters.postgres import PostgresAdapter
 from odooctl.adapters.reverse_proxy import public_url
+from odooctl.metadata.models import CloneManifest
+from odooctl.metadata.store import MetadataStore
 from odooctl.odoo.db_swap import swap_temp_database
 from odooctl.odoo.healthcheck import check_url, with_db_selector
 from odooctl.odoo.module_update import update_modules_compose
+from odooctl.odoo.neutralize import compose_neutralizer, supports_neutralize
 from odooctl.odoo.sanitize import sanitize_database
 from odooctl.services.models import CloneResult
 
@@ -48,11 +51,18 @@ def run_clone(
     scheme = cfg.healthcheck.scheme or dst.scheme
     base_url = public_url(dst.domain, scheme=scheme, port=dst.port)
 
+    use_neutralize = (
+        should_sanitize
+        and cfg.sanitization.use_odoo_neutralize
+        and supports_neutralize(cfg.project.odoo_version)
+    )
+
     if preview:
         print("[clone] preview")
         print(
             f"source={source} target={target} profile={sanitization_profile} "
-            f"base_url={base_url} sanitize={'yes' if should_sanitize else 'no'}"
+            f"base_url={base_url} sanitize={'yes' if should_sanitize else 'no'} "
+            f"neutralize={'yes' if use_neutralize else 'no'}"
         )
         print(f"source_branch={src.branch} target_branch={dst.branch} clone_from={dst.clone_from}")
         print(f"affected_integrations={','.join(dst.update_modules) or 'none'}")
@@ -83,8 +93,30 @@ def run_clone(
     src_filestore = src.filestore_path if src.filestore_volume else str(ctx.project.resolve_path(src.filestore_path))
     dst_filestore = dst.filestore_path if dst.filestore_volume else str(ctx.project.resolve_path(dst.filestore_path))
     fs.copy(src_filestore, dst_filestore)
+    compose = DockerComposeAdapter(cfg.runtime.compose_file, project_dir=str(ctx.project.root))
+    mechanisms: list[str] = []
     if should_sanitize:
-        sanitize_database(pg, temp_db, dst, cfg, sanitization_profile, sql_files=ctx.project.sanitization_sql_files())
+        neutralize = (
+            compose_neutralizer(
+                compose,
+                cfg.odoo.service,
+                db_host=cfg.odoo.db_host,
+                db_user=cfg.odoo.db_user,
+                db_password_env=cfg.odoo.db_password_env,
+                config_path=cfg.odoo.config_path,
+            )
+            if use_neutralize
+            else None
+        )
+        mechanisms = sanitize_database(
+            pg,
+            temp_db,
+            dst,
+            cfg,
+            sanitization_profile,
+            sql_files=ctx.project.sanitization_sql_files(),
+            neutralize=neutralize,
+        )
     swap_temp_database(
         pg,
         temp_db=temp_db,
@@ -92,7 +124,6 @@ def run_clone(
         target_env_name=target,
         is_protected_fn=cfg.is_protected,
     )
-    compose = DockerComposeAdapter(cfg.runtime.compose_file, project_dir=str(ctx.project.root))
     update_modules_compose(
         compose,
         cfg.odoo.service,
@@ -114,4 +145,16 @@ def run_clone(
         retries=cfg.healthcheck.retries,
         interval=cfg.healthcheck.interval_seconds,
     )
-    return CloneResult(url=base_url)
+    MetadataStore(ctx.project.state_dir).save_clone_manifest(
+        CloneManifest(
+            project=cfg.project.name,
+            source=source,
+            target=target,
+            db_name=dst.db_name,
+            odoo_version=cfg.project.odoo_version,
+            sanitized=should_sanitize,
+            sanitization_profile=sanitization_profile if should_sanitize else None,
+            sanitization_mechanisms=mechanisms,
+        )
+    )
+    return CloneResult(url=base_url, sanitization_mechanisms=mechanisms)

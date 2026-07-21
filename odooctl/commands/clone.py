@@ -42,5 +42,6 @@ def execute(
             ctx, source, target,
             sanitize=sanitize, sanitization_profile=sanitization_profile, preview=False,
         )
-        op_ctx.emit(f"clone complete: {result.url}", phase="clone")
+        mechanisms = ", ".join(result.sanitization_mechanisms) or "none"
+        op_ctx.emit(f"clone complete: {result.url} (sanitization: {mechanisms})", phase="clone")
     return result.url  # type: ignore[union-attr]

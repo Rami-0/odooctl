@@ -23,7 +23,7 @@ def build_update_modules_args(
     return args
 
 
-def _resolve_password_env(db_password_env: str | None) -> dict[str, str] | None:
+def resolve_password_env(db_password_env: str | None) -> dict[str, str] | None:
     """Resolve the configured password env var to a PGPASSWORD mapping.
 
     The database password never appears on argv. It is handed to the Odoo
@@ -49,7 +49,7 @@ def update_modules_local(
 ) -> None:
     if not modules:
         return
-    env = _resolve_password_env(db_password_env)
+    env = resolve_password_env(db_password_env)
     run(
         build_update_modules_args(
             db_name,
@@ -76,7 +76,7 @@ def update_modules_compose(
 ) -> None:
     if not modules:
         return
-    extra_env = _resolve_password_env(db_password_env)
+    extra_env = resolve_password_env(db_password_env)
     compose.exec(
         service,
         build_update_modules_args(

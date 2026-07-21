@@ -61,6 +61,9 @@ environments:
       - custom_module
 
 sanitization:
+  # Run Odoo's own `odoo-bin neutralize` first (Odoo >= 16); the SQL below
+  # supplements it (third-party modules, secrets, base URL rewrite).
+  use_odoo_neutralize: true
   sql_files:
     - .sanitize/staging.sql
     - .sanitize/disable_connectors.sql

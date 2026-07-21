@@ -214,6 +214,9 @@ class BackupsConfig(BaseModel):
 
 
 class SanitizationConfig(BaseModel):
+    # Run Odoo's own `odoo-bin neutralize` first when the target Odoo is >= 16;
+    # the odooctl SQL then acts as a supplement rather than the sole mechanism.
+    use_odoo_neutralize: bool = True
     sql_files: list[str] = Field(default_factory=list)
     disable_mail_servers: bool = True
     disable_fetchmail: bool = True
@@ -457,6 +460,9 @@ environments:
       - custom_module
 
 sanitization:
+  # Run Odoo's own `odoo-bin neutralize` first (Odoo >= 16); the SQL below
+  # supplements it (third-party modules, secrets, base URL rewrite).
+  use_odoo_neutralize: true
   sql_files:
     - .sanitize/staging.sql
     - .sanitize/disable_connectors.sql

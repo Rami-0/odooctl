@@ -69,6 +69,7 @@ class RestoreResult:
 @dataclass
 class CloneResult:
     url: str
+    sanitization_mechanisms: list[str] = field(default_factory=list)
 
 
 @dataclass

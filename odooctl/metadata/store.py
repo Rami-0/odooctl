@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from odooctl.metadata.models import BackupManifest, DeploymentMetadata
+from odooctl.metadata.models import BackupManifest, CloneManifest, DeploymentMetadata
 from odooctl.utils.paths import ensure_dir
 
 class MetadataStore:
@@ -9,6 +9,7 @@ class MetadataStore:
         self.root = ensure_dir(root)
         ensure_dir(self.root / "deployments")
         ensure_dir(self.root / "backups")
+        ensure_dir(self.root / "clones")
 
     def save_deployment(self, metadata: DeploymentMetadata) -> Path:
         path = self.root / "deployments" / f"{metadata.environment}-{metadata.timestamp.replace(':','')}.json"
@@ -44,4 +45,14 @@ class MetadataStore:
 
     def latest_backup(self, environment: str) -> dict | None:
         path = self.root / "backups" / f"{environment}-latest.json"
+        return json.loads(path.read_text()) if path.exists() else None
+
+    def save_clone_manifest(self, manifest: CloneManifest) -> Path:
+        path = self.root / "clones" / f"{manifest.target}-{manifest.timestamp.replace(':','')}.json"
+        path.write_text(manifest.model_dump_json(indent=2))
+        (self.root / "clones" / f"{manifest.target}-latest.json").write_text(manifest.model_dump_json(indent=2))
+        return path
+
+    def latest_clone(self, environment: str) -> dict | None:
+        path = self.root / "clones" / f"{environment}-latest.json"
         return json.loads(path.read_text()) if path.exists() else None

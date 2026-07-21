@@ -46,6 +46,7 @@ nav:
       - Examples: examples.md
   - Operations:
       - Deployment: deployment.md
+      - Git sync (CI/CD): git-sync.md
       - Backup & restore: backup-restore.md
       - Staging clones: staging-clone.md
       - Rollback: rollback.md

@@ -70,7 +70,10 @@ $ odooctl schedule sync --env staging
 # /etc/systemd/system/odooctl-sync-staging.timer  (OnCalendar=*:0/5)
 ```
 
-Install the rendered units, then:
+The service unit runs with a minimal environment: add an `EnvironmentFile=`
+line (or `Environment=` entries) to the `[Service]` section supplying the
+environment variables your config references (e.g. `ODOO_DB_PASSWORD`), the
+same as for scheduled backups. Install the rendered units, then:
 
 ```console
 $ sudo systemctl daemon-reload

@@ -102,6 +102,13 @@ $ odooctl branch status           # drift table across all environments
     longer match), run `odooctl deploy <env>` manually — it re-reads the
     updated config from the already-pulled worktree.
 
+!!! note "Machine-local overlay and sync"
+    A server-side [`odooctl.local.yml` overlay](configuration.md#machine-local-overlay-odooctllocalyml)
+    is unaffected by pulls (git never touches it), so server-specific settings
+    survive every sync. It **must be gitignored**: an untracked-but-not-ignored
+    overlay makes `git status` dirty and blocks sync with `dirty_worktree`.
+    `odooctl validate` warns about this.
+
 ## Push-based deploys (secondary)
 
 `odooctl github-actions` generates a manual-dispatch GitHub Actions workflow

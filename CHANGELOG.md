@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Machine-local config overlay (`odooctl.local.yml`).** An untracked
+  sibling of `odooctl.yml`, deep-merged over it by every command, for
+  machine-specific values (ports, resource limits, TLS off, local paths).
+  Precedence: env vars > `odooctl.local.yml` > `odooctl.yml`; mappings merge
+  key-by-key, scalars and lists replace. A custom `--config custom.yml`
+  merges `custom.local.yml`. `odooctl init`/`odooctl setup` gitignore the
+  overlay automatically, and `odooctl validate` reports the merged overlay
+  and warns when it is not gitignored (an unignored overlay would block
+  `odooctl sync` with `dirty_worktree`).
 - **`odooctl sync <env>` — pull-based auto-deploy.** Fetches the remote,
   compares the last deployed commit against the remote tip of the
   environment's branch, and runs the existing deploy pipeline (pre-deploy

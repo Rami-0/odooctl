@@ -388,11 +388,68 @@ class OdooCtlConfig(BaseModel):
         return [name for name in self.referenced_env_vars() if not os.getenv(name)]
 
 
+#: Suffix inserted before the file extension to name the machine-local
+#: overlay: ``odooctl.yml`` -> ``odooctl.local.yml``. The overlay is
+#: untracked (gitignored) and deep-merged over the main config for
+#: machine-specific values (ports, resource limits, TLS off, local paths).
+#: Precedence: env vars (the ``*_env`` indirections, read at runtime)
+#: > overlay > main config.
+LOCAL_OVERLAY_MARKER = ".local"
+
+
+def local_overlay_path(config_path: str | Path) -> Path | None:
+    """Return the sibling overlay path for *config_path*, or None.
+
+    ``odooctl.yml`` maps to ``odooctl.local.yml``; a path whose stem already
+    ends in ``.local`` has no overlay (prevents recursive overlaying when the
+    overlay file itself is passed as --config).
+    """
+    path = Path(config_path)
+    if path.stem.endswith(LOCAL_OVERLAY_MARKER):
+        return None
+    return path.with_name(path.stem + LOCAL_OVERLAY_MARKER + path.suffix)
+
+
+def deep_merge(base: dict, overlay: dict) -> dict:
+    """Return a new dict with *overlay* recursively merged over *base*.
+
+    Mappings merge key-by-key; any non-mapping overlay value (scalars, lists,
+    null) replaces the base value wholesale. Lists replace, never append.
+    """
+    merged = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _load_yaml_mapping(path: Path, *, allow_empty: bool = False) -> dict:
+    data = yaml.safe_load(path.read_text())
+    if data is None and allow_empty:
+        return {}
+    if not isinstance(data, dict):
+        raise click.ClickException(f"Config file must contain a YAML mapping: {path}")
+    return data
+
+
 def load_config(path: str | Path = "odooctl.yml") -> OdooCtlConfig:
     config_path = Path(path)
     if not config_path.exists():
         raise click.ClickException(f"Config file not found: {config_path}")
-    data = yaml.safe_load(config_path.read_text())
+    data = _load_yaml_mapping(config_path)
+    overlay_path = local_overlay_path(config_path)
+    if overlay_path is not None and overlay_path.exists():
+        overlay = _load_yaml_mapping(overlay_path, allow_empty=True)
+        data = deep_merge(data, overlay)
+        try:
+            return OdooCtlConfig.model_validate(data)
+        except Exception as exc:
+            raise click.ClickException(
+                f"Invalid config after merging overlay {overlay_path.name} "
+                f"over {config_path.name}: {exc}"
+            ) from exc
     return OdooCtlConfig.model_validate(data)
 
 

@@ -22,6 +22,45 @@ Key sections:
 - `healthcheck`: path and retry timing used after clone/deploy/restore operations.
 - `redaction`: log-redaction policy for sensitive environment values.
 
+## Machine-local overlay (`odooctl.local.yml`)
+
+`odooctl.yml` lives in the git repo and is shared by every machine that checks
+the project out. For machine-specific values — ports, resource limits, TLS off,
+local paths — create an untracked `odooctl.local.yml` next to it. When present,
+it is deep-merged over the main config by every command.
+
+Precedence (highest wins):
+
+1. Environment variables — the `*_env` indirections (`password_env`, S3
+   credential envs, …) are read at runtime and always take effect.
+2. `odooctl.local.yml` — machine-local overrides.
+3. `odooctl.yml` — the shared project config.
+
+Merge semantics: mappings merge key-by-key, so you only write the keys you
+change; scalars and **lists replace wholesale** (an overlay `update_modules`
+replaces the main list, it does not append). Example for a laptop running the
+stack over plain HTTP:
+
+```yaml
+# odooctl.local.yml — gitignored, never committed
+environments:
+  production:
+    scheme: http
+    port: 8069
+```
+
+Rules:
+
+- **Gitignore it.** `odooctl init` and `odooctl setup` add `odooctl.local.yml`
+  to `.gitignore` automatically. An untracked-but-not-ignored overlay blocks
+  `odooctl sync` with `dirty_worktree`; a committed one is no longer
+  machine-local. `odooctl validate` warns when the overlay is not ignored.
+- A custom config name gets a matching overlay: `--config custom.yml` merges
+  `custom.local.yml`.
+- `odooctl validate` prints which overlay was merged; config-writing commands
+  (`env add`, domain attach, …) always write the shared `odooctl.yml`, never
+  the overlay.
+
 ## Docker vs host execution
 
 `runtime.execution_mode: docker` runs PostgreSQL operations through the configured Compose DB service. Use this for the common topology where the DB service is named `db` and port `5432` is not published to the host:

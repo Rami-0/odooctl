@@ -31,6 +31,7 @@ from odooctl.commands import (
     serve as serve_cmd,
     setup as setup_cmd,
     status as status_cmd,
+    sync as sync_cmd,
     update_modules as update_cmd,
     validate as validate_cmd,
 )
@@ -164,6 +165,25 @@ def promote(
     promote_cmd.execute(source, target, _context_config(ctx, config), preview=preview, yes=yes)
 
 @app.command()
+def sync(
+    ctx: typer.Context,
+    environment: str,
+    config: str = "odooctl.yml",
+    force: bool = typer.Option(False, "--force", help="Deploy when behind even if auto_deploy is false."),
+    json_output: bool = typer.Option(False, "--json", "--json-output"),
+):
+    """Pull-based auto-deploy: fetch, check drift, and deploy when behind.
+
+    Deploys only when the environment is behind its remote branch and has
+    auto_deploy: true (or --force is given); every other state is a no-op with
+    an explanation. Designed to run from a systemd timer or cron via
+    'odooctl schedule sync'. Exits non-zero when the environment needs
+    attention (diverged history, missing remote, fetch failure).
+    """
+    sync_cmd.execute(environment, _context_config(ctx, config), force=force, json_output=json_output)
+
+
+@app.command()
 def logs(ctx: typer.Context, environment: str, service: str | None = None, config: str = "odooctl.yml", follow: bool = True, tail: int | None = None):
     logs_cmd.execute(environment, service, _context_config(ctx, config), follow=follow, tail=tail)
 
@@ -194,15 +214,15 @@ def doctor(
 @app.command()
 def schedule(
     ctx: typer.Context,
-    command: str = typer.Argument(..., help="odooctl command to schedule: backup or doctor."),
+    command: str = typer.Argument(..., help="odooctl command to schedule: backup, doctor, or sync."),
     environment: str = typer.Option(..., "--env", "--environment", help="Environment to target."),
     format: str = typer.Option("systemd", "--format", "-f", help="Output format: systemd or cron."),
-    interval: str = typer.Option(
-        "daily",
+    interval: str | None = typer.Option(
+        None,
         "--interval",
         "-i",
         "--cron",
-        help="systemd OnCalendar value or cron alias/expression.",
+        help="systemd OnCalendar value or cron alias/expression (default: daily; sync defaults to every 5 minutes).",
     ),
     cron_line: bool = typer.Option(False, "--cron-line", help="Shortcut for --format cron."),
     user: str | None = typer.Option(None, "--user", "-u", help="User for systemd service or /etc/cron.d entry."),

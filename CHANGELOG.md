@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`odooctl sync <env>` — pull-based auto-deploy.** Fetches the remote,
+  compares the last deployed commit against the remote tip of the
+  environment's branch, and runs the existing deploy pipeline (pre-deploy
+  backup, health check, rollback path) when the environment is behind and
+  `auto_deploy: true` (previously a dead config flag). All other states are
+  explicit no-ops; attention states (diverged history, missing remote,
+  fetch failure) exit non-zero so timers surface them. `--force` overrides
+  the `auto_deploy` gate; `--json` emits machine-readable output.
+- `odooctl schedule sync --env <env>` renders a systemd timer or cron entry
+  for the sync poller (default interval: every 5 minutes).
+- The generated GitHub Actions workflow now targets a self-hosted runner and
+  documents that pull-based `odooctl sync` is the primary CI/CD model
+  (GitHub-hosted runners cannot reach a VPS Docker daemon).
 - Open-source contribution infrastructure: label taxonomy
   (`.github/labels.yml`) with automated sync, path-based PR auto-labeling,
   issue triage flow (`status/needs-triage`), a documentation issue

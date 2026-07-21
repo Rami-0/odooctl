@@ -40,8 +40,8 @@ def build_spec(
 ) -> ScheduleSpec:
     ctx = ProjectContext.from_config_path(config_path)
     cfg = ctx.config
-    if command not in {"backup", "doctor"}:
-        raise ValueError("schedule command must be one of: backup, doctor")
+    if command not in {"backup", "doctor", "sync"}:
+        raise ValueError("schedule command must be one of: backup, doctor, sync")
     if environment not in cfg.environments:
         raise ValueError(f"Unknown environment: {environment}")
     return ScheduleSpec(
@@ -96,16 +96,25 @@ def _cron_expression(interval: str) -> str:
     return aliases.get(interval, interval)
 
 
+# Per-command default intervals by output format. `sync` polls the remote, so
+# its default is minutes, not days; everything else stays daily.
+DEFAULT_INTERVALS: dict[str, dict[str, str]] = {
+    "sync": {"systemd": "*:0/5", "cron": "*/5 * * * *"},
+}
+
+
 def render(
     command: str,
     environment: str,
     config_path: str = "odooctl.yml",
     *,
     format: str = "systemd",
-    interval: str = "daily",
+    interval: str | None = None,
     user: str | None = None,
     odooctl_bin: str = "odooctl",
 ) -> str:
+    if interval is None:
+        interval = DEFAULT_INTERVALS.get(command, {}).get(format, "daily")
     spec = build_spec(command, environment, config_path, interval=interval, user=user, odooctl_bin=odooctl_bin)
     if format == "systemd":
         return render_systemd(spec)

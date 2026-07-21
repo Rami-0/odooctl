@@ -79,6 +79,32 @@ class DeployResult:
     backup_id: str | None = None
 
 
+SyncStatus = Literal[
+    "up_to_date",
+    "behind",
+    "deployed",
+    "disabled",
+    "never_deployed",
+    "diverged",
+    "no_remote",
+    "fetch_failed",
+    "unknown",
+]
+
+
+@dataclass
+class SyncOutcome:
+    environment: str
+    branch: str
+    status: SyncStatus
+    remote_commit: str | None = None
+    deployed_commit: str | None = None
+    ahead: int | None = None
+    behind: int | None = None
+    message: str = ""
+    backup_id: str | None = None
+
+
 @dataclass
 class ProjectSummary:
     name: str

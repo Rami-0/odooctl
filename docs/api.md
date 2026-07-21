@@ -68,11 +68,14 @@ odooctl runner --once       # process one operation and exit
 
 ## Authentication
 
-All requests require a bearer token:
+Every request must be authenticated, by one of two credentials:
 
-```
-Authorization: Bearer <token>
-```
+- **Bearer token** (CLI/CI): `Authorization: Bearer <token>` — stateless
+  HMAC token, roles embedded in the payload.
+- **Session cookie** (browser): `odooctl_session`, set by
+  `POST /auth/login` with a user account's email + password. Revocable;
+  roles are resolved from the user store on every request. See
+  [Users & access](users-and-access.md).
 
 Tokens are minted with `odooctl security token mint` (see `docs/rbac.md`):
 
@@ -102,6 +105,19 @@ Token payload fields:
 | `iat`    | Issued-at Unix timestamp                                 |
 | `exp`    | Expiry Unix timestamp                                    |
 | `nonce`  | Random per-token nonce (enables future single-use checks)|
+
+### Auth and user routes
+
+| Route | Method | Access | Description |
+|---|---|---|---|
+| `/auth/login` | POST | — | Email/password login; sets the session cookie. Throttled per email. |
+| `/auth/logout` | POST | — | Revoke the current session (idempotent). |
+| `/auth/me` | GET | any | The authenticated principal (id, kind, roles). |
+| `/auth/password` | POST | session | Self-service password change; revokes the account's other sessions. |
+| `/users` | GET/POST | admin+ | List / create accounts (role ceiling: not above your own). |
+| `/users/{id}` | PATCH/DELETE | admin+ | Roles, name, disable (revokes sessions) / delete. Guards: cannot touch accounts that outrank you, nor disable/delete yourself. |
+| `/users/{id}/password` | POST | admin+ | Password reset; revokes the account's sessions. |
+| `/projects/{project}/owner` | PATCH | admin+ | Record the owning user/team for a project. |
 
 ## RBAC roles
 

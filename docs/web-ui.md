@@ -89,8 +89,19 @@ prints a warning explaining that remote requests will be rejected.
 > reverse proxy) and firewall the port. `--allowed-host` widens the Host
 > allowlist; it is not a substitute for transport security.
 
-Open `http://localhost:8787/` (or `http://<allowed-host>:8787/`) and paste an
-API token. Generate one with:
+Open `http://localhost:8787/` (or `http://<allowed-host>:8787/`) and sign in
+with your **email and password**. Create the first account on the server:
+
+```bash
+odooctl user add you@example.com --role admin
+```
+
+Sessions are HttpOnly cookies, revocable via **Sign out**, `odooctl user
+disable`, or a password change; see
+[Users & access](users-and-access.md).
+
+Alternatively, expand *"Sign in with an API token instead"* and paste a
+bearer token (the CLI/CI credential):
 
 ```bash
 odooctl security token mint \
@@ -108,7 +119,7 @@ API server verifies with, so the explicit `--key-env` above is optional. See
 | Hash route | Description |
 |---|---|
 | `#/` | Dashboard — list all registered projects |
-| `#/access` | Access — RBAC role matrix + admin token minting |
+| `#/access` | Access — RBAC role matrix, admin token minting, user accounts |
 | `#/project/:name` | Project detail — environment grid, live Containers panel, recent operations |
 | `#/project/:name/env/:env` | Environment detail — Overview, Containers, Doctor, Operations, Backups, Restore Points, Clone, Promote, Migrate tabs |
 

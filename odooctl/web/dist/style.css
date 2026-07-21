@@ -100,6 +100,11 @@ code {
 .login-box input { width: 100%; padding: 0.55rem 0.8rem; border: 1px solid var(--border); border-radius: 5px; font-size: 0.95rem; }
 .login-box button[type=submit] { width: 100%; margin-top: 1.25rem; padding: 0.65rem; }
 .hint { font-size: 0.82rem; color: var(--muted); margin-top: 1rem; }
+.login-alt { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+.login-alt summary { font-size: 0.85rem; color: var(--muted); cursor: pointer; }
+.login-alt button[type=submit] { width: auto; padding: 0.5rem 1rem; }
+#login-error .alert { margin-top: 0.9rem; }
+.ta-right { text-align: right; }
 
 /* ---- Headings ---- */
 h2 { font-size: 1.15rem; margin: 1.5rem 0 0.6rem; color: var(--text); }

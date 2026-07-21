@@ -18,6 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **User accounts and browser sessions.** Persistent server-level accounts
+  (`odooctl user add/list/role/passwd/disable/enable/remove`; salted scrypt
+  password hashing, scheme-prefixed for future argon2/OIDC providers) with
+  email/password login for the web UI (`POST /auth/login`, HttpOnly
+  SameSite=Lax cookie, per-email login throttling). Sessions are revocable —
+  logout, `user disable`, and password changes kill live sessions
+  immediately — and roles are re-read from the user store on every request.
+  Bearer HMAC tokens remain the CLI/CI credential. Admins manage accounts
+  from the UI (Access page) or `/users` API with a role ceiling (never above
+  your own role), outrank guards, and no self-disable/delete.
+- **Ownership.** Projects (`odooctl project add --owner`, `odooctl project
+  owner`, `PATCH /projects/{p}/owner`) and environments (`owner:` in
+  `odooctl.yml`) record an owning user/team, shown in listings, the API,
+  and the UI.
+- **Real actor attribution.** Operations and audit records now carry the
+  acting principal: the authenticated user's email via the API/UI, and
+  `local:<os-user>` (overridable with `ODOOCTL_ACTOR`) instead of a `"cli"`
+  literal for CLI commands.
+- New RBAC action `users` (admin+) gating account management and ownership
+  changes; a regression test asserts every mutating API route requires an
+  authenticated principal.
 - **Machine-local config overlay (`odooctl.local.yml`).** An untracked
   sibling of `odooctl.yml`, deep-merged over it by every command, for
   machine-specific values (ports, resource limits, TLS off, local paths).

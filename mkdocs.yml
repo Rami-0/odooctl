@@ -63,6 +63,7 @@ nav:
       - Catalog: catalog.md
   - Security:
       - Security notes: security.md
+      - Users & access: users-and-access.md
       - RBAC: rbac.md
   - Project:
       - Contributing: CONTRIBUTING.md

@@ -14,7 +14,7 @@ Key sections:
 
 - `project`: project name and Odoo version.
 - `runtime`: Docker Compose file, reverse-proxy mode, and `execution_mode` (`docker` or `host`).
-- `environments`: per-environment branch, scheme/domain/port, database, filestore, clone source, sanitization flag, `db_selector`, module update list, and `auto_deploy` (opt-in for pull-based [git sync](git-sync.md)).
+- `environments`: per-environment branch, scheme/domain/port, database, filestore, clone source, sanitization flag, `db_selector`, module update list, `auto_deploy` (opt-in for pull-based [git sync](git-sync.md)), and an optional `owner` (owning user/team label, see [Users & access](users-and-access.md)).
 - `postgres`: host-side connection settings plus Docker service/internal-host settings for container-native operations.
 - `odoo`: image, config path, addons paths, service name, DB flags for module updates, and container filestore root.
 - `backups`: local backup path, optional S3 remote storage, and retention policy.

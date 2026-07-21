@@ -6,9 +6,13 @@ action matrix, secret handling, and capability tokens. It complements
 [`runner-architecture.md`](runner-architecture.md), which covers the
 web/API vs. privileged runner split.
 
-Current scope note: these checks are implemented as reusable primitives and are
-not yet wired into every existing CLI mutating command path. API/runner callers
-must invoke `rbac.require(...)` before enqueuing or executing protected work.
+Enforcement scope: every mutating API route authenticates a principal and
+checks the matrix (a test asserts this for all mutating routes), and the
+privileged runner re-checks the capability token's roles before executing.
+The local CLI is the local-admin principal — a shell on the server outranks
+any API role — so CLI commands are attributed (`local:<os-user>`) but not
+role-gated. User accounts and sessions are covered in
+[Users & access](users-and-access.md).
 
 The implementation lives in `odooctl/security/`:
 

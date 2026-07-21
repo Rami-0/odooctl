@@ -14,19 +14,24 @@
     var state = {
         token: localStorage.getItem('odooctl_token') || '',
         apiBase: localStorage.getItem('odooctl_api_base') || window.location.origin,
+        sessionUser: null,    // /auth/me result when signed in via session cookie
+        sessionChecked: false, // whether the boot-time cookie probe has run
         runnerOnline: null,   // null = unknown, true/false once polled
         runnerTimer: null,
     };
+
+    function isAuthed() { return !!(state.token || state.sessionUser); }
 
     // -------------------------------------------------------------------------
     // API client
     // -------------------------------------------------------------------------
     function apiFetch(path, options) {
         options = options || {};
-        var headers = Object.assign(
-            { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.token },
-            options.headers || {}
-        );
+        // Bearer token when one is set; otherwise the session cookie rides
+        // along automatically (same-origin fetch).
+        var base = { 'Content-Type': 'application/json' };
+        if (state.token) base['Authorization'] = 'Bearer ' + state.token;
+        var headers = Object.assign(base, options.headers || {});
         return fetch(state.apiBase + path, Object.assign({}, options, { headers: headers }))
             .then(function (resp) {
                 if (!resp.ok) {
@@ -58,6 +63,7 @@
     var RANK = { viewer: 0, operator: 1, admin: 2, owner: 3 };
 
     function getRoles() {
+        if (state.sessionUser && state.sessionUser.roles) return state.sessionUser.roles;
         var payload = decodePayload();
         return (payload && payload.roles) ? payload.roles : ['viewer'];
     }
@@ -111,10 +117,15 @@
     }
 
     function renderHeader(title) {
-        var payload = decodePayload();
-        var sub = (payload && payload.sub) ? esc(payload.sub) : '';
+        var sub, exp = '';
+        if (state.sessionUser) {
+            sub = esc(state.sessionUser.display || state.sessionUser.id);
+        } else {
+            var payload = decodePayload();
+            sub = (payload && payload.sub) ? esc(payload.sub) : '';
+            if (payload && payload.exp) exp = ' &middot; expires ' + esc(formatTime(payload.exp));
+        }
         var roles = esc(getRoles().join(', '));
-        var exp = (payload && payload.exp) ? ' &middot; expires ' + esc(formatTime(payload.exp)) : '';
         return '<header class="top-bar">' +
             '<a class="logo" href="#/"><span class="logo-mark"></span>odooctl</a>' +
             '<a class="top-link" href="#/access">Access</a>' +
@@ -139,7 +150,7 @@
     }
 
     function pollRunner() {
-        if (!state.token) return;
+        if (!isAuthed()) return;
         apiFetch('/runner/status').then(function (s) {
             state.runnerOnline = !!s.online;
             updateRunnerPillDom();
@@ -179,7 +190,18 @@
         var hash = window.location.hash.slice(1) || '/';
         var el = document.getElementById('app');
 
-        if (!state.token) {
+        if (!isAuthed()) {
+            // A session cookie may already exist (page reload): probe once
+            // before showing the login form.
+            if (!state.sessionChecked) {
+                state.sessionChecked = true;
+                el.innerHTML = '<div class="login-wrap">' + renderSpinner() + '</div>';
+                apiFetch('/auth/me').then(function (me) {
+                    if (me && me.session) state.sessionUser = me;
+                    route();
+                }).catch(function () { route(); });
+                return;
+            }
             renderLogin(el);
             return;
         }
@@ -210,15 +232,45 @@
         el.innerHTML = '<div class="login-wrap"><div class="login-box">' +
             '<h1><span class="logo-mark logo-mark-lg"></span>odooctl Dashboard</h1>' +
             '<form id="login-form">' +
-            '<label>API Token<input type="password" id="token-input" placeholder="Paste your bearer token" required></label>' +
-            '<label>API Base URL<input type="text" id="base-input" value="' + esc(state.apiBase) + '"></label>' +
+            '<label>Email<input type="email" id="email-input" placeholder="you@example.com" autocomplete="username" required></label>' +
+            '<label>Password<input type="password" id="password-input" autocomplete="current-password" required></label>' +
             '<button type="submit" class="btn btn-primary">Sign in</button>' +
+            '<div id="login-error"></div>' +
             '</form>' +
-            '<p class="hint">Generate a token: <code>odooctl security token mint --action api --env \'*\' --project \'*\' --role operator</code><br>' +
+            '<details class="login-alt"><summary>Sign in with an API token instead</summary>' +
+            '<form id="token-form">' +
+            '<label>API Token<input type="password" id="token-input" placeholder="Paste your bearer token"></label>' +
+            '<label>API Base URL<input type="text" id="base-input" value="' + esc(state.apiBase) + '"></label>' +
+            '<button type="submit" class="btn">Use token</button>' +
+            '</form>' +
+            '<p class="hint">Generate a token: <code>odooctl security token mint --action api --env \'*\' --project \'*\' --role operator</code></p>' +
+            '</details>' +
+            '<p class="hint">No account yet? Create one on the server: <code>odooctl user add you@example.com --role admin</code><br>' +
             'Operations run only while a runner is active: <code>odooctl runner</code></p>' +
             '</div></div>';
 
         el.querySelector('#login-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var errBox = el.querySelector('#login-error');
+            errBox.innerHTML = '';
+            apiFetch('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    email: el.querySelector('#email-input').value.trim(),
+                    password: el.querySelector('#password-input').value,
+                }),
+            }).then(function () {
+                return apiFetch('/auth/me');
+            }).then(function (me) {
+                state.sessionUser = me;
+                window.location.hash = '#/';
+                route();
+            }).catch(function (err) {
+                errBox.innerHTML = renderAlert(err.message, 'error');
+            });
+        });
+
+        el.querySelector('#token-form').addEventListener('submit', function (e) {
             e.preventDefault();
             state.token = el.querySelector('#token-input').value.trim();
             state.apiBase = el.querySelector('#base-input').value.trim().replace(/\/$/, '');
@@ -274,8 +326,12 @@
 
             var content = '<nav class="breadcrumb"><a href="#/">Dashboard</a> &rsaquo; Access</nav>';
             content += '<h2>Your access</h2>';
-            content += '<p>Signed in with role(s): <strong>' + esc(myRoles.join(', ')) + '</strong>. ' +
-                'Roles are carried inside the bearer token; the server re-checks every request.</p>';
+            content += '<p>Signed in as <strong>' +
+                esc(state.sessionUser ? (state.sessionUser.display || state.sessionUser.id) : 'token client') +
+                '</strong> with role(s): <strong>' + esc(myRoles.join(', ')) + '</strong>. ' +
+                (state.sessionUser
+                    ? 'Roles come from your user account; the server re-checks every request.'
+                    : 'Roles are carried inside the bearer token; the server re-checks every request.') + '</p>';
 
             content += '<h2>Role &rarr; action matrix</h2>';
             content += '<div class="matrix-wrap"><table class="ops-table rbac-matrix"><tr><th>Action</th>';
@@ -322,7 +378,15 @@
                 content += renderAlert('Admin role required to mint tokens. Ask an admin, or mint from the server shell: odooctl security token mint --action api --env \'*\' --project \'*\' --role <role>', 'info');
             }
 
+            content += '<h2>User accounts</h2>';
+            if (isAdmin()) {
+                content += '<div id="users-panel">' + renderSpinner() + '</div>';
+            } else {
+                content += renderAlert('Admin role required to manage user accounts.', 'info');
+            }
+
             el.innerHTML = renderHeader('Access') + content + closePageBody();
+            if (isAdmin()) loadUsersPanel(el);
 
             var mintBtn = el.querySelector('#mint-btn');
             if (mintBtn) {
@@ -356,6 +420,84 @@
         });
     }
 
+    // Users panel on the Access page: list, create, disable/enable, delete.
+    // Server enforces the role ceiling and self-guards; UI just surfaces errors.
+    function loadUsersPanel(el) {
+        var panel = el.querySelector('#users-panel');
+        if (!panel) return;
+        apiFetch('/users').then(function (data) {
+            var users = data.users || [];
+            var html = '';
+            if (!users.length) {
+                html += '<p class="text-muted">No user accounts yet. Accounts let teammates sign in ' +
+                    'with email + password instead of pasted tokens.</p>';
+            } else {
+                html += '<table class="ops-table"><tr><th>Email</th><th>Name</th><th>Roles</th><th>Status</th><th></th></tr>';
+                users.forEach(function (u) {
+                    html += '<tr>' +
+                        '<td>' + esc(u.email) + '</td>' +
+                        '<td>' + esc(u.name || '—') + '</td>' +
+                        '<td>' + esc((u.roles || []).join(', ') || '—') + '</td>' +
+                        '<td>' + (u.disabled ? '<span class="badge protected">disabled</span>' : 'active') + '</td>' +
+                        '<td class="ta-right">' +
+                        '<button class="btn btn-sm" data-user-action="' + (u.disabled ? 'enable' : 'disable') + '" data-user-id="' + esc(u.id) + '">' + (u.disabled ? 'Enable' : 'Disable') + '</button> ' +
+                        '<button class="btn btn-sm" data-user-action="delete" data-user-id="' + esc(u.id) + '" data-user-email="' + esc(u.email) + '">Delete</button>' +
+                        '</td></tr>';
+                });
+                html += '</table>';
+            }
+            html += '<div class="op-form mt-2" id="user-create-form">' +
+                '<p>Create an account. The granted role cannot exceed your own.</p>' +
+                '<label>Email:<input type="email" id="new-user-email" autocomplete="off"></label>' +
+                '<label>Password:<input type="password" id="new-user-password" autocomplete="new-password" placeholder="min 8 characters"></label>' +
+                '<label>Role:<select id="new-user-role">' +
+                    '<option value="viewer">viewer</option>' +
+                    '<option value="operator">operator</option>' +
+                    '<option value="admin">admin</option>' +
+                '</select></label>' +
+                '<div class="tab-actions mt-2"><button class="btn btn-primary" id="create-user-btn">Create user</button></div>' +
+                '</div>';
+            panel.innerHTML = html;
+
+            panel.querySelector('#create-user-btn').addEventListener('click', function () {
+                apiFetch('/users', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: panel.querySelector('#new-user-email').value.trim(),
+                        password: panel.querySelector('#new-user-password').value,
+                        roles: [panel.querySelector('#new-user-role').value],
+                    }),
+                }).then(function () {
+                    showToast('User created.', 'success');
+                    loadUsersPanel(el);
+                }).catch(function (err) {
+                    showToast('Create failed: ' + err.message, 'error');
+                });
+            });
+
+            panel.querySelectorAll('[data-user-action]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var action = btn.getAttribute('data-user-action');
+                    var uid = btn.getAttribute('data-user-id');
+                    var req;
+                    if (action === 'delete') {
+                        if (!window.confirm('Delete user ' + btn.getAttribute('data-user-email') + '?')) return;
+                        req = apiFetch('/users/' + encodeURIComponent(uid), { method: 'DELETE' });
+                    } else {
+                        req = apiFetch('/users/' + encodeURIComponent(uid), {
+                            method: 'PATCH',
+                            body: JSON.stringify({ disabled: action === 'disable' }),
+                        });
+                    }
+                    req.then(function () { loadUsersPanel(el); })
+                        .catch(function (err) { showToast('Failed: ' + err.message, 'error'); });
+                });
+            });
+        }).catch(function (err) {
+            panel.innerHTML = renderErrorAlert(err);
+        });
+    }
+
     // -------------------------------------------------------------------------
     // Project detail page
     // -------------------------------------------------------------------------
@@ -365,15 +507,20 @@
         Promise.all([
             apiFetch('/projects/' + encodeURIComponent(project) + '/environments'),
             apiFetch('/projects/' + encodeURIComponent(project) + '/status'),
+            apiFetch('/projects/' + encodeURIComponent(project)),
         ]).then(function (results) {
             var envsData = results[0];
             var statusData = results[1];
+            var projectInfo = results[2] || {};
             var envs = envsData.environments || [];
             var statusByEnv = {};
             (statusData.environments || []).forEach(function (e) { statusByEnv[e.name] = e; });
             var recentOps = statusData.recent_operations || [];
 
             var content = '<nav class="breadcrumb"><a href="#/">Dashboard</a> &rsaquo; ' + esc(project) + '</nav>';
+            if (projectInfo.owner) {
+                content += '<p class="text-muted">Owner: <strong>' + esc(projectInfo.owner) + '</strong></p>';
+            }
             content += '<h2>Environments</h2>';
 
             if (!envs.length) {
@@ -393,6 +540,7 @@
                         '<span>Branch: ' + esc(env.branch || '—') + '</span>' +
                         '<span>Backup: ' + esc(st.latest_backup || 'none') + '</span>' +
                         '<span>Deploy: ' + esc(st.last_deployment_status || '—') + '</span>' +
+                        (env.owner ? '<span>Owner: ' + esc(env.owner) + '</span>' : '') +
                         '</div>' +
                         '<div class="env-actions">' +
                         '<a class="btn btn-sm" href="#/project/' + encodeURIComponent(project) + '/env/' + encodeURIComponent(env.name) + '">Details</a>' +
@@ -1036,8 +1184,9 @@
     }
 
     function streamEvents(opId, onEvent, onDone) {
+        var headers = state.token ? { 'Authorization': 'Bearer ' + state.token } : {};
         fetch(state.apiBase + '/operations/' + encodeURIComponent(opId) + '/events', {
-            headers: { 'Authorization': 'Bearer ' + state.token },
+            headers: headers,
         }).then(function (resp) {
             if (!resp.ok) { onDone('Connection failed (' + resp.status + ')', 'failed'); return; }
             var reader = resp.body.getReader();
@@ -1139,12 +1288,20 @@
         var btn = target && target.closest ? target.closest('button') : target;
         var id = (btn && btn.id) || (target && target.id);
         if (id === 'logout-btn') {
-            state.token = '';
-            localStorage.removeItem('odooctl_token');
-            if (state.runnerTimer) { clearInterval(state.runnerTimer); state.runnerTimer = null; }
-            state.runnerOnline = null;
-            window.location.hash = '#/';
-            route();
+            var finishLogout = function () {
+                state.token = '';
+                state.sessionUser = null;
+                localStorage.removeItem('odooctl_token');
+                if (state.runnerTimer) { clearInterval(state.runnerTimer); state.runnerTimer = null; }
+                state.runnerOnline = null;
+                window.location.hash = '#/';
+                route();
+            };
+            if (state.sessionUser) {
+                apiFetch('/auth/logout', { method: 'POST' }).then(finishLogout, finishLogout);
+            } else {
+                finishLogout();
+            }
         } else if (id === 'refresh-btn') {
             pollRunner();
             route();

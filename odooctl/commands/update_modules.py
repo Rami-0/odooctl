@@ -9,6 +9,7 @@ from odooctl.operations.audit import AuditStore
 from odooctl.operations.engine import run_operation
 from odooctl.operations.models import OperationKind
 from odooctl.operations.store import OperationStore
+from odooctl.security.principals import local_actor
 
 
 def _compose_adapter(compose_file: str, project_root: Path):
@@ -31,7 +32,7 @@ def execute(environment: str, modules: list[str] | None = None, config_path: str
         kind=OperationKind.UPDATE_MODULES,
         project=cfg.project.name,
         environment=environment,
-        actor="cli",
+        actor=local_actor(),
         params_redacted={"environment": environment, "modules": selected},
         state_dir=context.state_dir,
     ) as op_ctx:

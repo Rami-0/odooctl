@@ -77,7 +77,31 @@ def get_project(
     proj = reg.projects.get(project)
     if proj is None:
         raise HTTPException(status_code=404, detail=f"Project {project!r} not found")
-    return {"name": proj.name, "path": str(proj.path)}
+    return {"name": proj.name, "path": str(proj.path), "owner": proj.owner}
+
+
+@router.patch("/projects/{project}/owner")
+def set_project_owner(
+    project: str,
+    body: dict,
+    request: Request,
+    principal=Depends(require_action(Action.USERS)),
+):
+    """Record the owning user/team for a project (admin+). Empty string clears."""
+    import dataclasses
+
+    from odooctl.registry import Registry, save_registry
+
+    enforce_project_scope(request, project)
+    reg = _registry(request)
+    proj = reg.projects.get(project)
+    if proj is None:
+        raise HTTPException(status_code=404, detail=f"Project {project!r} not found")
+    updated = dataclasses.replace(proj, owner=str(body.get("owner", "")))
+    projects = dict(reg.projects)
+    projects[project] = updated
+    save_registry(Registry(path=reg.path, active=reg.active, projects=projects))
+    return {"name": updated.name, "owner": updated.owner}
 
 
 @router.get("/projects/{project}/environments")
@@ -94,6 +118,7 @@ def list_environments(
             "domain": env.domain,
             "tier": env.tier,
             "protected": env.protected,
+            "owner": env.owner,
         }
         for name, env in ctx.config.environments.items()
     ]

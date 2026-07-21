@@ -44,6 +44,7 @@ class Action(str, Enum):
     ENV = "env"                  # create/destroy environments
     SECRETS = "secrets"          # manage secret store
     CANCEL = "cancel"            # cancel a queued/running operation
+    USERS = "users"              # manage user accounts and ownership
 
 
 READ_ACTIONS: frozenset[Action] = frozenset(
@@ -60,6 +61,7 @@ WRITE_ACTIONS: frozenset[Action] = frozenset(
         Action.ENV,
         Action.SECRETS,
         Action.CANCEL,
+        Action.USERS,
     }
 )
 

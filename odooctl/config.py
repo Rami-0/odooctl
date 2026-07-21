@@ -94,6 +94,10 @@ class EnvironmentConfig(BaseModel):
     promotes_to: str | None = None
     auto_deploy: bool = False
     last_deployed_commit: str | None = None
+    # Owning user/team for "who owns what" queries (an email or team label).
+    # Informational attribution, not an access-control boundary: RBAC roles
+    # still decide who may act on the environment.
+    owner: str | None = None
 
     @field_validator("db_name", "filestore_volume")
     @classmethod

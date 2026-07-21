@@ -17,6 +17,7 @@ from odooctl.operations.models import OperationKind
 from odooctl.operations.store import OperationStore
 from odooctl.utils.logging import warn
 from odooctl.utils.shell import run
+from odooctl.security.principals import local_actor
 
 
 def _compose_adapter(compose_file: str, project_root: Path):
@@ -87,7 +88,7 @@ def execute(environment: str, mode: str = "code", backup: str | None = None, con
         kind=OperationKind.ROLLBACK,
         project=cfg.project.name,
         environment=environment,
-        actor="cli",
+        actor=local_actor(),
         params_redacted={"environment": environment, "mode": mode},
         state_dir=context.state_dir,
     ) as op_ctx:

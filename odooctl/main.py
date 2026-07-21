@@ -33,6 +33,7 @@ from odooctl.commands import (
     status as status_cmd,
     sync as sync_cmd,
     update_modules as update_cmd,
+    user as user_cmd,
     validate as validate_cmd,
 )
 
@@ -45,6 +46,7 @@ app.add_typer(ops_cmd.app, name="ops")
 app.add_typer(branch_cmd.app, name="branch")
 app.add_typer(catalog_cmd.app, name="catalog")
 app.add_typer(security_cmd.app, name="security")
+app.add_typer(user_cmd.app, name="user")
 app.add_typer(domain_cmd.app, name="domain")
 app.add_typer(dr_cmd.app, name="dr")
 app.add_typer(migrate_cmd.app, name="migrate")

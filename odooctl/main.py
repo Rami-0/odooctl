@@ -178,7 +178,8 @@ def sync(
     auto_deploy: true (or --force is given); every other state is a no-op with
     an explanation. Designed to run from a systemd timer or cron via
     'odooctl schedule sync'. Exits non-zero when the environment needs
-    attention (diverged history, missing remote, fetch failure).
+    attention (failed last deploy, dirty worktree, diverged history,
+    missing remote, fetch failure).
     """
     sync_cmd.execute(environment, _context_config(ctx, config), force=force, json_output=json_output)
 

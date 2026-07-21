@@ -85,6 +85,8 @@ SyncStatus = Literal[
     "deployed",
     "disabled",
     "never_deployed",
+    "deploy_failed",
+    "dirty_worktree",
     "diverged",
     "no_remote",
     "fetch_failed",

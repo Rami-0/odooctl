@@ -33,6 +33,8 @@ branch:
 | `deployed` | Was behind; deploy pipeline ran | deploy | 0 |
 | `disabled` | Behind, but `auto_deploy: false` | none (message) | 0 |
 | `never_deployed` | No deployment recorded yet | none (run `odooctl deploy` once) | 0 |
+| `deploy_failed` | Last deploy failed and the remote hasn't moved | none — push a fix (auto-retried) or deploy manually | 1 |
+| `dirty_worktree` | Behind, but the server worktree has uncommitted changes | none — commit or stash them | 1 |
 | `diverged` | Deployed and remote history diverged | none — resolve manually | 1 |
 | `no_remote` | No upstream/`origin/<branch>` ref | none — fix remote config | 1 |
 | `fetch_failed` | `git fetch` failed | none — check network/deploy key | 1 |
@@ -91,6 +93,14 @@ $ odooctl sync staging            # human-readable status
 $ odooctl sync staging --json     # machine-readable
 $ odooctl branch status           # drift table across all environments
 ```
+
+!!! note "Config changes lag one deploy"
+    The deploy pipeline reads `odooctl.yml` **before** pulling, so a pushed
+    commit that changes `odooctl.yml` itself is deployed using the previous
+    config; the new config takes effect from the next deploy on. If such a
+    deploy ends in `deploy_failed` (e.g. the old healthcheck settings no
+    longer match), run `odooctl deploy <env>` manually — it re-reads the
+    updated config from the already-pulled worktree.
 
 ## Push-based deploys (secondary)
 

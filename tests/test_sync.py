@@ -80,7 +80,7 @@ def test_sync_up_to_date_is_noop(tmp_path, monkeypatch):
     ctx = _make_ctx(tmp_path)
     _patch(monkeypatch, {
         ("git", "rev-parse", "--short", "main@{upstream}"): "abc1234",
-    }, {"production": {"commit": "abc1234"}})
+    }, {"production": {"commit": "abc1234", "status": "success"}})
 
     calls: list = []
     outcome = sync_svc.run_sync(ctx, "production", deploy=_deploy_recorder(calls))
@@ -97,7 +97,7 @@ def test_sync_behind_with_auto_deploy_runs_deploy(tmp_path, monkeypatch):
         ("git", "rev-parse", "--short", "main@{upstream}"): "newHead",
         ("git", "rev-list", "--count", "oldHead..newHead"): "3",
         ("git", "rev-list", "--count", "newHead..oldHead"): "0",
-    }, {"production": {"commit": "oldHead"}})
+    }, {"production": {"commit": "oldHead", "status": "success"}})
 
     calls: list = []
     outcome = sync_svc.run_sync(ctx, "production", deploy=_deploy_recorder(calls))
@@ -114,7 +114,7 @@ def test_sync_behind_without_auto_deploy_is_disabled(tmp_path, monkeypatch):
         ("git", "rev-parse", "--short", "staging@{upstream}"): "newHead",
         ("git", "rev-list", "--count", "oldHead..newHead"): "2",
         ("git", "rev-list", "--count", "newHead..oldHead"): "0",
-    }, {"staging": {"commit": "oldHead"}})
+    }, {"staging": {"commit": "oldHead", "status": "success"}})
 
     calls: list = []
     outcome = sync_svc.run_sync(ctx, "staging", deploy=_deploy_recorder(calls))
@@ -130,7 +130,7 @@ def test_sync_force_overrides_disabled_auto_deploy(tmp_path, monkeypatch):
         ("git", "rev-parse", "--short", "staging@{upstream}"): "newHead",
         ("git", "rev-list", "--count", "oldHead..newHead"): "2",
         ("git", "rev-list", "--count", "newHead..oldHead"): "0",
-    }, {"staging": {"commit": "oldHead"}})
+    }, {"staging": {"commit": "oldHead", "status": "success"}})
 
     calls: list = []
     outcome = sync_svc.run_sync(ctx, "staging", force=True, deploy=_deploy_recorder(calls))
@@ -145,7 +145,7 @@ def test_sync_diverged_is_noop(tmp_path, monkeypatch):
         ("git", "rev-parse", "--short", "main@{upstream}"): "newHead",
         ("git", "rev-list", "--count", "oldHead..newHead"): "2",
         ("git", "rev-list", "--count", "newHead..oldHead"): "1",
-    }, {"production": {"commit": "oldHead"}})
+    }, {"production": {"commit": "oldHead", "status": "success"}})
 
     calls: list = []
     outcome = sync_svc.run_sync(ctx, "production", deploy=_deploy_recorder(calls))
@@ -170,7 +170,7 @@ def test_sync_never_deployed_is_noop(tmp_path, monkeypatch):
 
 def test_sync_no_remote_ref(tmp_path, monkeypatch):
     ctx = _make_ctx(tmp_path)
-    _patch(monkeypatch, {}, {"production": {"commit": "abc1234"}})
+    _patch(monkeypatch, {}, {"production": {"commit": "abc1234", "status": "success"}})
 
     outcome = sync_svc.check_sync(ctx, "production")
 
@@ -179,7 +179,7 @@ def test_sync_no_remote_ref(tmp_path, monkeypatch):
 
 def test_sync_fetch_failure(tmp_path, monkeypatch):
     ctx = _make_ctx(tmp_path)
-    _patch(monkeypatch, {FETCH: ("", 128)}, {"production": {"commit": "abc1234"}})
+    _patch(monkeypatch, {FETCH: ("", 128)}, {"production": {"commit": "abc1234", "status": "success"}})
 
     outcome = sync_svc.check_sync(ctx, "production")
 
@@ -191,12 +191,77 @@ def test_sync_falls_back_to_origin_ref(tmp_path, monkeypatch):
     _patch(monkeypatch, {
         ("git", "rev-parse", "--short", "main@{upstream}"): ("", 128),
         ("git", "rev-parse", "--short", "origin/main"): "abc1234",
-    }, {"production": {"commit": "abc1234"}})
+    }, {"production": {"commit": "abc1234", "status": "success"}})
 
     outcome = sync_svc.check_sync(ctx, "production")
 
     assert outcome.status == "up_to_date"
     assert outcome.remote_commit == "abc1234"
+
+
+def test_sync_reports_deploy_failed_instead_of_up_to_date(tmp_path, monkeypatch):
+    """A failed deploy with no new remote commits must not read as up_to_date."""
+    ctx = _make_ctx(tmp_path)
+    _patch(monkeypatch, {
+        ("git", "rev-parse", "--short", "main@{upstream}"): "abc1234",
+    }, {"production": {"commit": "abc1234", "status": "failed", "message": "health check failed"}})
+
+    calls: list = []
+    outcome = sync_svc.run_sync(ctx, "production", deploy=_deploy_recorder(calls))
+
+    assert outcome.status == "deploy_failed"
+    assert calls == []
+    assert "health check failed" in outcome.message
+    assert outcome.status in sync_svc.ATTENTION_STATUSES
+
+
+def test_sync_retries_failed_deploy_when_new_commits_arrive(tmp_path, monkeypatch):
+    """New commits after a failed deploy flip back to behind → auto-heal."""
+    ctx = _make_ctx(tmp_path)
+    _patch(monkeypatch, {
+        ("git", "rev-parse", "--short", "main@{upstream}"): "fixHead",
+        ("git", "rev-list", "--count", "badHead..fixHead"): "1",
+        ("git", "rev-list", "--count", "fixHead..badHead"): "0",
+    }, {"production": {"commit": "badHead", "status": "failed"}})
+
+    calls: list = []
+    outcome = sync_svc.run_sync(ctx, "production", deploy=_deploy_recorder(calls))
+
+    assert outcome.status == "deployed"
+    assert calls == ["production"]
+
+
+def test_sync_dirty_worktree_blocks_deploy_without_operation(tmp_path, monkeypatch):
+    ctx = _make_ctx(tmp_path)
+    _patch(monkeypatch, {
+        ("git", "rev-parse", "--short", "main@{upstream}"): "newHead",
+        ("git", "rev-list", "--count", "oldHead..newHead"): "2",
+        ("git", "rev-list", "--count", "newHead..oldHead"): "0",
+        ("git", "status", "--porcelain"): " M odooctl.yml\n",
+    }, {"production": {"commit": "oldHead", "status": "success"}})
+
+    calls: list = []
+    outcome = sync_svc.run_sync(ctx, "production", deploy=_deploy_recorder(calls))
+
+    assert outcome.status == "dirty_worktree"
+    assert calls == []
+    assert "odooctl.yml" in outcome.message
+    assert outcome.status in sync_svc.ATTENTION_STATUSES
+
+
+def test_sync_dirty_worktree_not_checked_when_auto_deploy_disabled(tmp_path, monkeypatch):
+    """Behind with auto_deploy off stays 'disabled' even if the tree is dirty."""
+    ctx = _make_ctx(tmp_path)
+    _patch(monkeypatch, {
+        ("git", "rev-parse", "--short", "staging@{upstream}"): "newHead",
+        ("git", "rev-list", "--count", "oldHead..newHead"): "2",
+        ("git", "rev-list", "--count", "newHead..oldHead"): "0",
+        ("git", "status", "--porcelain"): " M odooctl.yml\n",
+    }, {"staging": {"commit": "oldHead", "status": "success"}})
+
+    outcome = sync_svc.check_sync(ctx, "staging")
+
+    assert outcome.status == "disabled"
 
 
 # ─── CLI ─────────────────────────────────────────────────────────────────────

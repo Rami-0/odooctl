@@ -21,7 +21,9 @@ if TYPE_CHECKING:
 
 # Statuses that mean the environment needs human attention (surfaced as a
 # non-zero exit by the CLI so systemd timers mark the unit failed).
-ATTENTION_STATUSES = frozenset({"diverged", "no_remote", "fetch_failed", "unknown"})
+ATTENTION_STATUSES = frozenset(
+    {"deploy_failed", "dirty_worktree", "diverged", "no_remote", "fetch_failed", "unknown"}
+)
 
 
 def _git_rev(ref: str, cwd: str | None = None) -> str | None:
@@ -83,6 +85,20 @@ def check_sync(ctx: ServiceContext, environment: str, *, force: bool = False) ->
 
     details = {"remote_commit": remote_commit, "deployed_commit": deployed_commit}
     if deployed_commit == remote_commit:
+        # The remote hasn't moved since the last deploy attempt. If that
+        # attempt failed, reporting up_to_date would silently mask a broken
+        # environment forever; surface it instead. Retrying the same commit is
+        # deliberate-human territory — a new push flips this back to behind.
+        if last.get("status") != "success":
+            return outcome(
+                "deploy_failed",
+                f"last deploy of {deployed_commit} failed"
+                f"{': ' + last['message'] if last.get('message') else ''}; "
+                f"push a fix or run 'odooctl deploy {environment}' manually",
+                ahead=0,
+                behind=0,
+                **details,
+            )
         return outcome(
             "up_to_date", f"deployed commit {deployed_commit} matches remote", ahead=0, behind=0, **details
         )
@@ -99,6 +115,17 @@ def check_sync(ctx: ServiceContext, environment: str, *, force: bool = False) ->
 
     if behind > 0 and ahead == 0:
         if env.auto_deploy or force:
+            # The deploy pipeline refuses dirty worktrees; catching it here
+            # turns a per-poll failed operation record (and, on protected
+            # envs, a pre-deploy backup attempt) into a clean no-op status.
+            dirty = run(["git", "status", "--porcelain"], check=False, cwd=cwd).stdout.strip()
+            if dirty:
+                return outcome(
+                    "dirty_worktree",
+                    f"{behind} new commit(s) on remote {env.branch}, but the worktree at "
+                    f"{cwd} has uncommitted changes; commit or stash them:\n{dirty}",
+                    **details,
+                )
             return outcome(
                 "behind", f"{behind} new commit(s) on remote {env.branch}; deploy needed", **details
             )
